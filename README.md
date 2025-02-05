@@ -1,0 +1,1 @@
+MedyAs Finder is a web-based system designed to help patients find and apply for healthcare assistance programs, HMOs, and insurance coverage. This platform connects the patients with hospitals and grantors, ensuring that they will receive the financial aid they are eligible for.
