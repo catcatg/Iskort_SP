@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:iskort/reusables.dart';
 import 'page_routes/food.dart';
 import 'page_routes/housing.dart';
-import 'page_routes/establishments.dart';
 import 'page_routes/map_route.dart';
 
 class HomePage extends StatelessWidget {
@@ -10,14 +9,9 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardNames = ['Food', 'Housing', 'Establishment', 'Route'];
-    final cardIcons = [
-      Icons.fastfood,
-      Icons.home,
-      Icons.store,
-      Icons.directions,
-    ];
-    final cardRoutes = ['/food', '/housing', '/establishment', '/route'];
+    final cardNames = ['Food', 'Housing', 'Route'];
+    final cardIcons = [Icons.fastfood, Icons.home, Icons.directions];
+    final cardRoutes = ['/food', '/housing', '/route'];
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -127,7 +121,6 @@ class HomePage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
               ),
-
               child: Column(
                 children: [
                   ProductCard(
@@ -159,7 +152,6 @@ class HomePage extends StatelessWidget {
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 0,
         onTap: (index) {
-          // Add navigation logic here, e.g.
           if (index == 1) {
             Navigator.pushNamed(context, '/route');
           } else if (index == 2) {
