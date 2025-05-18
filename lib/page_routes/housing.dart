@@ -10,7 +10,6 @@ class HousingPage extends StatefulWidget {
 class _HousingPageState extends State<HousingPage> {
   final TextEditingController _searchController = TextEditingController();
 
-  // Original housing data
   final List<Map<String, dynamic>> housingData = [
     {
       'name': 'Nonato’s Boarding',
@@ -50,7 +49,7 @@ class _HousingPageState extends State<HousingPage> {
     super.initState();
     filteredHousingData = housingData;
 
-    // Listen to search field changes
+    // search field changes
     _searchController.addListener(_onSearchChanged);
   }
 
