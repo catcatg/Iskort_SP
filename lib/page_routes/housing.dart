@@ -1,41 +1,84 @@
 import 'package:flutter/material.dart';
 
-class HousingPage extends StatelessWidget {
+class HousingPage extends StatefulWidget {
   const HousingPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> housingData = [
-      {
-        'name': 'Nonato’s Boarding',
-        'location': 'Paguntalan, Sapa',
-        'price': 459,
-        'pax': '2pax',
-        'image': 'assets/images/housing.jpg',
-      },
-      {
-        'name': 'British Boarding House',
-        'location': 'Paguntalan, Sapa',
-        'price': 894,
-        'pax': '6pax',
-        'image': 'assets/images/housing.jpg',
-      },
-      {
-        'name': 'Aonang House',
-        'location': 'Mat-y',
-        'price': 761,
-        'image': 'assets/images/housing.jpg',
-        'pax': '2pax',
-      },
-      {
-        'name': 'Tara Rent',
-        'location': 'Mat-y',
-        'price': 857,
-        'image': 'assets/images/housing.jpg',
-        'pax': '2pax',
-      },
-    ];
+  State<HousingPage> createState() => _HousingPageState();
+}
 
+class _HousingPageState extends State<HousingPage> {
+  final TextEditingController _searchController = TextEditingController();
+
+  // Original housing data
+  final List<Map<String, dynamic>> housingData = [
+    {
+      'name': 'Nonato’s Boarding',
+      'location': 'Paguntalan, Sapa',
+      'price': 459,
+      'pax': '2pax',
+      'image': 'assets/images/housing.jpg',
+    },
+    {
+      'name': 'British Boarding House',
+      'location': 'Paguntalan, Sapa',
+      'price': 894,
+      'pax': '6pax',
+      'image': 'assets/images/housing.jpg',
+    },
+    {
+      'name': 'Aonang House',
+      'location': 'Mat-y',
+      'price': 761,
+      'image': 'assets/images/housing.jpg',
+      'pax': '2pax',
+    },
+    {
+      'name': 'Tara Rent',
+      'location': 'Mat-y',
+      'price': 857,
+      'image': 'assets/images/housing.jpg',
+      'pax': '2pax',
+    },
+  ];
+
+  // Filtered housing data to show in UI
+  late List<Map<String, dynamic>> filteredHousingData;
+
+  @override
+  void initState() {
+    super.initState();
+    filteredHousingData = housingData;
+
+    // Listen to search field changes
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.toLowerCase();
+
+    setState(() {
+      if (query.isEmpty) {
+        filteredHousingData = housingData;
+      } else {
+        filteredHousingData =
+            housingData.where((house) {
+              final name = house['name'].toString().toLowerCase();
+              final location = house['location'].toString().toLowerCase();
+              return name.contains(query) || location.contains(query);
+            }).toList();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -60,6 +103,7 @@ class HousingPage extends StatelessWidget {
         child: Column(
           children: [
             TextField(
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: "Search Housing",
                 prefixIcon: const Icon(Icons.search),
@@ -84,7 +128,7 @@ class HousingPage extends StatelessWidget {
                   icon: const Icon(Icons.sort),
                   label: const Text("Sort"),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Color(0xFF7A1E1E),
+                    foregroundColor: const Color(0xFF7A1E1E),
                     side: const BorderSide(color: Color(0xFF7A1E1E)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
@@ -97,7 +141,7 @@ class HousingPage extends StatelessWidget {
             Expanded(
               child: GridView.builder(
                 padding: const EdgeInsets.fromLTRB(1, 16, 1, 16),
-                itemCount: housingData.length,
+                itemCount: filteredHousingData.length,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   mainAxisSpacing: 12,
@@ -105,7 +149,7 @@ class HousingPage extends StatelessWidget {
                   childAspectRatio: 0.75,
                 ),
                 itemBuilder: (context, index) {
-                  final house = housingData[index];
+                  final house = filteredHousingData[index];
                   return HousingCard(
                     name: house['name'],
                     location: house['location'],
@@ -123,7 +167,6 @@ class HousingPage extends StatelessWidget {
   }
 }
 
-/// Stateful for toggling like button
 class HousingCard extends StatefulWidget {
   final String name;
   final String location;
@@ -158,7 +201,7 @@ class _HousingCardState extends State<HousingCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// Image with heart icon
+          // Image with heart icon
           Stack(
             children: [
               Container(
@@ -202,7 +245,7 @@ class _HousingCardState extends State<HousingCard> {
             ],
           ),
 
-          /// Info
+          // Info
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
             child: Column(
