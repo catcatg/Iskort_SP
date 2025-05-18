@@ -11,27 +11,27 @@ class HousingPage extends StatelessWidget {
         'location': 'Paguntalan, Sapa',
         'price': 459,
         'pax': '2pax',
-        'image': 'assets/images/house1.png',
+        'image': 'assets/images/housing.jpg',
       },
       {
         'name': 'British Boarding House',
         'location': 'Paguntalan, Sapa',
         'price': 894,
         'pax': '6pax',
-        'image': 'assets/images/house2.png',
+        'image': 'assets/images/housing.jpg',
       },
       {
         'name': 'Aonang House',
         'location': 'Mat-y',
         'price': 761,
-        'image': 'assets/images/aonang.png',
+        'image': 'assets/images/housing.jpg',
         'pax': '2pax',
       },
       {
         'name': 'Tara Rent',
         'location': 'Mat-y',
         'price': 857,
-        'image': 'assets/images/tara.png',
+        'image': 'assets/images/housing.jpg',
         'pax': '2pax',
       },
     ];
@@ -84,10 +84,8 @@ class HousingPage extends StatelessWidget {
                   icon: const Icon(Icons.sort),
                   label: const Text("Sort"),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Color(0xFF7A1E1E), // text & icon color
-                    side: const BorderSide(
-                      color: Color(0xFF7A1E1E),
-                    ), // 👈 border color
+                    foregroundColor: Color(0xFF7A1E1E),
+                    side: const BorderSide(color: Color(0xFF7A1E1E)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -231,7 +229,7 @@ class _HousingCardState extends State<HousingCard> {
                 Text(
                   "\$${widget.price}/Person",
                   style: TextStyle(
-                    color: widget.price < 800 ? Colors.green : Colors.blue,
+                    color: Colors.green,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
