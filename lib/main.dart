@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:iskort/homepage.dart';
-import 'package:iskort/page_routes/establishments.dart';
 import 'package:iskort/page_routes/food.dart';
 import 'package:iskort/page_routes/housing.dart';
 import 'package:iskort/page_routes/map_route.dart';
@@ -32,7 +31,6 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const UserProfilePage(),
         '/food': (context) => const FoodPage(),
         '/housing': (context) => const HousingPage(),
-        '/establishment': (context) => const EstablishmentPage(),
         '/route': (context) => const RoutePage(),
       },
     );

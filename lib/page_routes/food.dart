@@ -19,6 +19,7 @@ class _FoodPageState extends State<FoodPage> {
       "location": "Miag-ao, Iloilo",
       "priceRange": "₱80–₱120",
       "image": "assets/images/angels.png",
+      "distance": "2.3 km",
     },
     {
       "name": "Sinigang",
@@ -26,6 +27,7 @@ class _FoodPageState extends State<FoodPage> {
       "location": "Miag-ao, Iloilo",
       "priceRange": "₱90–₱130",
       "image": "assets/images/angels.png",
+      "distance": "1.8 km",
     },
     {
       "name": "Lechon",
@@ -33,6 +35,7 @@ class _FoodPageState extends State<FoodPage> {
       "location": "Miag-ao, Iloilo",
       "priceRange": "₱150–₱200",
       "image": "assets/images/angels.png",
+      "distance": "3.5 km",
     },
     {
       "name": "Kare-Kare",
@@ -40,6 +43,7 @@ class _FoodPageState extends State<FoodPage> {
       "location": "Miag-ao, Iloilo",
       "priceRange": "₱120–₱180",
       "image": "assets/images/angels.png",
+      "distance": "4.0 km",
     },
     {
       "name": "Tocino",
@@ -47,6 +51,7 @@ class _FoodPageState extends State<FoodPage> {
       "location": "Miag-ao, Iloilo",
       "priceRange": "₱75–₱100",
       "image": "assets/images/angels.png",
+      "distance": "2.3 km",
     },
   ];
 
@@ -139,7 +144,8 @@ class _FoodPageState extends State<FoodPage> {
                       itemCount: _filteredFoods.length,
                       itemBuilder: (context, index) {
                         final food = _filteredFoods[index];
-                        return GestureDetector(
+                        return DisplayCard(
+                          food: food,
                           onTap: () {
                             final restaurantMenu =
                                 _allFoods
@@ -162,91 +168,6 @@ class _FoodPageState extends State<FoodPage> {
                               ),
                             );
                           },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0E1E1),
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 4,
-                                  offset: Offset(2, 2),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(12),
-                                    ),
-                                    child: Image.asset(
-                                      food["image"]!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    food["name"]!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  child: Text(
-                                    food["restaurant"]!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  child: Text(
-                                    food["location"]!,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    food["priceRange"]!,
-                                    style: const TextStyle(
-                                      color: Color(0xFF7A1E1E),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         );
                       },
                     ),
