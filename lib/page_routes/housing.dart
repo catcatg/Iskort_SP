@@ -269,7 +269,7 @@ class _HousingCardState extends State<HousingCard> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "\$${widget.price}/Person",
+                  "₱${widget.price}/Person",
                   style: TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.w500,
