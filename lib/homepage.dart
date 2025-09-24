@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:iskort/reusables.dart';
-import 'page_routes/food.dart';
-import 'page_routes/housing.dart';
-import 'page_routes/map_route.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});

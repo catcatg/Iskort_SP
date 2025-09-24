@@ -4,12 +4,14 @@ class CustomTextField extends StatefulWidget {
   final String title;
   final String label;
   final bool isPassword;
+  final TextEditingController? controller;
 
   const CustomTextField({
     super.key,
     required this.title,
     required this.label,
     this.isPassword = false,
+    this.controller,
   });
 
   @override
@@ -32,27 +34,27 @@ class _CustomTextFieldState extends State<CustomTextField> {
       children: [
         Text(
           widget.title,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        SizedBox(height: 5),
+        const SizedBox(height: 5),
         TextField(
+          controller: widget.controller,
           obscureText: _obscureText,
           decoration: InputDecoration(
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
             labelText: widget.label,
-            suffixIcon:
-                widget.isPassword
-                    ? IconButton(
-                      icon: Icon(
-                        _obscureText ? Icons.visibility_off : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscureText = !_obscureText;
-                        });
-                      },
-                    )
-                    : null,
+            suffixIcon: widget.isPassword
+                ? IconButton(
+                    icon: Icon(
+                      _obscureText ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureText = !_obscureText;
+                      });
+                    },
+                  )
+                : null,
           ),
         ),
       ],
@@ -74,7 +76,7 @@ class CustomBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return BottomNavigationBar(
       currentIndex: currentIndex,
-      selectedItemColor: Color(0xFF791317),
+      selectedItemColor: const Color(0xFF791317),
       unselectedItemColor: Colors.brown.shade200,
       onTap: onTap,
       items: const [
@@ -109,7 +111,6 @@ class ProductCard extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         child: Row(
           children: [
-            /// Image (always fixed size)
             Container(
               width: 80,
               height: 60,
@@ -121,18 +122,14 @@ class ProductCard extends StatelessWidget {
               child: Image.asset(
                 imagePath,
                 fit: BoxFit.cover,
-                errorBuilder:
-                    (context, error, stackTrace) => const Icon(
-                      Icons.broken_image,
-                      color: Colors.red,
-                      size: 40,
-                    ),
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.broken_image,
+                  color: Colors.red,
+                  size: 40,
+                ),
               ),
             ),
-
             const SizedBox(width: 12),
-
-            /// Text
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -167,7 +164,6 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-/// A reusable card widget to display food, and housing items.
 class DisplayCard extends StatelessWidget {
   final Map<String, String> food;
   final VoidCallback onTap;
