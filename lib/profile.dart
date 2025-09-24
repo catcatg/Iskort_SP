@@ -5,6 +5,12 @@ class UserProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Get user data from route arguments
+    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+    final String name = args?['name'] ?? 'User';
+    final String email = args?['email'] ?? 'No email';
+    final String role = args?['role'] ?? 'No role';
+
     return Scaffold(
       body: Stack(
         children: [
@@ -19,7 +25,6 @@ class UserProfilePage extends StatelessWidget {
               ),
             ),
           ),
-
           SafeArea(
             child: Column(
               children: [
@@ -36,10 +41,7 @@ class UserProfilePage extends StatelessWidget {
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 24,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(30),
@@ -65,26 +67,32 @@ class UserProfilePage extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
 
-                        // Name
-                        const Text(
-                          'Catherine Adonis',
-                          style: TextStyle(
+                        // ✅ Name
+                        Text(
+                          name,
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
                           ),
                         ),
-                        const Text(
-                          '@catsudon',
-                          style: TextStyle(color: Colors.grey),
+
+                        // ✅ Email
+                        Text(
+                          email,
+                          style: const TextStyle(color: Colors.grey),
                         ),
+
+                        // ✅ Role
+                        Text(
+                          'Role: $role',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+
                         const SizedBox(height: 8),
 
                         // Online Status Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
                             border: Border.all(color: Color(0xFF0A4423)),
                             borderRadius: BorderRadius.circular(20),
@@ -106,13 +114,28 @@ class UserProfilePage extends StatelessWidget {
                         _buildMenuItem(Icons.notifications, "Notifications"),
                         _buildMenuItem(Icons.comment, "Comments"),
                         _buildMenuItem(Icons.settings, "Settings"),
-                        _buildMenuItem(
-                          Icons.help,
-                          "Help",
-                          iconColor: Color(0xFF7A1E1E),
-                        ),
+                        _buildMenuItem(Icons.help, "Help", iconColor: Color(0xFF7A1E1E)),
 
                         const Spacer(),
+
+                        // Back to Homepage
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/homepage');
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green[700],
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Text(
+                              'Back to Homepage',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
 
                         // Logout Button
                         SizedBox(
@@ -125,7 +148,32 @@ class UserProfilePage extends StatelessWidget {
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
-                            onPressed: () {},
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Confirm Logout"),
+                                  content: const Text("Are you sure you want to log out?"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        Navigator.pushNamedAndRemoveUntil(
+                                          context,
+                                          '/login',
+                                          (route) => false,
+                                        );
+                                      },
+                                      child: const Text("Yes"),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                             child: const Text(
                               "Logout",
                               style: TextStyle(fontSize: 16),
