@@ -1,233 +1,264 @@
-// API KEY '5b3ce3597851110001cf6248a6f3b67e3a8c448a91fa92c0fa878fbd';
-
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class Suggestion {
-  final String label;
-  final double lat;
-  final double lon;
-
-  Suggestion({required this.label, required this.lat, required this.lon});
-}
-
-class RoutePage extends StatefulWidget {
-  const RoutePage({super.key});
+class MapRoutePage extends StatefulWidget {
+  const MapRoutePage({super.key});
 
   @override
-  State<RoutePage> createState() => _RoutePageState();
+  State<MapRoutePage> createState() => _MapRoutePageState();
 }
 
-class _RoutePageState extends State<RoutePage> {
+class _MapRoutePageState extends State<MapRoutePage> {
   final MapController _mapController = MapController();
+  final Location _locationService = Location();
   final TextEditingController _searchController = TextEditingController();
-  LatLng? _currentLocation;
-  LatLng? _searchedLocation;
-
-  final String _apiKey =
-      '5b3ce3597851110001cf6248a6f3b67e3a8c448a91fa92c0fa878fbd';
+  bool isLoading = true;
+  LatLng? _userDestination;
+  LatLng? _userLocation;
+  List<LatLng> _routePoints = [];
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+    _initLocation();
   }
 
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  Future<void> _initLocation() async {
+    if (!await _checkPermissions()) return;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location services are disabled.')),
-      );
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permissions are denied.')),
-        );
-        return;
+    _locationService.onLocationChanged.listen((LocationData locationData) {
+      if (locationData.latitude != null && locationData.longitude != null) {
+        setState(() {
+          _userLocation = LatLng(
+            locationData.latitude!,
+            locationData.longitude!,
+          );
+          isLoading = false;
+        });
       }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location permissions are permanently denied.'),
-        ),
-      );
-      return;
-    }
-
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
-    setState(() {
-      _currentLocation = LatLng(position.latitude, position.longitude);
     });
-
-    _mapController.move(_currentLocation!, 15.0);
   }
 
-  Future<List<Suggestion>> _getSuggestions(String input) async {
+  Future<void> fetchCoordPoint(String location) async {
     final url = Uri.parse(
-      'https://api.openrouteservice.org/geocode/autocomplete',
+      'https://nominatim.openstreetmap.org/search?q=$location&format=json&limit=1',
     );
-
-    final response = await http.get(
-      url.replace(
-        queryParameters: {
-          'api_key': _apiKey,
-          'text': input,
-          'size': '5',
-          'boundary.country': 'PH', // limited to Philippines
-        },
-      ),
-    );
-
+    final response = await http.get(url);
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      List<Suggestion> suggestions = [];
-
-      for (var feature in data['features']) {
-        suggestions.add(
-          Suggestion(
-            label: feature['properties']['label'],
-            lat: feature['geometry']['coordinates'][1],
-            lon: feature['geometry']['coordinates'][0],
-          ),
-        );
+      final List data = json.decode(response.body);
+      if (data.isNotEmpty) {
+        final lat = double.parse(data[0]['lat']);
+        final lon = double.parse(data[0]['lon']);
+        setState(() {
+          _userDestination = LatLng(lat, lon);
+        });
+        await _fetchRoute();
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Location not found.')));
       }
-
-      return suggestions;
     } else {
-      print('Failed to fetch suggestions: ${response.statusCode}');
-      return [];
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error fetching location data.')),
+      );
+    }
+  }
+
+  Future<void> _fetchRoute() async {
+    if (_userLocation == null || _userDestination == null) return;
+
+    final url = Uri.parse(
+      'http://router.project-osrm.org/route/v1/driving/${_userLocation!.longitude},${_userLocation!.latitude};${_userDestination!.longitude},${_userDestination!.latitude}?overview=full&geometries=polyline',
+    );
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final geometry = data['routes'][0]['geometry'];
+      _decodePolyline(geometry);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error fetching route data.')),
+      );
+    }
+  }
+
+  void _decodePolyline(String encodedPolyline) {
+    PolylinePoints polylinePoints = PolylinePoints();
+    List<PointLatLng> result = polylinePoints.decodePolyline(encodedPolyline);
+    setState(() {
+      _routePoints =
+          result
+              .map((point) => LatLng(point.latitude, point.longitude))
+              .toList();
+    });
+  }
+
+  // Check location permissions of user
+  Future<bool> _checkPermissions() async {
+    bool serviceEnabled = await _locationService.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await _locationService.requestService();
+      if (!serviceEnabled) return false;
+    }
+
+    PermissionStatus permissionGranted = await _locationService.hasPermission();
+    if (permissionGranted == PermissionStatus.denied) {
+      permissionGranted = await _locationService.requestPermission();
+      if (permissionGranted != PermissionStatus.granted) return false;
+    }
+    return true;
+  }
+
+  Future<void> _getUserLocation() async {
+    try {
+      final current = await _locationService.getLocation();
+      if (current.latitude != null && current.longitude != null) {
+        final pos = LatLng(current.latitude!, current.longitude!);
+        setState(() => _userLocation = pos);
+
+        // Move camera to user
+        _mapController.move(pos, 15);
+
+        // If destination exists, redraw the route
+        if (_userDestination != null) {
+          await _fetchRoute();
+        }
+      } else {
+        throw Exception("No coordinates");
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User location not available.')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Iskort Route Finder")),
-      body: Column(
+      appBar: AppBar(
+        foregroundColor: Colors.red,
+        title: const Text("Map"),
+        backgroundColor: Colors.white,
+      ),
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Autocomplete<Suggestion>(
-                    displayStringForOption: (Suggestion option) => option.label,
-                    optionsBuilder: (TextEditingValue textEditingValue) async {
-                      if (textEditingValue.text.isEmpty) {
-                        return const Iterable<Suggestion>.empty();
-                      }
-                      return await _getSuggestions(textEditingValue.text);
-                    },
-                    onSelected: (Suggestion selectedSuggestion) {
-                      _searchController.text = selectedSuggestion.label;
-                      setState(() {
-                        _searchedLocation = LatLng(
-                          selectedSuggestion.lat,
-                          selectedSuggestion.lon,
-                        );
-                      });
-                      _mapController.move(_searchedLocation!, 15.0);
-                    },
-                    fieldViewBuilder: (
-                      context,
-                      controller,
-                      focusNode,
-                      onEditingComplete,
-                    ) {
-                      _searchController.value = controller.value;
-                      return TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        onEditingComplete: onEditingComplete,
-                        decoration: const InputDecoration(
-                          hintText: "Enter destination",
-                          border: OutlineInputBorder(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              // Set initial center to Panay island
+              initialCenter: _userLocation ?? const LatLng(11.0, 122.5),
+              initialZoom: 15,
+              minZoom: 1,
+              maxZoom: 100,
             ),
-          ),
-          Expanded(
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: const LatLng(
-                  14.5995,
-                  120.9842,
-                ), // Manila default (fallback)
-                initialZoom: 13.0,
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               ),
-              children: [
-                TileLayer(
-                  urlTemplate:
-                      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                  subdomains: const ['a', 'b', 'c'],
+              CurrentLocationLayer(
+                alignPositionOnUpdate: AlignOnUpdate.always,
+                //focalPoint: FocalPoint.center,
+                style: const LocationMarkerStyle(
+                  marker: DefaultLocationMarker(
+                    child: Icon(
+                      Icons.location_pin,
+                      color: Color.fromARGB(255, 150, 29, 20),
+                    ),
+                  ),
+                  markerSize: Size(0, 0),
+                  markerDirection: MarkerDirection.heading,
                 ),
-                if (_currentLocation != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: _currentLocation!,
-                        width: 80,
-                        height: 80,
-                        child: const Icon(
-                          Icons.my_location,
-                          color: Colors.blue,
-                          size: 40,
+              ),
+              if (_userDestination != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _userDestination!,
+                      width: 80,
+                      height: 80,
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Color.fromARGB(255, 26, 91, 28),
+                        size: 40,
+                      ),
+                    ),
+                  ],
+                ),
+              if (_userLocation != null && _routePoints.isNotEmpty)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _routePoints,
+                      strokeWidth: 4.0,
+                      color: Colors.blue,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter destination',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 0.0,
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                if (_searchedLocation != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: _searchedLocation!,
-                        width: 80,
-                        height: 80,
-                        child: const Icon(
-                          Icons.location_pin,
-                          color: Colors.red,
-                          size: 40,
-                        ),
+                  const SizedBox(width: 8.0),
+                  ElevatedButton(
+                    onPressed: () {
+                      FocusScope.of(context).unfocus();
+                      fetchCoordPoint(_searchController.text);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 150, 29, 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 12.0,
                       ),
-                    ],
+                    ),
+                    child: const Icon(Icons.search),
                   ),
-                if (_currentLocation != null && _searchedLocation != null)
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: [_currentLocation!, _searchedLocation!],
-                        color: Colors.green,
-                        strokeWidth: 4.0,
-                      ),
-                    ],
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        elevation: 0,
+        onPressed: _getUserLocation,
+        backgroundColor: const Color.fromARGB(255, 5, 41, 5),
+        child: const Icon(
+          Icons.my_location,
+          color: Color.fromARGB(255, 150, 29, 20),
+        ),
       ),
     );
   }
