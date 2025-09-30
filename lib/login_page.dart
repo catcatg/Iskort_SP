@@ -18,55 +18,59 @@ class _LoginPageState extends State<LoginPage> {
   bool get isRoleSelected => selectedRole.isNotEmpty;
 
   Future<void> login() async {
-  try {
-    final response = await http.post(
-      Uri.parse('http://192.168.68.108:3000/api/admin/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'email': emailController.text,
-        'password': passwordController.text,
-        'role': selectedRole, // ✅ Include role
-      }),
-    );
-
-    print('🔁 Response status: ${response.statusCode}');
-    print('🧾 Response body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      final responseJson = jsonDecode(response.body);
-      final user = responseJson['user'];
-      final name = user['name'];
-
-      Navigator.pushNamed(
-        context,
-        '/profile',
-        arguments: {
-          'name': name,
-          'email': user['email'],
-          'role': user['role'],
-        },
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.68.108:3000/api/admin/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': emailController.text,
+          'password': passwordController.text,
+          'role': selectedRole, // ✅ include role in login
+        }),
       );
-    } else {
-      try {
-        final body = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${body['message'] ?? 'Login failed'}')),
-        );
-      } catch (_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unexpected server error (HTML response)')),
-        );
-      }
-    }
-  } catch (e, stackTrace) {
-    print('🔥 Error during login: $e');
-    print('📍 Stack trace:\n$stackTrace');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Network or backend error')),
-    );
-  }
-}
 
+      print('🔁 Response status: ${response.statusCode}');
+      print('🧾 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseJson = jsonDecode(response.body);
+        final user = responseJson['user'];
+        final name = user['name'];
+        final role = user['role'];
+
+        if (role == 'admin') {
+          Navigator.pushNamed(context, '/admin-dashboard');
+        } else {
+          Navigator.pushNamed(
+            context,
+            '/profile',
+            arguments: {
+              'name': name,
+              'email': user['email'],
+              'role': role,
+            },
+          );
+        }
+      } else {
+        try {
+          final body = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${body['message'] ?? 'Login failed'}')),
+          );
+        } catch (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unexpected server error (HTML response)')),
+          );
+        }
+      }
+    } catch (e, stackTrace) {
+      print('🔥 Error during login: $e');
+      print('📍 Stack trace:\n$stackTrace');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network or backend error')),
+      );
+    }
+  }
 
   Widget roleButton(String roleLabel) {
     final isSelected = selectedRole == roleLabel.toLowerCase();

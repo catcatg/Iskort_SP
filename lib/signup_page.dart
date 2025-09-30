@@ -40,10 +40,19 @@ class _SignupPageState extends State<SignupPage> {
       );
 
       if (response.statusCode == 200) {
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registered successfully!')),
+          const SnackBar(content: Text('Registered successfully! Please login.')),
         );
-        Navigator.pushNamed(context, '/homepage');
+
+        // Clear fields
+        nameController.clear();
+        emailController.clear();
+        passwordController.clear();
+        confirmPasswordController.clear();
+
+        // Go to login page
+        Navigator.pushReplacementNamed(context, '/login');
       } else {
         final body = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(

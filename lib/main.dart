@@ -8,6 +8,7 @@ import 'package:iskort/profile.dart';
 import 'landing_page.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
+import 'admin_dashboard.dart'; 
 
 void main() {
   runApp(MyApp());
@@ -29,6 +30,7 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => SignupPage(),
         '/homepage': (context) => HomePage(),
         '/profile': (context) => const UserProfilePage(),
+        '/admin-dashboard': (context) => const AdminDashboardPage(),
         '/food': (context) => const FoodPage(),
         '/housing': (context) => const HousingPage(),
         '/route': (context) => const RoutePage(),
