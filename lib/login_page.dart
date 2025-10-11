@@ -20,7 +20,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> login() async {
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.68.108:3000/api/admin/login'),
+        Uri.parse('https://iskort-public-web.onrender.com/api/admin/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': emailController.text,

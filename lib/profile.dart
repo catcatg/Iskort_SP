@@ -140,7 +140,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
                         const Spacer(),
 
-                        // 👉 Show Setup button only if role == owner
+              
                         if (role.toLowerCase() == "owner")
                           SizedBox(
                             width: double.infinity,

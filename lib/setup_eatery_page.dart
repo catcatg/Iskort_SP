@@ -39,7 +39,7 @@ class _SetupPageState extends State<SetupPage> {
 
   Future<void> submitData() async {
     final response = await http.post(
-      Uri.parse('http://192.168.68.108:3000/api/eatery'),
+      Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'owner_id': 1, // TODO: replace with logged-in owner_id
@@ -56,7 +56,7 @@ class _SetupPageState extends State<SetupPage> {
 
       for (var item in menuItems) {
         await http.post(
-          Uri.parse('http://192.168.68.108:3000/api/food'),
+          Uri.parse('https://iskort-public-web.onrender.com/api/food'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'name': item['name'],

@@ -29,7 +29,7 @@ class _SignupPageState extends State<SignupPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.68.108:3000/api/admin/register'),
+        Uri.parse('https://iskort-public-web.onrender.com/api/admin/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'name': nameController.text,
