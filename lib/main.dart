@@ -9,6 +9,8 @@ import 'landing_page.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 import 'admin_dashboard.dart';
+import 'admin_dashboard.dart'; 
+import 'setup_eatery_page.dart';
 
 void main() {
   runApp(MyApp());
@@ -34,6 +36,7 @@ class MyApp extends StatelessWidget {
         '/food': (context) => const FoodPage(),
         '/housing': (context) => const HousingPage(),
         '/route': (context) => const MapRoutePage(),
+        '/setup-page': (context) => const SetupPage(),
       },
     );
   }

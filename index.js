@@ -3,12 +3,24 @@ const mysql = require('mysql2');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
 
 dotenv.config();
 const app = express();
 
 app.use(cors());
 app.use(bodyParser.json());
+
+// ✅ Serve static images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ✅ Multer setup for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/'),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+});
+const upload = multer({ storage });
 
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
@@ -25,6 +37,9 @@ db.connect(err => {
   console.log('✅ Connected to MySQL');
 });
 
+// ======================================================
+// 🔑 REGISTER + LOGIN (your existing logic)
+// ======================================================
 
 // ✅ REGISTER
 app.post('/api/admin/register', (req, res) => {
@@ -38,7 +53,7 @@ app.post('/api/admin/register', (req, res) => {
 
     db.query(
       'INSERT INTO admin (name, email, password, role, is_verified) VALUES (?, ?, ?, ?, ?)',
-      [name, email, password, role, 0], // default not verified
+      [name, email, password, role, 0],
       (err, result) => {
         if (err) return res.status(500).json({ error: err });
 
@@ -50,7 +65,6 @@ app.post('/api/admin/register', (req, res) => {
     );
   });
 });
-
 
 // ✅ LOGIN
 app.post('/api/admin/login', (req, res) => {
@@ -67,7 +81,6 @@ app.post('/api/admin/login', (req, res) => {
 
       const user = results[0];
 
-      // Role check
       if (user.role !== role) {
         return res.status(403).json({
           success: false,
@@ -75,7 +88,6 @@ app.post('/api/admin/login', (req, res) => {
         });
       }
 
-      // Verification check
       if (!user.is_verified) {
         return res.status(403).json({
           success: false,
@@ -98,28 +110,30 @@ app.get('/api/admin/users', (req, res) => {
     SELECT admin_id AS id, name, email,
            COALESCE(role, 'admin') AS role,
            COALESCE(status, 'pending') AS status,
-           is_verified, created_at,
+           COALESCE(is_verified, 0) AS is_verified,
+           created_at,
            'admin' AS table_name
     FROM admin
     UNION ALL
     SELECT user_id AS id, name, email,
            COALESCE(role, 'user') AS role,
            COALESCE(status, 'pending') AS status,
-           is_verified, created_at,
+           COALESCE(is_verified, 0) AS is_verified,
+           created_at,
            'user' AS table_name
     FROM user
     UNION ALL
     SELECT owner_id AS id, name, email,
            COALESCE(role, 'owner') AS role,
            COALESCE(status, 'pending') AS status,
-           is_verified, created_at,
+           COALESCE(is_verified, 0) AS is_verified,
+           created_at,
            'owner' AS table_name
     FROM owner
   `;
 
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err });
-
     res.json({
       success: true,
       users: results,
@@ -128,13 +142,10 @@ app.get('/api/admin/users', (req, res) => {
 });
 
 
-
-
-// ✅ VERIFY USER (set is_verified = TRUE depending on role)
+// ✅ VERIFY
 app.put('/api/admin/verify/:role/:id', (req, res) => {
   const { role, id } = req.params;
   let table;
-
   if (role === 'admin') table = 'admin';
   else if (role === 'user') table = 'user';
   else if (role === 'owner') table = 'owner';
@@ -150,11 +161,10 @@ app.put('/api/admin/verify/:role/:id', (req, res) => {
   );
 });
 
-// ❌ REJECT USER (Delete from correct table)
+// ❌ REJECT
 app.delete('/api/admin/reject/:role/:id', (req, res) => {
   const { role, id } = req.params;
   let table;
-
   if (role === 'admin') table = 'admin';
   else if (role === 'user') table = 'user';
   else if (role === 'owner') table = 'owner';
@@ -170,6 +180,48 @@ app.delete('/api/admin/reject/:role/:id', (req, res) => {
   );
 });
 
+
+// Add Eatery
+app.post('/api/eatery', (req, res) => {
+  const { owner_id, name, location, open_time, end_time } = req.body;
+  const sql = `INSERT INTO eateries (owner_id, name, location, open_time, end_time) VALUES (?, ?, ?, ?, ?)`;
+  db.query(sql, [owner_id, name, location, open_time, end_time], (err, result) => {
+    if (err) return res.status(500).send(err);
+    res.send({ success: true, eatery_id: result.insertId });
+  });
+});
+
+// Add Food
+app.post('/api/food', (req, res) => {
+  const { name, eatery_id, classification, price, photo } = req.body;
+  const sql = `INSERT INTO foods (name, eatery_id, classification, price, photo) VALUES (?, ?, ?, ?, ?)`;
+  db.query(sql, [name, eatery_id, classification, price, photo], (err, result) => {
+    if (err) return res.status(500).send(err);
+    res.send({ success: true, food_id: result.insertId });
+  });
+});
+
+// Get Foods by Eatery
+app.get('/api/foods/:eatery_id', (req, res) => {
+  const { eatery_id } = req.params;
+  const sql = `SELECT * FROM foods WHERE eatery_id = ?`;
+  db.query(sql, [eatery_id], (err, results) => {
+    if (err) return res.status(500).send(err);
+    res.send({ success: true, foods: results });
+  });
+});
+
+// ✅ Get all Eateries (for homepage)
+app.get('/api/eateries', (req, res) => {
+  const sql = `SELECT * FROM eateries`;
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching eateries:", err);
+      return res.status(500).json({ success: false, error: err });
+    }
+    res.json({ success: true, eateries: results });
+  });
+});
 
 
 app.listen(3000, '0.0.0.0', () => {
