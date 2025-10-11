@@ -45,11 +45,12 @@ class _LoginPageState extends State<LoginPage> {
             context,
             '/profile',
             arguments: {
-              'name': name,
+              'name': user['name'],
               'email': user['email'],
-              'role': role,
+              'role': user['role'],
             },
           );
+
         }
       } else {
         try {

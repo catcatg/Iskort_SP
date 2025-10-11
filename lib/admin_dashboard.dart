@@ -77,7 +77,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               itemCount: users.length,
               itemBuilder: (context, index) {
                 final user = users[index];
-                final isVerified = user['is_verified'] == 1;
+                final isVerified = (user['is_verified'] ?? 0) == 1;
 
                 return Card(
                   margin: const EdgeInsets.all(8),

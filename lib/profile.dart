@@ -1,15 +1,36 @@
 import 'package:flutter/material.dart';
 
-class UserProfilePage extends StatelessWidget {
+class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // ✅ Get user data from route arguments
+  State<UserProfilePage> createState() => _UserProfilePageState();
+}
+
+class _UserProfilePageState extends State<UserProfilePage> {
+  // Static fields to persist values across navigation
+  static String? _name;
+  static String? _email;
+  static String? _role;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Get arguments if passed
     final args = ModalRoute.of(context)?.settings.arguments as Map?;
-    final String name = args?['name'] ?? 'User';
-    final String email = args?['email'] ?? 'No email';
-    final String role = args?['role'] ?? 'No role';
+    if (args != null) {
+      _name = args['name'] ?? _name;
+      _email = args['email'] ?? _email;
+      _role = args['role'] ?? _role;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String name = _name ?? 'User';
+    final String email = _email ?? 'No email';
+    final String role = _role ?? 'No role';
 
     return Scaffold(
       body: Stack(
@@ -41,7 +62,8 @@ class UserProfilePage extends StatelessWidget {
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 24),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(30),
@@ -55,7 +77,6 @@ class UserProfilePage extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        // Avatar
                         CircleAvatar(
                           radius: 40,
                           backgroundColor: Colors.blue[100],
@@ -92,7 +113,8 @@ class UserProfilePage extends StatelessWidget {
 
                         // Online Status Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
                             border: Border.all(color: Color(0xFF0A4423)),
                             borderRadius: BorderRadius.circular(20),
@@ -109,25 +131,56 @@ class UserProfilePage extends StatelessWidget {
 
                         const SizedBox(height: 20),
 
-                        // Menu Items
                         _buildMenuItem(Icons.bookmark, "Saved"),
                         _buildMenuItem(Icons.notifications, "Notifications"),
                         _buildMenuItem(Icons.comment, "Comments"),
                         _buildMenuItem(Icons.settings, "Settings"),
-                        _buildMenuItem(Icons.help, "Help", iconColor: Color(0xFF7A1E1E)),
+                        _buildMenuItem(Icons.help, "Help",
+                            iconColor: Color(0xFF7A1E1E)),
 
                         const Spacer(),
+
+                        // 👉 Show Setup button only if role == owner
+                        if (role.toLowerCase() == "owner")
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/setup-page');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: const Text(
+                                "Set up your business",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+
+                        const SizedBox(height: 12),
 
                         // Back to Homepage
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: () {
-                              Navigator.pushNamed(context, '/homepage');
+                              Navigator.pushNamed(
+                                context,
+                                '/homepage',
+                                arguments: {
+                                  'name': name,
+                                  'email': email,
+                                  'role': role,
+                                },
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green[700],
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
                             ),
                             child: const Text(
                               'Back to Homepage',
@@ -146,21 +199,29 @@ class UserProfilePage extends StatelessWidget {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
                             ),
                             onPressed: () {
                               showDialog(
                                 context: context,
                                 builder: (context) => AlertDialog(
                                   title: const Text("Confirm Logout"),
-                                  content: const Text("Are you sure you want to log out?"),
+                                  content: const Text(
+                                      "Are you sure you want to log out?"),
                                   actions: [
                                     TextButton(
-                                      onPressed: () => Navigator.pop(context),
+                                      onPressed: () =>
+                                          Navigator.pop(context),
                                       child: const Text("Cancel"),
                                     ),
                                     TextButton(
                                       onPressed: () {
+                                        // clear session
+                                        _name = null;
+                                        _email = null;
+                                        _role = null;
+
                                         Navigator.pop(context);
                                         Navigator.pushNamedAndRemoveUntil(
                                           context,
