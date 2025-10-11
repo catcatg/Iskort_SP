@@ -16,7 +16,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> fetchEateries() async {
     try {
-      final response = await http.get(Uri.parse('http://192.168.68.108:3000/api/eateries'));
+      final response = await http.get(Uri.parse('https://iskort-public-web.onrender.com/api/eateries'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {

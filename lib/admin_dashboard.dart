@@ -15,7 +15,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Future<void> fetchUsers() async {
     try {
-      final response = await http.get(Uri.parse('http://192.168.68.108:3000/api/admin/users'));
+      final response = await http.get(Uri.parse('https://iskort-public-web.onrender.com/api/admin/users'));
       final data = jsonDecode(response.body);
 
       if (data['success'] == true) {
@@ -33,12 +33,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     try {
       late Uri url;
       if (action == 'verify') {
-        url = Uri.parse('http://192.168.68.108:3000/api/admin/verify/$role/$id');
+        url = Uri.parse('https://iskort-public-web.onrender.com/api/admin/verify/$role/$id');
         final response = await http.put(url);
         final data = jsonDecode(response.body);
         print('🛠️ Verify -> ${data['message']}');
       } else if (action == 'reject') {
-        url = Uri.parse('http://192.168.68.108:3000/api/admin/reject/$role/$id');
+        url = Uri.parse('https://iskort-public-web.onrender.com/api/admin/reject/$role/$id');
         final response = await http.delete(url);
         final data = jsonDecode(response.body);
         print('🛠️ Reject -> ${data['message']}');
