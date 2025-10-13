@@ -22,19 +22,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// ✅ MySQL connection (for Railway)
 const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
+  host: process.env.DB_HOST || 'switchyard.proxy.rlwy.net',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
+  database: process.env.DB_NAME || 'railway',
+  port: process.env.DB_PORT || 43301,
 });
 
-db.connect(err => {
+db.connect((err) => {
   if (err) {
     console.error('❌ MySQL connection failed:', err);
-    return;
+  } else {
+    console.log('✅ Connected to Railway MySQL successfully!');
   }
-  console.log('✅ Connected to MySQL');
 });
 
 // ======================================================
@@ -104,7 +106,7 @@ app.post('/api/admin/login', (req, res) => {
   );
 });
 
-// ✅ GET ALL USERS (Admin Dashboard: admins + owners + users)
+// ✅ GET ALL USERS (Admin Dashboard)
 app.get('/api/admin/users', (req, res) => {
   const query = `
     SELECT admin_id AS id, name, email,
@@ -134,13 +136,9 @@ app.get('/api/admin/users', (req, res) => {
 
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err });
-    res.json({
-      success: true,
-      users: results,
-    });
+    res.json({ success: true, users: results });
   });
 });
-
 
 // ✅ VERIFY
 app.put('/api/admin/verify/:role/:id', (req, res) => {
@@ -180,8 +178,7 @@ app.delete('/api/admin/reject/:role/:id', (req, res) => {
   );
 });
 
-
-// Add Eatery
+// ✅ Eateries
 app.post('/api/eatery', (req, res) => {
   const { owner_id, name, location, open_time, end_time } = req.body;
   const sql = `INSERT INTO eateries (owner_id, name, location, open_time, end_time) VALUES (?, ?, ?, ?, ?)`;
@@ -191,7 +188,7 @@ app.post('/api/eatery', (req, res) => {
   });
 });
 
-// Add Food
+// ✅ Foods
 app.post('/api/food', (req, res) => {
   const { name, eatery_id, classification, price, photo } = req.body;
   const sql = `INSERT INTO foods (name, eatery_id, classification, price, photo) VALUES (?, ?, ?, ?, ?)`;
@@ -201,7 +198,6 @@ app.post('/api/food', (req, res) => {
   });
 });
 
-// Get Foods by Eatery
 app.get('/api/foods/:eatery_id', (req, res) => {
   const { eatery_id } = req.params;
   const sql = `SELECT * FROM foods WHERE eatery_id = ?`;
@@ -211,7 +207,6 @@ app.get('/api/foods/:eatery_id', (req, res) => {
   });
 });
 
-// ✅ Get all Eateries (for homepage)
 app.get('/api/eateries', (req, res) => {
   const sql = `SELECT * FROM eateries`;
   db.query(sql, (err, results) => {
@@ -222,7 +217,6 @@ app.get('/api/eateries', (req, res) => {
     res.json({ success: true, eateries: results });
   });
 });
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
