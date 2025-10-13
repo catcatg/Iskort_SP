@@ -222,3 +222,8 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+app.get('/', (req, res) => {
+  res.send('💚 Iskort API is live and ready for use!');
+});
+
