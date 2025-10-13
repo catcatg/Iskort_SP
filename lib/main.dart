@@ -1,3 +1,5 @@
+import 'package:provider/provider.dart'; // <-- 1. Added Provider Import
+import 'package:iskort/menu_state.dart'; // state
 import 'package:flutter/material.dart';
 import 'package:iskort/homepage.dart';
 import 'package:iskort/page_routes/food.dart';
@@ -9,11 +11,18 @@ import 'landing_page.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 import 'admin_dashboard.dart';
-import 'admin_dashboard.dart'; 
 import 'setup_eatery_page.dart';
+import 'user_manage.dart';
 
 void main() {
-  runApp(MyApp());
+  // Wrapping MyApp with the Provider to make MenuState available globally
+  runApp(
+    ChangeNotifierProvider(
+      // The 'create' method instantiates the state object from the imported file.
+      create: (context) => MenuState(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -32,7 +41,8 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => SignupPage(),
         '/homepage': (context) => HomePage(),
         '/profile': (context) => const UserProfilePage(),
-        '/admin-dashboard': (context) => const AdminDashboardPage(),
+        '/admin-dashboard': (context) => const DashboardAdminScreen(),
+        '/user-management': (context) => const UserManage(),
         '/food': (context) => const FoodPage(),
         '/housing': (context) => const HousingPage(),
         '/route': (context) => const MapRoutePage(),
