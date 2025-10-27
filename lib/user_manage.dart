@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../layouts/admin_layout.dart';
 
 class UserManage extends StatefulWidget {
   const UserManage({super.key});
@@ -11,6 +12,7 @@ class UserManage extends StatefulWidget {
 
 class _UserManageState extends State<UserManage> {
   List users = [];
+  List filteredUsers = [];
   bool isLoading = true;
 
   Future<void> fetchUsers() async {
@@ -23,6 +25,7 @@ class _UserManageState extends State<UserManage> {
       if (data['success'] == true) {
         setState(() {
           users = data['users'];
+          filteredUsers = users;
           isLoading = false;
         });
       }
@@ -50,10 +53,27 @@ class _UserManageState extends State<UserManage> {
         print('🛠️ Reject -> ${data['message']}');
       }
 
-      fetchUsers(); // refresh list after action
+      fetchUsers(); // refresh after action
     } catch (e) {
       print('❌ Action error: $e');
     }
+  }
+
+  void onSearchChanged(String query) {
+    setState(() {
+      filteredUsers =
+          users
+              .where(
+                (user) =>
+                    (user['name'] ?? '').toLowerCase().contains(
+                      query.toLowerCase(),
+                    ) ||
+                    (user['email'] ?? '').toLowerCase().contains(
+                      query.toLowerCase(),
+                    ),
+              )
+              .toList();
+    });
   }
 
   @override
@@ -64,77 +84,116 @@ class _UserManageState extends State<UserManage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () {
-              Navigator.pushNamed(context, '/profile');
-            },
-          ),
-        ],
-      ),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView.builder(
-                itemCount: users.length,
-                itemBuilder: (context, index) {
-                  final user = users[index];
-                  final isVerified = (user['is_verified'] ?? 0) == 1;
-
-                  return Card(
-                    margin: const EdgeInsets.all(8),
-                    child: ListTile(
-                      title: Text(
-                        '${user['name'] ?? 'Unknown'} (${user['role'] ?? 'No role'})',
+    return AdminLayout(
+      pageTitle: 'User Management',
+      onSearchChanged: onSearchChanged, // ✅ functional search callback
+      child: Padding(
+        padding: const EdgeInsets.all(30.0),
+        child:
+            isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    /*
+                    const Text(
+                      'User Management',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(user['email'] ?? 'No email'),
-                          Text('Joined: ${user['created_at'] ?? 'N/A'}'),
-                        ],
-                      ),
-                      trailing:
-                          isVerified
-                              ? const Text(
-                                '✅ Verified',
-                                style: TextStyle(color: Colors.green),
+                    ),
+                    */
+                    const SizedBox(height: 25),
+                    Expanded(
+                      child:
+                          filteredUsers.isEmpty
+                              ? const Center(
+                                child: Text(
+                                  'No users found.',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 16,
+                                  ),
+                                ),
                               )
-                              : Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  TextButton(
-                                    onPressed:
-                                        () => performAction(
-                                          (user['id'] ?? '').toString(),
-                                          user['table_name'] ?? 'user',
-                                          'verify',
-                                        ),
-                                    child: const Text('Verify'),
-                                  ),
-                                  TextButton(
-                                    onPressed:
-                                        () => performAction(
-                                          (user['id'] ?? '').toString(),
-                                          user['table_name'] ?? 'user',
-                                          'reject',
-                                        ),
-                                    child: const Text(
-                                      'Reject',
-                                      style: TextStyle(color: Colors.red),
+                              : ListView.builder(
+                                itemCount: filteredUsers.length,
+                                itemBuilder: (context, index) {
+                                  final user = filteredUsers[index];
+                                  final isVerified =
+                                      (user['is_verified'] ?? 0) == 1;
+
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(
+                                      vertical: 8.0,
                                     ),
-                                  ),
-                                ],
+                                    child: ListTile(
+                                      title: Text(
+                                        '${user['name'] ?? 'Unknown'} (${user['role'] ?? 'No role'})',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(user['email'] ?? 'No email'),
+                                          Text(
+                                            'Joined: ${user['created_at'] ?? 'N/A'}',
+                                          ),
+                                        ],
+                                      ),
+                                      trailing:
+                                          isVerified
+                                              ? const Text(
+                                                '✅ Verified',
+                                                style: TextStyle(
+                                                  color: Colors.green,
+                                                ),
+                                              )
+                                              : Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  TextButton(
+                                                    onPressed:
+                                                        () => performAction(
+                                                          (user['id'] ?? '')
+                                                              .toString(),
+                                                          user['table_name'] ??
+                                                              'user',
+                                                          'verify',
+                                                        ),
+                                                    child: const Text('Verify'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed:
+                                                        () => performAction(
+                                                          (user['id'] ?? '')
+                                                              .toString(),
+                                                          user['table_name'] ??
+                                                              'user',
+                                                          'reject',
+                                                        ),
+                                                    child: const Text(
+                                                      'Reject',
+                                                      style: TextStyle(
+                                                        color: Colors.red,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                    ),
+                                  );
+                                },
                               ),
                     ),
-                  );
-                },
-              ),
+                  ],
+                ),
+      ),
     );
   }
 }
