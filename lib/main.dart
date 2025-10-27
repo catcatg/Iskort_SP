@@ -46,7 +46,7 @@ class MyApp extends StatelessWidget {
         '/food': (context) => const FoodPage(),
         '/housing': (context) => const HousingPage(),
         '/route': (context) => const MapRoutePage(),
-        '/setup-page': (context) => const SetupPage(),
+        '/setup-page': (context) => const SetupEateryPage(),
       },
     );
   }
