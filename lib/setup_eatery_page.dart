@@ -1,81 +1,35 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:iskort/homepage.dart';
+import 'setup_details.dart';
 
-class SetupPage extends StatefulWidget {
-  const SetupPage({super.key});
+class SetupEateryPage extends StatefulWidget {
+  const SetupEateryPage({super.key});
 
   @override
-  State<SetupPage> createState() => _SetupPageState();
+  State<SetupEateryPage> createState() => _SetupEateryPageState();
 }
 
-class _SetupPageState extends State<SetupPage> {
-  String? establishmentType;
-  final nameController = TextEditingController();
-  final ownerNameController = TextEditingController();
-  final contactEmailController = TextEditingController();
-  final contactPhoneController = TextEditingController();
-  final locationController = TextEditingController();
-  TimeOfDay? openTime;
-  TimeOfDay? closeTime;
+class _SetupEateryPageState extends State<SetupEateryPage> {
+  String selectedType = '';
 
-  File? pickedImage;
-  final List<Map<String, dynamic>> menuItems = [];
-
-  final ImagePicker _picker = ImagePicker();
-
-  int step = 0;
-
-  Future<void> pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        pickedImage = File(pickedFile.path);
-      });
-    }
+  void selectType(String type) {
+    setState(() {
+      selectedType = type;
+    });
   }
 
-  Future<void> submitData() async {
-    final response = await http.post(
-      Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'owner_id': 1, // TODO: replace with logged-in owner_id
-        'name': nameController.text,
-        'location': locationController.text,
-        'open_time': openTime?.format(context),
-        'end_time': closeTime?.format(context),
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final eateryId = data['eatery_id'];
-
-      for (var item in menuItems) {
-        await http.post(
-          Uri.parse('https://iskort-public-web.onrender.com/api/food'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'name': item['name'],
-            'eatery_id': eateryId,
-            'classification': item['classification'],
-            'price': item['price'],
-            'photo': item['photo'] ?? '',
-          }),
-        );
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Business setup complete!")),
+  void goToNext() {
+    if (selectedType.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
       );
-
-      Navigator.pushReplacementNamed(context, '/homepage');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to save business setup.")),
+        const SnackBar(
+          content: Text("Please select an establishment type first!"),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
@@ -83,130 +37,177 @@ class _SetupPageState extends State<SetupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Setup Your Business")),
-      body: Stepper(
-        currentStep: step,
-        onStepContinue: () {
-          if (step < 2) {
-            setState(() => step++);
-          } else {
-            submitData();
-          }
-        },
-        onStepCancel: () {
-          if (step > 0) setState(() => step--);
-        },
-        steps: [
-          Step(
-            title: const Text("Choose Type"),
-            content: Column(
-              children: [
-                RadioListTile(
-                  title: const Text("Food"),
-                  value: "food",
-                  groupValue: establishmentType,
-                  onChanged: (val) => setState(() => establishmentType = val),
-                ),
-                RadioListTile(
-                  title: const Text("Lodging"),
-                  value: "lodging",
-                  groupValue: establishmentType,
-                  onChanged: (val) => setState(() => establishmentType = val),
-                ),
+      appBar: AppBar(
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color.fromARGB(255, 122, 12, 12),
+                Color.fromARGB(255, 10, 62, 17),
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
-          Step(
-            title: const Text("Details"),
-            content: Column(
-              children: [
-                TextField(controller: ownerNameController, decoration: const InputDecoration(labelText: "Owner Name")),
-                TextField(controller: nameController, decoration: const InputDecoration(labelText: "Establishment Name")),
-                TextField(controller: contactEmailController, decoration: const InputDecoration(labelText: "Contact Email")),
-                TextField(controller: contactPhoneController, decoration: const InputDecoration(labelText: "Contact Phone")),
-                TextField(controller: locationController, decoration: const InputDecoration(labelText: "Location")),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () async {
-                        final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-                        if (time != null) setState(() => openTime = time);
-                      },
-                      child: Text(openTime == null ? "Set Open Time" : "Open: ${openTime!.format(context)}"),
+        ),
+        title: const Text(
+          "Setup Your Business",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        //centerTitle: true,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Text(
+              "What’s your establishment?",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color.fromARGB(255, 122, 12, 12),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+
+            // Food Card
+            GestureDetector(
+              onTap: () => selectType('Food'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color:
+                      selectedType == 'Food'
+                          ? const Color(0xFFF8F8F8)
+                          : Colors.white,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          selectedType == 'Food'
+                              ? Colors.grey.withOpacity(0.4)
+                              : Colors.grey.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    TextButton(
-                      onPressed: () async {
-                        final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-                        if (time != null) setState(() => closeTime = time);
-                      },
-                      child: Text(closeTime == null ? "Set Close Time" : "Close: ${closeTime!.format(context)}"),
+                  ],
+                  border: Border.all(
+                    color:
+                        selectedType == 'Food'
+                            ? Colors.redAccent
+                            : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.restaurant_rounded,
+                      color: Colors.redAccent,
+                      size: 36,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      "Food Establishment",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-          Step(
-            title: const Text("Menu"),
-            content: Column(
-              children: [
-                ElevatedButton(
-                  onPressed: () async {
-                    final itemNameController = TextEditingController();
-                    final itemPriceController = TextEditingController();
-                    String classification = "chicken";
 
-                    await showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text("Add Menu Item"),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextField(controller: itemNameController, decoration: const InputDecoration(labelText: "Name")),
-                            TextField(controller: itemPriceController, decoration: const InputDecoration(labelText: "Price")),
-                            DropdownButton<String>(
-                              value: classification,
-                              onChanged: (val) => classification = val!,
-                              items: ["chicken", "pork", "beef", "coffee", "non-coffee", "alcoholic", "non-alcoholic"]
-                                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                                  .toList(),
-                            ),
-                            ElevatedButton(
-                              onPressed: pickImage,
-                              child: const Text("Pick Image"),
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                menuItems.add({
-                                  "name": itemNameController.text,
-                                  "price": itemPriceController.text,
-                                  "classification": classification,
-                                  "photo": pickedImage?.path,
-                                });
-                              });
-                              Navigator.pop(context);
-                            },
-                            child: const Text("Add"),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: const Text("Add Menu Item"),
+            // Lodging Card
+            GestureDetector(
+              onTap: () => selectType('Lodging'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color:
+                      selectedType == 'Lodging'
+                          ? const Color(0xFFF8F8F8)
+                          : Colors.white,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          selectedType == 'Lodging'
+                              ? Colors.grey.withOpacity(0.4)
+                              : Colors.grey.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(
+                    color:
+                        selectedType == 'Lodging'
+                            ? Colors.redAccent
+                            : Colors.transparent,
+                    width: 2,
+                  ),
                 ),
-                ...menuItems.map((item) => ListTile(
-                      title: Text(item['name']),
-                      subtitle: Text("₱${item['price']} - ${item['classification']}"),
-                    )),
-              ],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.house_rounded,
+                      color: Colors.redAccent,
+                      size: 36,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      "Lodging / Dormitory",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: 40),
+
+            // Next Button
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: goToNext,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF387C44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  elevation: 5,
+                ),
+                child: const Text(
+                  "Next",
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
