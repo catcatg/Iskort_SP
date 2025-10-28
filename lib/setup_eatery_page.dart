@@ -22,7 +22,7 @@ class _SetupEateryPageState extends State<SetupEateryPage> {
     if (selectedType.isNotEmpty) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => HomePage()),
+        MaterialPageRoute(builder: (context) => SetupDetailsPage()),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
