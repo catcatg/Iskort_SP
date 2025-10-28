@@ -13,6 +13,7 @@ import 'signup_page.dart';
 import 'admin_dashboard.dart';
 import 'setup_eatery_page.dart';
 import 'user_manage.dart';
+import 'setup_details.dart';
 
 void main() {
   // Wrapping MyApp with the Provider to make MenuState available globally
@@ -47,6 +48,7 @@ class MyApp extends StatelessWidget {
         '/housing': (context) => const HousingPage(),
         '/route': (context) => const MapRoutePage(),
         '/setup-page': (context) => const SetupEateryPage(),
+        '/setup-details': (context) => const SetupDetailsPage(),
       },
     );
   }
