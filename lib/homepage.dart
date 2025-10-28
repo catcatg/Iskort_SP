@@ -16,11 +16,11 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> fetchEateries() async {
     try {
-      final response = await http.get(Uri.parse('https://iskort-public-web.onrender.com/api/eateries'));
+      final response = await http.get(Uri.parse('https://iskort-public-web.onrender.com/api/eatery'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          eateries = data['eateries'] ?? [];
+          eateries = data['eatery'] ?? [];
           isLoading = false;
         });
       }

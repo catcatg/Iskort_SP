@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 import 'package:iskort/reusables.dart';
 
 class SignupPage extends StatefulWidget {
@@ -15,9 +16,12 @@ class _SignupPageState extends State<SignupPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
+  final phoneController = TextEditingController();
 
   String selectedRole = '';
   bool get isRoleSelected => selectedRole.isNotEmpty;
+
+  String notifPreference = 'email';
 
   Future<void> register() async {
     if (passwordController.text != confirmPasswordController.text) {
@@ -29,29 +33,33 @@ class _SignupPageState extends State<SignupPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://iskort-public-web.onrender.com/api/admin/register'),
+        Uri.parse(
+          selectedRole == 'admin'
+            ? 'https://iskort-public-web.onrender.com/api/admin/register'
+            : selectedRole == 'owner'
+              ? 'https://iskort-public-web.onrender.com/api/owner/register'
+              : 'https://iskort-public-web.onrender.com/api/user/register',
+        ),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'name': nameController.text,
           'email': emailController.text,
           'password': passwordController.text,
+          'phone_number': phoneController.text,
           'role': selectedRole,
+          'notif_preference': notifPreference,
         }),
       );
 
-      if (response.statusCode == 200) {
-        // Show success message
+      if (response.statusCode == 201 || response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Registered successfully! Please login.')),
         );
-
-        // Clear fields
         nameController.clear();
         emailController.clear();
         passwordController.clear();
         confirmPasswordController.clear();
-
-        // Go to login page
+        phoneController.clear();
         Navigator.pushReplacementNamed(context, '/login');
       } else {
         final body = jsonDecode(response.body);
@@ -87,9 +95,37 @@ class _SignupPageState extends State<SignupPage> {
               roleLabel,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: isSelected
-                    ? const Color(0xFFFBAC24)
-                    : Colors.black,
+                color: isSelected ? const Color(0xFFFBAC24) : Colors.black,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget notifButton(String label) {
+    final isSelected = notifPreference == label.toLowerCase();
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            notifPreference = label.toLowerCase();
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF0A4423) : Colors.grey[300],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isSelected ? const Color(0xFFFBAC24) : Colors.black,
               ),
             ),
           ),
@@ -124,19 +160,31 @@ class _SignupPageState extends State<SignupPage> {
             ),
             const Text(
               "Let's get started!",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 20),
 
+            // Role selection
             Row(
               children: [
                 roleButton("ADMIN"),
                 roleButton("OWNER"),
                 roleButton("USER"),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // Notification preference selection
+            const Text(
+              'Preferred way to receive updates:',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            Row(
+              children: [
+                notifButton('Email'),
+                notifButton('SMS'),
+                notifButton('Both'),
               ],
             ),
 
@@ -158,6 +206,14 @@ class _SignupPageState extends State<SignupPage> {
                       title: 'Email',
                       label: 'Enter your email',
                       controller: emailController,
+                    ),
+                    const SizedBox(height: 15),
+                    CustomTextField(
+                      title: 'Phone Number',
+                      label: 'Enter your phone number',
+                      controller: phoneController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
                     const SizedBox(height: 15),
                     CustomTextField(
