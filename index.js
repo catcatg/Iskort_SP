@@ -9,12 +9,29 @@ const path = require('path');
 dotenv.config();
 const app = express();
 
+const allowedOrigins = [
+  'http://localhost:8080', // for Flutter web debug
+  'http://localhost:51564', // (optional, if Flutter uses another random port)
+  'https://iskort-public-web.onrender.com', // your backend itself
+  'https://iskort-frontend.web.app', // if you host frontend on Firebase or similar later
+];
+
 app.use(cors({
-  origin: '*', // or set to your frontend origin if hosted (e.g. 'https://yourapp.web.app')
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`🚫 CORS blocked request from: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
-app.options('*', cors()); // handle preflight requests explicitly
+
+app.options('*', cors());
+
 
 app.use(bodyParser.json());
 
@@ -34,7 +51,7 @@ const db = mysql.createConnection({
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
   database: process.env.DB_NAME || 'railway',
-  port: process.env.DB_PORT || 43301,
+  port: process.env.DB_PORT || 3306,
 });
 
 db.connect((err) => {

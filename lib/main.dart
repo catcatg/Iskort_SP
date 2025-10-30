@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => SignupPage(),
         '/homepage': (context) => HomePage(),
         '/profile': (context) => const UserProfilePage(),
-        '/admin-dashboard': (context) => const DashboardAdminScreen(),
+        '/admin-dashboard': (context) => const AdminDashboardPage(),
         '/user-management': (context) => const UserManage(),
         '/food': (context) => const FoodPage(),
         '/housing': (context) => const HousingPage(),
