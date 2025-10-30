@@ -47,7 +47,7 @@ const upload = multer({ storage });
 
 // ✅ MySQL connection (for Railway)
 const db = mysql.createConnection({
-  host: process.env.DB_HOST || 'switchyard.proxy.rlwy.net',
+  host: process.env.DB_HOST || 'mysql.railway.internal',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
   database: process.env.DB_NAME || 'railway',
@@ -63,7 +63,7 @@ db.connect((err) => {
 });
 
 app.post('/api/admin/register', (req, res) => {
-  const { name, email, password, role, phone_number, notif_preference } = req.body;
+  const { name, email, password, role, phone_num, notif_preference } = req.body;
 
   db.query('SELECT * FROM admin WHERE email = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ error: err });
@@ -73,9 +73,9 @@ app.post('/api/admin/register', (req, res) => {
 
     db.query(
       `INSERT INTO admin 
-       (name, email, password, role, is_verified, phone_number, notif_preference) 
+       (name, email, password, role, is_verified, phone_num, notif_preference) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, email, password, role, 0, phone_number, notif_preference],
+      [name, email, password, role, 0, phone_num, notif_preference],
       (err, result) => {
         if (err) return res.status(500).json({ error: err });
 
@@ -89,7 +89,7 @@ app.post('/api/admin/register', (req, res) => {
 });
 
 app.post('/api/user/register', (req, res) => {
-  const { name, email, password, phone_number, notif_preference } = req.body;
+  const { name, email, password, phone_num, notif_preference } = req.body;
 
   db.query('SELECT * FROM user WHERE email = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ error: err });
@@ -98,9 +98,9 @@ app.post('/api/user/register', (req, res) => {
     }
 
     db.query(
-      `INSERT INTO user (name, email, password, role, is_verified, phone_number, notif_preference)
+      `INSERT INTO user (name, email, password, role, is_verified, phone_num, notif_preference)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, email, password, 'user', 0, phone_number, notif_preference],
+      [name, email, password, 'user', 0, phone_num, notif_preference],
       (err, result) => {
         if (err) return res.status(500).json({ error: err });
         res.status(201).json({ success: true, message: 'User registered successfully' });
@@ -110,7 +110,7 @@ app.post('/api/user/register', (req, res) => {
 });
 
 app.post('/api/owner/register', (req, res) => {
-  const { name, email, password, phone_number, notif_preference } = req.body;
+  const { name, email, password, phone_num, notif_preference } = req.body;
 
   db.query('SELECT * FROM owner WHERE email = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ error: err });
@@ -119,9 +119,9 @@ app.post('/api/owner/register', (req, res) => {
     }
 
     db.query(
-      `INSERT INTO owner (name, email, password, role, is_verified, phone_number, notif_preference)
+      `INSERT INTO owner (name, email, password, role, is_verified, phone_num, notif_preference)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, email, password, 'owner', 0, phone_number, notif_preference],
+      [name, email, password, 'owner', 0, phone_num, notif_preference],
       (err, result) => {
         if (err) return res.status(500).json({ error: err });
         res.status(201).json({ success: true, message: 'Owner registered successfully' });
@@ -219,7 +219,7 @@ app.post('/api/owner/login', (req, res) => {
 // GET ALL USERS (with phone & notif preference)
 app.get('/api/admin/users', (req, res) => {
   const query = `
-    SELECT admin_id AS id, name, email, phone_number, notif_preference,
+    SELECT admin_id AS id, name, email, phone_num, notif_preference,
            COALESCE(role, 'admin') AS role,
            COALESCE(status, 'pending') AS status,
            COALESCE(is_verified, 0) AS is_verified,
@@ -227,7 +227,7 @@ app.get('/api/admin/users', (req, res) => {
            'admin' AS table_name
     FROM admin
     UNION ALL
-    SELECT user_id AS id, name, email, phone_number, notif_preference,
+    SELECT user_id AS id, name, email, phone_num, notif_preference,
            COALESCE(role, 'user') AS role,
            COALESCE(status, 'pending') AS status,
            COALESCE(is_verified, 0) AS is_verified,
@@ -235,7 +235,7 @@ app.get('/api/admin/users', (req, res) => {
            'user' AS table_name
     FROM user
     UNION ALL
-    SELECT owner_id AS id, name, email, phone_number, notif_preference,
+    SELECT owner_id AS id, name, email, phone_num, notif_preference,
            COALESCE(role, 'owner') AS role,
            COALESCE(status, 'pending') AS status,
            COALESCE(is_verified, 0) AS is_verified,
@@ -262,7 +262,7 @@ app.put('/api/admin/verify/:role/:id', (req, res) => {
     if (err) return res.status(500).json({ success: false, error: err });
 
     // Fetch user info for simulation
-    db.query(`SELECT name, email, phone_number, notif_preference FROM ${table} WHERE ${role}_id = ?`, [id], (err, users) => {
+    db.query(`SELECT name, email, phone_num, notif_preference FROM ${table} WHERE ${role}_id = ?`, [id], (err, users) => {
       if (err) return res.status(500).json({ success: false, error: err });
       const user = users[0];
 
@@ -271,7 +271,7 @@ app.put('/api/admin/verify/:role/:id', (req, res) => {
         console.log(`📧 Sent verification email to ${user.email}`);
       }
       if (user.notif_preference === 'sms' || user.notif_preference === 'both') {
-        console.log(`📱 Sent verification SMS to ${user.phone_number}`);
+        console.log(`📱 Sent verification SMS to ${user.phone_num}`);
       }
 
       res.json({ success: true, message: `${role} verified successfully` });
@@ -289,7 +289,7 @@ app.delete('/api/admin/reject/:role/:id', (req, res) => {
   else return res.status(400).json({ success: false, message: 'Invalid role' });
 
   // Fetch user info first to simulate message
-  db.query(`SELECT name, email, phone_number, notif_preference FROM ${table} WHERE ${role}_id = ?`, [id], (err, users) => {
+  db.query(`SELECT name, email, phone_num, notif_preference FROM ${table} WHERE ${role}_id = ?`, [id], (err, users) => {
     if (err) return res.status(500).json({ success: false, error: err });
     const user = users[0];
 
@@ -302,7 +302,7 @@ app.delete('/api/admin/reject/:role/:id', (req, res) => {
         console.log(`📧 Sent rejection email to ${user.email}`);
       }
       if (user.notif_preference === 'sms' || user.notif_preference === 'both') {
-        console.log(`📱 Sent rejection SMS to ${user.phone_number}`);
+        console.log(`📱 Sent rejection SMS to ${user.phone_num}`);
       }
 
       res.json({ success: true, message: `${role} rejected and deleted` });
