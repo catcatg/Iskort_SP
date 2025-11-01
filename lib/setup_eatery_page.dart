@@ -28,7 +28,7 @@ class _SetupEateryPageState extends State<SetupEateryPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Please select an establishment type first!"),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: Colors.greenAccent,
         ),
       );
     }
@@ -100,7 +100,7 @@ class _SetupEateryPageState extends State<SetupEateryPage> {
                   border: Border.all(
                     color:
                         selectedType == 'Food'
-                            ? Colors.redAccent
+                            ? Colors.greenAccent
                             : Colors.transparent,
                     width: 2,
                   ),
@@ -110,7 +110,7 @@ class _SetupEateryPageState extends State<SetupEateryPage> {
                   children: const [
                     Icon(
                       Icons.restaurant_rounded,
-                      color: Colors.redAccent,
+                      color: Colors.green,
                       size: 36,
                     ),
                     SizedBox(width: 12),
@@ -154,7 +154,7 @@ class _SetupEateryPageState extends State<SetupEateryPage> {
                   border: Border.all(
                     color:
                         selectedType == 'Lodging'
-                            ? Colors.redAccent
+                            ? Colors.greenAccent
                             : Colors.transparent,
                     width: 2,
                   ),
@@ -164,7 +164,7 @@ class _SetupEateryPageState extends State<SetupEateryPage> {
                   children: const [
                     Icon(
                       Icons.house_rounded,
-                      color: Colors.redAccent,
+                      color: Colors.greenAccent,
                       size: 36,
                     ),
                     SizedBox(width: 12),
