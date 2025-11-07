@@ -47,7 +47,7 @@ const upload = multer({ storage });
 
 // ✅ MySQL connection (for Railway)
 const db = mysql.createConnection({
-  host: process.env.DB_HOST || 'mysql.railway.internal',
+  host: process.env.DB_HOST || 'switchyard.proxy.rlwy.net',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
   database: process.env.DB_NAME || 'railway',
