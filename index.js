@@ -10,15 +10,13 @@ dotenv.config();
 const app = express();
 
 const allowedOrigins = [
-  'http://localhost:8080', // for Flutter web debug
-  'http://localhost:51564', // (optional, if Flutter uses another random port)
   'https://iskort-public-web.onrender.com', // your backend itself
   'https://iskort-frontend.web.app', // if you host frontend on Firebase or similar later
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || origin.includes('localhost') || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.warn(`🚫 CORS blocked request from: ${origin}`);
