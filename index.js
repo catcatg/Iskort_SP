@@ -44,7 +44,7 @@ db.connect((err) => {
 
 // ===== REGISTER (All roles register under admin first) =====
 app.post('/api/admin/register', (req, res) => {
-  const { name, email, password, role, phone_number, notif_preference } =
+  const { name, email, password, role, phone_num, notif_preference } =
     req.body;
 
   db.query('SELECT * FROM admin WHERE email = ?', [email], (err, results) => {
@@ -54,9 +54,9 @@ app.post('/api/admin/register', (req, res) => {
 
     db.query(
       `INSERT INTO admin 
-       (name, email, password, role, is_verified, phone_number, notif_preference, status, created_at)
+       (name, email, password, role, is_verified, phone_num, notif_preference, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
-      [name, email, password, role, 0, phone_number, notif_preference || 'email'],
+      [name, email, password, role, 0, phone_num, notif_preference || 'email'],
       (err, result) => {
         if (err) return res.status(500).json({ error: err });
         res.status(201).json({
@@ -109,7 +109,7 @@ app.post('/api/admin/login', (req, res) => {
 // ===== GET ALL USERS =====
 app.get('/api/admin/users', (req, res) => {
   const query = `
-    SELECT admin_id AS id, name, email, phone_number, notif_preference,
+    SELECT admin_id AS id, name, email, phone_num, notif_preference,
            COALESCE(role, 'admin') AS role,
            COALESCE(status, 'pending') AS status,
            COALESCE(is_verified, 0) AS is_verified,
@@ -117,7 +117,7 @@ app.get('/api/admin/users', (req, res) => {
            'admin' AS table_name
     FROM admin
     UNION ALL
-    SELECT user_id AS id, name, email, phone_number, notif_preference,
+    SELECT user_id AS id, name, email, phone_num, notif_preference,
            COALESCE(role, 'user') AS role,
            COALESCE(status, 'pending') AS status,
            COALESCE(is_verified, 0) AS is_verified,
@@ -125,7 +125,7 @@ app.get('/api/admin/users', (req, res) => {
            'user' AS table_name
     FROM user
     UNION ALL
-    SELECT owner_id AS id, name, email, phone_number, notif_preference,
+    SELECT owner_id AS id, name, email, phone_num, notif_preference,
            COALESCE(role, 'owner') AS role,
            COALESCE(status, 'pending') AS status,
            COALESCE(is_verified, 0) AS is_verified,
@@ -163,14 +163,14 @@ app.put('/api/admin/verify/:id', (req, res) => {
         if (user.role === 'owner' || user.role === 'user') {
           const table = user.role;
           db.query(
-            `INSERT INTO ${table} (name, email, password, role, phone_number, is_verified, status, notif_preference, created_at)
+            `INSERT INTO ${table} (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               user.name,
               user.email,
               user.password,
               user.role,
-              user.phone_number,
+              user.phone_num,
               1,
               'verified',
               user.notif_preference,
