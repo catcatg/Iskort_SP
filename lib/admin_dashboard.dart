@@ -16,7 +16,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<void> fetchUsers() async {
     try {
       final response = await http.get(
-        Uri.parse(''),
+        Uri.parse('https://iskort-public-web.onrender.com/api/admin/users'),
       );
       final data = jsonDecode(response.body);
 
