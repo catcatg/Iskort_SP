@@ -16,7 +16,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<void> fetchUsers() async {
     try {
       final response = await http.get(
-        Uri.parse('https://iskort-public-web.onrender.com/api/admin/users'),
+        Uri.parse(''),
       );
       final data = jsonDecode(response.body);
 
@@ -43,7 +43,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // SEND notification based on preference
         final pref = (user['notif_preference'] ?? 'email').toString().toLowerCase();
         final email = user['email'] ?? 'unknown';
-        final phone = user['phone_number'] ?? 'unknown';
+        final phone = user['phone_num'] ?? 'unknown';
         if (pref == 'email') print('Sent verification to $email via Email');
         else if (pref == 'sms') print('Sent verification to $phone via SMS');
         else print('Sent verification to $email via Email and $phone via SMS');
@@ -57,7 +57,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // SEND notification based on preference
         final pref = (user['notif_preference'] ?? 'email').toString().toLowerCase();
         final email = user['email'] ?? 'unknown';
-        final phone = user['phone_number'] ?? 'unknown';
+        final phone = user['phone_num'] ?? 'unknown';
         if (pref == 'email') print('Sent rejection to $email via Email');
         else if (pref == 'sms') print('Sent rejection to $phone via SMS');
         else print('Sent rejection to $email via Email and $phone via SMS');
@@ -106,7 +106,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(user['email'] ?? 'No email'),
-                        Text('Phone: ${user['phone_number'] ?? 'N/A'}'),
+                        Text('Phone: ${user['phone_num'] ?? 'N/A'}'),
                         Text('Joined: ${user['created_at'] ?? 'N/A'}'),
                         Text('Preference: ${user['notif_preference'] ?? 'email'}'),
                       ],
