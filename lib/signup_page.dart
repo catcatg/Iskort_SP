@@ -33,19 +33,13 @@ class _SignupPageState extends State<SignupPage> {
 
     try {
       final response = await http.post(
-        Uri.parse(
-          selectedRole == 'admin'
-            ? 'https://iskort-public-web.onrender.com/api/admin/register'
-            : selectedRole == 'owner'
-              ? 'https://iskort-public-web.onrender.com/api/owner/register'
-              : 'https://iskort-public-web.onrender.com/api/user/register',
-        ),
+        Uri.parse('https://iskort-public-web.onrender.com/api/admin/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'name': nameController.text,
           'email': emailController.text,
           'password': passwordController.text,
-          'phone_number': phoneController.text,
+          'phone_num': phoneController.text,
           'role': selectedRole,
           'notif_preference': notifPreference,
         }),
