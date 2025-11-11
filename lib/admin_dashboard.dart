@@ -17,7 +17,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   List eateries = [];
   bool isEateryLoading = true;
 
-  // Fetch users (existing)
+  // ---------------- USERS ----------------
   Future<void> fetchUsers() async {
     try {
       final response = await http.get(
@@ -36,7 +36,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  // Fetch eateries
+  // ---------------- EATERIES ----------------
   Future<void> fetchEateries() async {
     try {
       final response = await http.get(
@@ -45,8 +45,40 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       final data = jsonDecode(response.body);
 
       if (data['success'] == true) {
+        List eateriesData = data['eateries'] ?? [];
+
+        // Fetch owner details using owner_id for each eatery
+        for (var eatery in eateriesData) {
+          final ownerId = eatery['owner_id'];
+          if (ownerId != null) {
+            try {
+              final ownerResponse = await http.get(
+                Uri.parse(
+                    'https://iskort-public-web.onrender.com/api/owner/$ownerId'),
+              );
+              final ownerData = jsonDecode(ownerResponse.body);
+
+              if (ownerData['success'] == true && ownerData['owner'] != null) {
+                final owner = ownerData['owner'];
+                eatery['owner_name'] = owner['name'] ?? 'Unknown';
+                eatery['owner_email'] = owner['email'] ?? 'Unknown';
+                eatery['owner_phone'] = owner['phone_num'] ?? 'Unknown';
+              } else {
+                eatery['owner_name'] = 'Unknown';
+                eatery['owner_email'] = 'Unknown';
+                eatery['owner_phone'] = 'Unknown';
+              }
+            } catch (e) {
+              print('Error fetching owner for eatery $ownerId: $e');
+              eatery['owner_name'] = 'Unknown';
+              eatery['owner_email'] = 'Unknown';
+              eatery['owner_phone'] = 'Unknown';
+            }
+          }
+        }
+
         setState(() {
-          eateries = data['eateries'] ?? [];
+          eateries = eateriesData;
           isEateryLoading = false;
         });
       }
@@ -55,7 +87,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  // Actions for user verification
+  // ---------------- USER ACTIONS ----------------
   Future<void> performAction(
       String id, String role, String action, Map user) async {
     try {
@@ -67,7 +99,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         final data = jsonDecode(response.body);
         print('Verify -> ${data['message']}');
 
-        // SEND notification based on preference
+        // SEND notification
         final pref =
             (user['notif_preference'] ?? 'email').toString().toLowerCase();
         final email = user['email'] ?? 'unknown';
@@ -86,7 +118,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         final data = jsonDecode(response.body);
         print('Reject -> ${data['message']}');
 
-        // SEND notification based on preference
+        // SEND notification
         final pref =
             (user['notif_preference'] ?? 'email').toString().toLowerCase();
         final email = user['email'] ?? 'unknown';
@@ -100,30 +132,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         }
       }
 
-      fetchUsers(); // refresh list after action
+      fetchUsers();
     } catch (e) {
       print('Action error: $e');
     }
   }
 
-  // Actions for eatery verification
-  Future<void> performEateryAction(String id, String action, Map eatery) async {
+  // ---------------- EATERY ACTIONS ----------------
+  Future<void> performEateryAction(
+      String id, String action, Map eatery) async {
     try {
       late Uri url;
       if (action == 'verify') {
         url = Uri.parse(
-            'https://iskort-backend.onrender.com/api/admin/verify/eatery/$id');
+            'https://iskort-public-web.onrender.com/api/admin/verify/eatery/$id');
         final response = await http.put(url);
         final data = jsonDecode(response.body);
         print('Verify Eatery -> ${data['message']}');
 
-        // You can send notification to owner here if needed
         final ownerEmail = eatery['owner_email'] ?? 'unknown';
         final ownerPhone = eatery['owner_phone'] ?? 'unknown';
         print('Sent verification to $ownerEmail / $ownerPhone');
       } else if (action == 'reject') {
         url = Uri.parse(
-            'https://iskort-backend.onrender.com/api/admin/reject/eatery/$id');
+            'https://iskort-public-web.onrender.com/api/admin/reject/eatery/$id');
         final response = await http.delete(url);
         final data = jsonDecode(response.body);
         print('Reject Eatery -> ${data['message']}');
@@ -133,12 +165,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         print('Sent rejection to $ownerEmail / $ownerPhone');
       }
 
-      fetchEateries(); // refresh after action
+      fetchEateries();
     } catch (e) {
       print('Eatery Action Error: $e');
     }
   }
 
+  // ---------------- INIT ----------------
   @override
   void initState() {
     super.initState();
@@ -146,7 +179,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     fetchEateries();
   }
 
-  // Sidebar item builder
+  // ---------------- SIDEBAR ----------------
   Widget buildSidebarItem(String title, IconData icon, int index) {
     final bool isActive = selectedPage == index;
     return InkWell(
@@ -178,7 +211,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Build User Verification Page
+  // ---------------- USER PAGE ----------------
   Widget buildUserVerificationPage() {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -204,8 +237,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
             trailing: isVerified
-                ? const Text('✅ Verified',
-                    style: TextStyle(color: Colors.green))
+                ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -225,10 +257,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           'reject',
                           user,
                         ),
-                        child: const Text(
-                          'Reject',
-                          style: TextStyle(color: Colors.red),
-                        ),
+                        child: const Text('Reject',
+                            style: TextStyle(color: Colors.red)),
                       ),
                     ],
                   ),
@@ -238,7 +268,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Build Eatery Verification Page
+  // ---------------- EATERY PAGE ----------------
   Widget buildEateryPage() {
     if (isEateryLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -281,7 +311,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       TextButton(
                         onPressed: () => performEateryAction(
                             (eatery['id'] ?? '').toString(), 'reject', eatery),
-                        child: const Text('Reject', style: TextStyle(color: Colors.red)),
+                        child: const Text('Reject',
+                            style: TextStyle(color: Colors.red)),
                       ),
                     ],
                   ),
@@ -291,6 +322,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  // ---------------- HOUSING PAGE ----------------
   Widget buildHousingPage() {
     return const Center(
       child: Text(
@@ -301,6 +333,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  // ---------------- PAGE BUILDER ----------------
   Widget buildPageContent() {
     switch (selectedPage) {
       case 0:
@@ -314,6 +347,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
