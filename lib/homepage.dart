@@ -25,7 +25,7 @@ class _HomePageState extends State<HomePage> {
         });
       }
     } catch (e) {
-      print("❌ Error fetching eateries: $e");
+      print("Error fetching eateries: $e");
       setState(() => isLoading = false);
     }
   }
@@ -51,7 +51,7 @@ class _HomePageState extends State<HomePage> {
             Row(
               children: const [
                 Text(
-                  "Hello Iska, \nCatherine!",
+                  "Hello Iska!",
                   style: TextStyle(
                     color: Color(0xFF0A4423),
                     fontSize: 24,

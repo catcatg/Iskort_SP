@@ -38,7 +38,7 @@ db.connect((err) => {
   if (err) {
     console.error('MySQL connection failed:', err);
   } else {
-    console.log('✅ Connected to Railway MySQL successfully!');
+    console.log('Connected to Railway MySQL successfully!');
   }
 });
 
@@ -94,7 +94,7 @@ app.post('/api/admin/login', (req, res) => {
       if (!user.is_verified)
         return res.status(403).json({
           success: false,
-          message: '⏳ Your account is not verified yet by admin.',
+          message: 'Your account is not verified yet by admin.',
         });
 
       res.json({
@@ -178,7 +178,7 @@ app.put('/api/admin/verify/:id', (req, res) => {
             ],
             (err2) => {
               if (err2) return res.status(500).json({ success: false, error: err2 });
-              console.log(`✅ ${user.role} account copied to ${table} table`);
+              console.log(`${user.role} account copied to ${table} table`);
               res.json({
                 success: true,
                 message: `${user.role} verified and copied successfully`,
@@ -209,7 +209,7 @@ app.delete('/api/admin/reject/:id', (req, res) => {
     db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
       if (err2) return res.status(500).json({ success: false, error: err2 });
 
-      console.log(`❌ ${user.role} (${user.email}) rejected and removed`);
+      console.log(`${user.role} (${user.email}) rejected and removed`);
       res.json({
         success: true,
         message: `${user.role} rejected and deleted`,
@@ -256,10 +256,10 @@ app.get('/api/foods/:eatery_id', (req, res) => {
 
 // ===== BASE ROUTE =====
 app.get('/', (req, res) => {
-  res.send('✅ Iskort API is live and ready for use!');
+  res.send('Iskort API is live and ready for use!');
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
