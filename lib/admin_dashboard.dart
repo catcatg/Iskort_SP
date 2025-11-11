@@ -10,9 +10,11 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
+  int selectedPage = 0; // 0 = Users, 1 = Eatery, 2 = Housing
   List users = [];
   bool isLoading = true;
 
+  // Fetch users (existing)
   Future<void> fetchUsers() async {
     try {
       final response = await http.get(
@@ -31,36 +33,49 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  Future<void> performAction(String id, String role, String action, Map user) async {
+  // Actions for user verification
+  Future<void> performAction(
+      String id, String role, String action, Map user) async {
     try {
       late Uri url;
       if (action == 'verify') {
-        url = Uri.parse('https://iskort-public-web.onrender.com/api/admin/verify/$id');
+        url = Uri.parse(
+            'https://iskort-public-web.onrender.com/api/admin/verify/$id');
         final response = await http.put(url);
         final data = jsonDecode(response.body);
         print('Verify -> ${data['message']}');
 
         // SEND notification based on preference
-        final pref = (user['notif_preference'] ?? 'email').toString().toLowerCase();
+        final pref =
+            (user['notif_preference'] ?? 'email').toString().toLowerCase();
         final email = user['email'] ?? 'unknown';
         final phone = user['phone_num'] ?? 'unknown';
-        if (pref == 'email') print('Sent verification to $email via Email');
-        else if (pref == 'sms') print('Sent verification to $phone via SMS');
-        else print('Sent verification to $email via Email and $phone via SMS');
-
+        if (pref == 'email') {
+          print('Sent verification to $email via Email');
+        } else if (pref == 'sms') {
+          print('Sent verification to $phone via SMS');
+        } else {
+          print('Sent verification to $email via Email and $phone via SMS');
+        }
       } else if (action == 'reject') {
-        url = Uri.parse('https://iskort-public-web.onrender.com/api/admin/reject/$id');
+        url = Uri.parse(
+            'https://iskort-public-web.onrender.com/api/admin/reject/$id');
         final response = await http.delete(url);
         final data = jsonDecode(response.body);
         print('Reject -> ${data['message']}');
 
         // SEND notification based on preference
-        final pref = (user['notif_preference'] ?? 'email').toString().toLowerCase();
+        final pref =
+            (user['notif_preference'] ?? 'email').toString().toLowerCase();
         final email = user['email'] ?? 'unknown';
         final phone = user['phone_num'] ?? 'unknown';
-        if (pref == 'email') print('Sent rejection to $email via Email');
-        else if (pref == 'sms') print('Sent rejection to $phone via SMS');
-        else print('Sent rejection to $email via Email and $phone via SMS');
+        if (pref == 'email') {
+          print('Sent rejection to $email via Email');
+        } else if (pref == 'sms') {
+          print('Sent rejection to $phone via SMS');
+        } else {
+          print('Sent rejection to $email via Email and $phone via SMS');
+        }
       }
 
       fetchUsers(); // refresh list after action
@@ -75,74 +90,195 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     fetchUsers();
   }
 
+  // Sidebar item builder
+  Widget buildSidebarItem(String title, IconData icon, int index) {
+    final bool isActive = selectedPage == index;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          selectedPage = index;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.blue.shade100 : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isActive ? Colors.blue : Colors.black54),
+            const SizedBox(width: 10),
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                color: isActive ? Colors.blue.shade900 : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Build User Verification Page
+  Widget buildUserVerificationPage() {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return ListView.builder(
+      itemCount: users.length,
+      itemBuilder: (context, index) {
+        final user = users[index];
+        final isVerified = (user['is_verified'] ?? 0) == 1;
+
+        return Card(
+          margin: const EdgeInsets.all(8),
+          child: ListTile(
+            title:
+                Text('${user['name'] ?? 'Unknown'} (${user['role'] ?? 'No role'})'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(user['email'] ?? 'No email'),
+                Text('Phone: ${user['phone_num'] ?? 'N/A'}'),
+                Text('Joined: ${user['created_at'] ?? 'N/A'}'),
+                Text('Preference: ${user['notif_preference'] ?? 'email'}'),
+              ],
+            ),
+            trailing: isVerified
+                ? const Text('✅ Verified',
+                    style: TextStyle(color: Colors.green))
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () => performAction(
+                          (user['id'] ?? '').toString(),
+                          user['table_name'] ?? 'user',
+                          'verify',
+                          user,
+                        ),
+                        child: const Text('Verify'),
+                      ),
+                      TextButton(
+                        onPressed: () => performAction(
+                          (user['id'] ?? '').toString(),
+                          user['table_name'] ?? 'user',
+                          'reject',
+                          user,
+                        ),
+                        child: const Text(
+                          'Reject',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Placeholder pages
+  Widget buildEateryPage() {
+    return const Center(
+      child: Text(
+        'Eatery Verification Dashboard\n(coming soon...)',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18),
+      ),
+    );
+  }
+
+  Widget buildHousingPage() {
+    return const Center(
+      child: Text(
+        'Housing Verification Dashboard\n(coming soon...)',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18),
+      ),
+    );
+  }
+
+  // Page content switcher
+  Widget buildPageContent() {
+    switch (selectedPage) {
+      case 0:
+        return buildUserVerificationPage();
+      case 1:
+        return buildEateryPage();
+      case 2:
+        return buildHousingPage();
+      default:
+        return const Center(child: Text('Invalid Page'));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () {
-              Navigator.pushNamed(context, '/profile');
-            },
+      body: Row(
+        children: [
+          // Sidebar
+          Container(
+            width: 230,
+            color: Colors.grey.shade200,
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 40),
+                const Text(
+                  'Admin Panel',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                buildSidebarItem('Users Verification', Icons.people, 0),
+                buildSidebarItem('Eateries Verification', Icons.restaurant, 1),
+                buildSidebarItem('Lodgings Verification', Icons.hotel, 2),
+                const Spacer(),
+                const Divider(),
+                TextButton.icon(
+                  onPressed: () => Navigator.pushNamed(context, '/profile'),
+                  icon: const Icon(Icons.home),
+                  label: const Text('Back to Profile'),
+                ),
+              ],
+            ),
+          ),
+          // Main content
+          Expanded(
+            child: Column(
+              children: [
+                Container(
+                  height: 60,
+                  color: Colors.blue.shade600,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    selectedPage == 0
+                        ? 'User Verification'
+                        : selectedPage == 1
+                            ? 'Eatery Verification'
+                            : 'Housing Verification',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Expanded(child: buildPageContent()),
+              ],
+            ),
           ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: users.length,
-              itemBuilder: (context, index) {
-                final user = users[index];
-                final isVerified = (user['is_verified'] ?? 0) == 1;
-
-                return Card(
-                  margin: const EdgeInsets.all(8),
-                  child: ListTile(
-                    title: Text('${user['name'] ?? 'Unknown'} (${user['role'] ?? 'No role'})'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(user['email'] ?? 'No email'),
-                        Text('Phone: ${user['phone_num'] ?? 'N/A'}'),
-                        Text('Joined: ${user['created_at'] ?? 'N/A'}'),
-                        Text('Preference: ${user['notif_preference'] ?? 'email'}'),
-                      ],
-                    ),
-                    trailing: isVerified
-                        ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton(
-                                onPressed: () => performAction(
-                                  (user['id'] ?? '').toString(),
-                                  user['table_name'] ?? 'user',
-                                  'verify',
-                                  user,
-                                ),
-                                child: const Text('Verify'),
-                              ),
-                              TextButton(
-                                onPressed: () => performAction(
-                                  (user['id'] ?? '').toString(),
-                                  user['table_name'] ?? 'user',
-                                  'reject',
-                                  user,
-                                ),
-                                child: const Text(
-                                  'Reject',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                );
-              },
-            ),
     );
   }
 }
