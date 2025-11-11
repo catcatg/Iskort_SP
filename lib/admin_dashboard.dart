@@ -40,7 +40,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<void> fetchEateries() async {
     try {
       final response = await http.get(
-        Uri.parse('https://iskort-backend.onrender.com/api/eatery'),
+        Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
       );
       final data = jsonDecode(response.body);
 
