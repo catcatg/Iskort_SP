@@ -98,7 +98,7 @@ class _SetupEateryPageState extends State<SetupEateryPage> {
       };
 
       final response = await http.post(
-        Uri.parse('https://iskort-backend.onrender.com/api/eatery'), // Replace with your actual backend URL if different
+        Uri.parse('https://iskort-public-web.onrender.com/api/eatery'), // Replace with your actual backend URL if different
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );
