@@ -14,6 +14,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   List users = [];
   bool isLoading = true;
 
+  List eateries = [];
+  bool isEateryLoading = true;
+
   // Fetch users (existing)
   Future<void> fetchUsers() async {
     try {
@@ -30,6 +33,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }
     } catch (e) {
       print('Error fetching users: $e');
+    }
+  }
+
+  // Fetch eateries
+  Future<void> fetchEateries() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://iskort-backend.onrender.com/api/eatery'),
+      );
+      final data = jsonDecode(response.body);
+
+      if (data['success'] == true) {
+        setState(() {
+          eateries = data['eateries'] ?? [];
+          isEateryLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching eateries: $e');
     }
   }
 
@@ -84,10 +106,44 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  // Actions for eatery verification
+  Future<void> performEateryAction(String id, String action, Map eatery) async {
+    try {
+      late Uri url;
+      if (action == 'verify') {
+        url = Uri.parse(
+            'https://iskort-backend.onrender.com/api/admin/verify/eatery/$id');
+        final response = await http.put(url);
+        final data = jsonDecode(response.body);
+        print('Verify Eatery -> ${data['message']}');
+
+        // You can send notification to owner here if needed
+        final ownerEmail = eatery['owner_email'] ?? 'unknown';
+        final ownerPhone = eatery['owner_phone'] ?? 'unknown';
+        print('Sent verification to $ownerEmail / $ownerPhone');
+      } else if (action == 'reject') {
+        url = Uri.parse(
+            'https://iskort-backend.onrender.com/api/admin/reject/eatery/$id');
+        final response = await http.delete(url);
+        final data = jsonDecode(response.body);
+        print('Reject Eatery -> ${data['message']}');
+
+        final ownerEmail = eatery['owner_email'] ?? 'unknown';
+        final ownerPhone = eatery['owner_phone'] ?? 'unknown';
+        print('Sent rejection to $ownerEmail / $ownerPhone');
+      }
+
+      fetchEateries(); // refresh after action
+    } catch (e) {
+      print('Eatery Action Error: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     fetchUsers();
+    fetchEateries();
   }
 
   // Sidebar item builder
@@ -182,14 +238,56 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Placeholder pages
+  // Build Eatery Verification Page
   Widget buildEateryPage() {
-    return const Center(
-      child: Text(
-        'Eatery Verification Dashboard\n(coming soon...)',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 18),
-      ),
+    if (isEateryLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (eateries.isEmpty) {
+      return const Center(child: Text('No eateries to verify'));
+    }
+
+    return ListView.builder(
+      itemCount: eateries.length,
+      itemBuilder: (context, index) {
+        final eatery = eateries[index];
+        final isVerified = (eatery['is_verified'] ?? 0) == 1;
+
+        return Card(
+          margin: const EdgeInsets.all(8),
+          child: ListTile(
+            title: Text(eatery['name'] ?? 'Unnamed Eatery'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Owner: ${eatery['owner_name'] ?? 'Unknown'}'),
+                Text('Email: ${eatery['owner_email'] ?? 'Unknown'}'),
+                Text('Phone: ${eatery['owner_phone'] ?? 'Unknown'}'),
+                Text('Location: ${eatery['location'] ?? 'Unknown'}'),
+                Text('Min Price: ${eatery['min_price'] ?? 'N/A'}'),
+              ],
+            ),
+            trailing: isVerified
+                ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () => performEateryAction(
+                            (eatery['id'] ?? '').toString(), 'verify', eatery),
+                        child: const Text('Verify'),
+                      ),
+                      TextButton(
+                        onPressed: () => performEateryAction(
+                            (eatery['id'] ?? '').toString(), 'reject', eatery),
+                        child: const Text('Reject', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+          ),
+        );
+      },
     );
   }
 
@@ -203,7 +301,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // Page content switcher
   Widget buildPageContent() {
     switch (selectedPage) {
       case 0:
@@ -222,7 +319,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Scaffold(
       body: Row(
         children: [
-          // Sidebar
           Container(
             width: 230,
             color: Colors.grey.shade200,
@@ -252,7 +348,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
           ),
-          // Main content
           Expanded(
             child: Column(
               children: [
