@@ -1,7 +1,8 @@
-import 'dart:convert';
+import 'dart:convert'; 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:iskort/reusables.dart';
+import 'setup_eatery_page.dart'; // Make sure you import your SetupEateryPage
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,18 +30,26 @@ class _LoginPageState extends State<LoginPage> {
         }),
       );
 
-      print('🔁 Response status: ${response.statusCode}');
-      print('🧾 Response body: ${response.body}');
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseJson = jsonDecode(response.body);
         final user = responseJson['user'];
-        final name = user['name'];
         final role = user['role'];
 
         if (role == 'admin') {
           Navigator.pushNamed(context, '/admin-dashboard');
+        } else if (role == 'owner') {
+          // ✅ Pass full loggedInUser to SetupEateryPage
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SetupEateryPage(currentUser: user),
+            ),
+          );
         } else {
+          // Normal user flow
           Navigator.pushNamed(
             context,
             '/profile',
@@ -50,7 +59,6 @@ class _LoginPageState extends State<LoginPage> {
               'role': user['role'],
             },
           );
-
         }
       } else {
         try {

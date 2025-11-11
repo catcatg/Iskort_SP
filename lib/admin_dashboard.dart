@@ -240,8 +240,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
                 const SizedBox(height: 30),
                 buildSidebarItem('Users Verification', Icons.people, 0),
-                buildSidebarItem('Eateries Verification', Icons.restaurant, 1),
-                buildSidebarItem('Lodgings Verification', Icons.hotel, 2),
+                buildSidebarItem('Eatery Verification', Icons.restaurant, 1),
+                buildSidebarItem('Housing Verification', Icons.hotel, 2),
                 const Spacer(),
                 const Divider(),
                 TextButton.icon(
