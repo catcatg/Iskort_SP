@@ -254,6 +254,32 @@ app.get('/api/foods/:eatery_id', (req, res) => {
   });
 });
 
+// ===== OWNER ROUTES =====
+
+// Get ALL owners
+app.get('/api/owner', (req, res) => {
+  const sql = `SELECT owner_id AS id, name, email, phone_num, notif_preference, created_at FROM owner`;
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    res.json({ success: true, owners: results });
+  });
+});
+
+// Get ONE owner by ID
+app.get('/api/owner/:id', (req, res) => {
+  const { id } = req.params;
+  const sql = `SELECT owner_id AS id, name, email, phone_num, notif_preference, created_at 
+               FROM owner WHERE owner_id = ?`;
+  db.query(sql, [id], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    if (results.length === 0)
+      return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    res.json({ success: true, owner: results[0] });
+  });
+});
+
+
 // ===== BASE ROUTE =====
 app.get('/', (req, res) => {
   res.send('Iskort API is live and ready for use!');
