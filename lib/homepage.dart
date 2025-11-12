@@ -45,6 +45,64 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _showMiniNotif(BuildContext avatarContext) {
+    final overlay = Overlay.of(avatarContext);
+    final renderBox = avatarContext.findRenderObject() as RenderBox?;
+    final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder:
+          (context) => GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => overlayEntry.remove(),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: offset.dy + renderBox!.size.height + 5,
+                  left: offset.dx + renderBox.size.width - 220,
+                  width: 220,
+                  child: Material(
+                    elevation: 6,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListTile(
+                            leading: const Icon(
+                              Icons.notifications,
+                              color: Color(0xFF0A4423),
+                            ),
+                            title: const Text("3 new notifications"),
+                            subtitle: const Text("Tap to view all"),
+                            onTap: () {
+                              overlayEntry.remove();
+                              Navigator.pushNamed(context, '/notifications');
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+
+    overlay?.insert(overlayEntry);
+
+    Future.delayed(const Duration(seconds: 3), () {
+      overlayEntry.remove();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -75,10 +133,31 @@ class _HomePageState extends State<HomePage> {
                 ),
 
                 Spacer(),
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.grey,
-                  child: Text("😊", style: TextStyle(fontSize: 24)),
+                Builder(
+                  builder:
+                      (avatarContext) => GestureDetector(
+                        onTap: () => _showMiniNotif(avatarContext),
+                        child: CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage:
+                              (user != null &&
+                                      user!['photo'] != null &&
+                                      user!['photo'].toString().isNotEmpty)
+                                  ? NetworkImage(user!['photo'])
+                                  : null,
+                          child:
+                              (user == null ||
+                                      user!['photo'] == null ||
+                                      user!['photo'].toString().isEmpty)
+                                  ? const Icon(
+                                    Icons.person,
+                                    size: 30,
+                                    color: Color(0xFF0A4423),
+                                  )
+                                  : null,
+                        ),
+                      ),
                 ),
               ],
             ),
