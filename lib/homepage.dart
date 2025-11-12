@@ -76,11 +76,22 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           ListTile(
                             leading: const Icon(
+                              size: 20,
                               Icons.notifications,
                               color: Color(0xFF0A4423),
                             ),
-                            title: const Text("3 new notifications"),
-                            subtitle: const Text("Tap to view all"),
+
+                            title: const Text(
+                              "3 new notifications",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: const Text(
+                              "Tap to view all",
+                              style: TextStyle(fontSize: 12),
+                            ),
                             onTap: () {
                               overlayEntry.remove();
                               Navigator.pushNamed(context, '/notifications');

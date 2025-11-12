@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 
 class CustomTextField extends StatefulWidget {
   final String title;
@@ -50,18 +50,19 @@ class _CustomTextFieldState extends State<CustomTextField> {
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             labelText: widget.label,
-            suffixIcon: widget.isPassword
-                ? IconButton(
-                    icon: Icon(
-                      _obscureText ? Icons.visibility_off : Icons.visibility,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscureText = !_obscureText;
-                      });
-                    },
-                  )
-                : null,
+            suffixIcon:
+                widget.isPassword
+                    ? IconButton(
+                      icon: Icon(
+                        _obscureText ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureText = !_obscureText;
+                        });
+                      },
+                    )
+                    : null,
           ),
         ),
       ],
@@ -81,16 +82,31 @@ class CustomBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      selectedItemColor: const Color(0xFF791317),
-      unselectedItemColor: Colors.brown.shade200,
-      onTap: onTap,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: ''),
-        BottomNavigationBarItem(icon: Icon(Icons.location_on), label: ''),
-        BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: ''),
-      ],
+    return Padding(
+      padding: EdgeInsetsGeometry.all(8),
+      child: BottomNavigationBar(
+        mouseCursor: SystemMouseCursors.click,
+        backgroundColor: const Color(0xFF791317),
+        currentIndex: currentIndex,
+        selectedLabelStyle: const TextStyle(fontSize: 12),
+        selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
+        unselectedItemColor: Colors.brown.shade200,
+        onTap: onTap,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            label: 'Homepage',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.location_on),
+            label: 'Location',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -129,11 +145,12 @@ class ProductCard extends StatelessWidget {
               child: Image.asset(
                 imagePath,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.broken_image,
-                  color: Colors.red,
-                  size: 40,
-                ),
+                errorBuilder:
+                    (context, error, stackTrace) => const Icon(
+                      Icons.broken_image,
+                      color: Colors.red,
+                      size: 40,
+                    ),
               ),
             ),
             const SizedBox(width: 12),
