@@ -21,12 +21,32 @@ class _NotificationsPageState extends State<NotificationsPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        foregroundColor: Colors.white,
         title: const Text("Your Activity"),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF0A4423),
-          indicatorColor: const Color(0xFF0A4423),
-          tabs: const [Tab(text: "All"), Tab(text: "Comments")],
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+        backgroundColor: const Color.fromARGB(255, 150, 29, 20),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            color: const Color.fromARGB(255, 255, 255, 255),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: const Color(0xFF0A4423),
+              labelStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+              unselectedLabelColor: const Color.fromARGB(179, 206, 206, 206),
+              indicatorColor: const Color(0xFF0A4423),
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicatorWeight: 4,
+              tabs: const [Tab(text: "All"), Tab(text: "Comments")],
+            ),
+          ),
         ),
       ),
       body: TabBarView(
@@ -36,7 +56,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     );
   }
 
-  // --- All Notifications ad Comments
+  // --- All Notifications ad Comments Hardcoded
   Widget _buildAllTab() {
     final items = [
       {
@@ -64,7 +84,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     return _buildFeedList(items);
   }
 
-  // --- User’s Comment History ---
+  // --- User’s Comment History Hardcoded---
   Widget _buildCommentsTab() {
     final comments = [
       {
