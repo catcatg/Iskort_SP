@@ -8,6 +8,44 @@ import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:iskort/page_routes/saved_locations.dart';
+
+class LocationRecord {
+  final String name;
+  final LatLng coordinates;
+  final double distanceKm;
+  final double durationMin;
+  final DateTime timestamp;
+
+  LocationRecord({
+    required this.name,
+    required this.coordinates,
+    required this.distanceKm,
+    required this.durationMin,
+    required this.timestamp,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'lat': coordinates.latitude,
+      'lng': coordinates.longitude,
+      'distanceKm': distanceKm,
+      'durationMin': durationMin,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
+
+  factory LocationRecord.fromMap(Map<String, dynamic> map) {
+    return LocationRecord(
+      name: map['name'],
+      coordinates: LatLng(map['lat'], map['lng']),
+      distanceKm: map['distanceKm'],
+      durationMin: map['durationMin'],
+      timestamp: DateTime.parse(map['timestamp']),
+    );
+  }
+}
 
 class MapRoutePage extends StatefulWidget {
   const MapRoutePage({super.key});
@@ -27,6 +65,11 @@ class _MapRoutePageState extends State<MapRoutePage> {
   LatLng? _userDestination;
   LatLng? _userLocation;
   List<LatLng> _routePoints = [];
+
+  // Saved locations
+  List<LocationRecord> savedLocations = [];
+  bool isSaved = false;
+  String? _destinationName;
 
   // Autocomplete
   List<Map<String, dynamic>> _searchSuggestions = [];
@@ -50,7 +93,73 @@ class _MapRoutePageState extends State<MapRoutePage> {
     super.dispose();
   }
 
-  // Load last destination from local storage
+  Future<void> _openSavedLocationsScreen() async {
+    // Clear the card and search when navigating to other pages
+    if (!mounted) return;
+    setState(() {
+      _searchController.clear();
+      _routePoints.clear();
+      _userDestination = null;
+      _distanceKm = null;
+      _durationMin = null;
+      _searchSuggestions.clear();
+      _destinationName = null;
+      isSaved = false;
+    });
+
+    final selectedRecord = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SavedLocations()),
+    );
+
+    if (selectedRecord != null && selectedRecord is LocationRecord) {
+      setState(() {
+        _userDestination = selectedRecord.coordinates;
+        _distanceKm = selectedRecord.distanceKm;
+        _durationMin = selectedRecord.durationMin;
+        _destinationName = selectedRecord.name;
+        isSaved = true;
+      });
+
+      _mapController.move(_userDestination!, 18);
+      await _fetchRoute();
+    }
+  }
+
+  Future<void> _toggleSaveCurrentLocation() async {
+    if (_userDestination == null || _distanceKm == null || _durationMin == null)
+      return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final savedList = prefs.getStringList('saved_locations') ?? [];
+
+    final record = LocationRecord(
+      name:
+          _searchController.text.trim().isEmpty
+              ? 'Unnamed Location'
+              : _searchController.text.trim(),
+      coordinates: _userDestination!,
+      distanceKm: _distanceKm!,
+      durationMin: _durationMin!,
+      timestamp: DateTime.now(),
+    );
+
+    final recordMap = jsonEncode(record.toMap());
+
+    if (isSaved) {
+      savedList.remove(recordMap);
+    } else {
+      savedList.add(recordMap);
+    }
+
+    await prefs.setStringList('saved_locations', savedList);
+
+    if (!mounted) return;
+    setState(() {
+      isSaved = !isSaved;
+    });
+  }
+
   Future<void> _loadLastDestination() async {
     final prefs = await SharedPreferences.getInstance();
     final last = prefs.getString('last_destination');
@@ -60,13 +169,11 @@ class _MapRoutePageState extends State<MapRoutePage> {
     }
   }
 
-  // Save destination
   Future<void> _saveLastDestination(String location) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_destination', location);
   }
 
-  // initialize location
   Future<void> _initLocation() async {
     if (!await _checkPermissions()) return;
 
@@ -106,6 +213,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
           if (moveCamera) _mapController.move(_userDestination!, 18);
           await _fetchRoute();
           _saveLastDestination(location);
+          await _checkIfLocationIsSaved();
         } else {
           ScaffoldMessenger.of(
             context,
@@ -124,6 +232,26 @@ class _MapRoutePageState extends State<MapRoutePage> {
     }
   }
 
+  Future<void> _checkIfLocationIsSaved() async {
+    if (_userDestination == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final savedList = prefs.getStringList('saved_locations') ?? [];
+
+    final isAlreadySaved = savedList.any((item) {
+      final data = jsonDecode(item);
+      final savedLat = data['lat'];
+      final savedLng = data['lng'];
+      return savedLat == _userDestination!.latitude &&
+          savedLng == _userDestination!.longitude;
+    });
+
+    if (!mounted) return;
+    setState(() {
+      isSaved = isAlreadySaved;
+    });
+  }
+
   Future<void> _fetchRoute() async {
     if (_userLocation == null || _userDestination == null) return;
 
@@ -134,8 +262,8 @@ class _MapRoutePageState extends State<MapRoutePage> {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final geometry = data['routes'][0]['geometry'];
-      final distance = data['routes'][0]['distance'] / 1000; // km
-      final duration = data['routes'][0]['duration'] / 60; // min
+      final distance = data['routes'][0]['distance'] / 1000;
+      final duration = data['routes'][0]['duration'] / 60;
       _decodePolyline(geometry);
       if (!mounted) return;
       setState(() {
@@ -161,7 +289,20 @@ class _MapRoutePageState extends State<MapRoutePage> {
     });
   }
 
-  // Check location permissions of user
+  void _clearSearchAndCard() {
+    if (!mounted) return;
+    setState(() {
+      _searchController.clear();
+      _routePoints.clear();
+      _userDestination = null;
+      _distanceKm = null;
+      _durationMin = null;
+      _searchSuggestions.clear();
+      _destinationName = null;
+      isSaved = false;
+    });
+  }
+
   Future<bool> _checkPermissions() async {
     bool serviceEnabled = await _locationService.serviceEnabled();
     if (!serviceEnabled) {
@@ -217,19 +358,35 @@ class _MapRoutePageState extends State<MapRoutePage> {
     }
   }
 
+  // ====================== UI ==========================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            _clearSearchAndCard();
+            Navigator.pop(context);
+          },
+        ),
+
         foregroundColor: Colors.white,
         title: const Text("Iskort Map"),
-        titleTextStyle: TextStyle(
+        titleTextStyle: const TextStyle(
           color: Colors.white,
           fontSize: 20,
           fontWeight: FontWeight.bold,
         ),
-        backgroundColor: Color.fromARGB(255, 150, 29, 20),
+        backgroundColor: const Color.fromARGB(255, 150, 29, 20),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.book, color: Colors.white),
+            onPressed: _openSavedLocationsScreen,
+          ),
+        ],
       ),
+
       body: Stack(
         children: [
           FlutterMap(
@@ -285,210 +442,184 @@ class _MapRoutePageState extends State<MapRoutePage> {
             ],
           ),
 
-          // Search bar
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'Enter destination',
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8.0),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 0.0,
-                            ),
-                            suffixIcon:
-                                (_searchController.text.isNotEmpty)
-                                    ? IconButton(
-                                      icon: const Icon(
-                                        Icons.clear,
-                                        color: Colors.grey,
-                                      ),
-                                      onPressed: () {
-                                        if (!mounted) return;
-                                        setState(() {
-                                          _searchController.clear();
-                                          _routePoints.clear();
-                                          _userDestination = null;
-                                          _distanceKm = null;
-                                          _durationMin = null;
-                                          _searchSuggestions.clear();
-                                        });
-                                      },
-                                    )
-                                    : null,
-                          ),
-                          onChanged: (value) {
-                            if (!mounted) return;
-                            setState(() {});
-                            if (_debounce?.isActive ?? false)
-                              _debounce!.cancel();
-                            _debounce = Timer(
-                              const Duration(milliseconds: 500),
-                              () => _fetchSuggestions(value),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8.0),
-                      ElevatedButton(
-                        onPressed: () async {
-                          FocusScope.of(context).unfocus();
-                          final destination = _searchController.text.trim();
-
-                          if (destination.isEmpty) {
-                            if (!mounted) return;
-                            setState(() {
-                              _routePoints.clear();
-                              _userDestination = null;
-                              _distanceKm = null;
-                              _durationMin = null;
-                            });
-                            return;
-                          }
-
-                          if (!mounted) return;
-                          setState(() {
-                            _isSearching = true;
-                            _loadingMessage =
-                                'Searching location, please wait...';
-                          });
-
-                          await fetchCoordPoint(destination);
-
-                          if (!mounted) return;
-                          setState(() => _isSearching = false);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color.fromARGB(
-                            255,
-                            150,
-                            29,
-                            20,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 12.0,
-                          ),
-                        ),
-                        child: const Icon(Icons.search, color: Colors.white),
-                      ),
-                    ],
-                  ),
-
-                  // Suggestions dropdown
-                  if (_searchSuggestions.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 6,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _searchSuggestions.length,
-                        itemBuilder: (context, index) {
-                          final suggestion = _searchSuggestions[index];
-                          final displayName = suggestion['display_name'];
-                          return ListTile(
-                            title: Text(displayName),
-                            onTap: () {
-                              _searchController.text = displayName;
-                              FocusScope.of(context).unfocus();
-                              if (!mounted) return;
-                              setState(() => _searchSuggestions.clear());
-                              fetchCoordPoint(displayName);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-
-          // Route summary card
           if (_distanceKm != null && _durationMin != null)
             Positioned(
               bottom: 90,
               left: 20,
               right: 20,
               child: Card(
-                color: Color.fromARGB(199, 5, 41, 5),
+                color: const Color.fromARGB(199, 5, 41, 5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
-                  child: Text(
-                    'Distance: ${_distanceKm!.toStringAsFixed(2)} km\n'
-                    'Estimated Time of Arrival: ${_durationMin!.toStringAsFixed(0)} mins',
-                    style: const TextStyle(fontSize: 16, color: Colors.white),
-                    textAlign: TextAlign.left,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Close card and clear search
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.white70),
+                          onPressed: _clearSearchAndCard,
+                        ),
+                      ),
+
+                      // Location name
+                      if (_searchController.text.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Text(
+                            _searchController.text,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.normal,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      else if (_destinationName != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Text(
+                            _destinationName!,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+
+                      // Row with ETA and Distance boxes
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(right: 6),
+                              decoration: BoxDecoration(
+                                color: const Color.fromARGB(180, 255, 255, 255),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'ETA: ${_durationMin!.toStringAsFixed(0)} mins',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(left: 6),
+                              decoration: BoxDecoration(
+                                color: const Color.fromARGB(180, 255, 255, 255),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Distance: ${_distanceKm!.toStringAsFixed(2)} km',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Save location button
+                      ElevatedButton.icon(
+                        onPressed: _toggleSaveCurrentLocation,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: Icon(
+                          isSaved ? Icons.bookmark : Icons.bookmark_border,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          isSaved ? "Saved" : "Save Location",
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
 
-          // Loading overlay
-          if (_isSearching)
-            Container(
-              color: Colors.black54,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          // Search bar and suggestions
+          Positioned(
+            top: 20,
+            left: 20,
+            right: 20,
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    _debounce?.cancel();
+                    _debounce = Timer(const Duration(milliseconds: 500), () {
+                      _fetchSuggestions(value);
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: "Search destination",
+                    filled: true,
+                    fillColor: Colors.white,
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.search),
+                      onPressed: () => fetchCoordPoint(_searchController.text),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _loadingMessage,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                if (_searchSuggestions.isNotEmpty)
+                  Container(
+                    color: Colors.white,
+                    child: Column(
+                      children:
+                          _searchSuggestions.map((s) {
+                            return ListTile(
+                              title: Text(s['display_name']),
+                              onTap: () {
+                                _searchController.text = s['display_name'];
+                                fetchCoordPoint(s['display_name']);
+                                setState(() => _searchSuggestions.clear());
+                              },
+                            );
+                          }).toList(),
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
+
       floatingActionButton: FloatingActionButton(
-        elevation: 0,
-        onPressed: () async {
-          if (!mounted) return;
-          setState(() {
-            _isSearching = true;
-            _loadingMessage = 'Getting your current location...';
-          });
-
-          await _getUserLocation();
-
-          if (!mounted) return;
-          setState(() => _isSearching = false);
-        },
-        backgroundColor: const Color.fromARGB(255, 5, 41, 5),
+        backgroundColor: const Color.fromARGB(255, 150, 29, 20),
+        onPressed: _getUserLocation,
         child: const Icon(Icons.my_location, color: Colors.white),
       ),
     );

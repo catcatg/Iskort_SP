@@ -14,9 +14,24 @@ class _HomePageState extends State<HomePage> {
   List eateries = [];
   bool isLoading = true;
 
+  Map<String, dynamic>? user;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+    if (args != null && user == null) {
+      setState(() {
+        user = args.cast<String, dynamic>();
+      });
+    }
+  }
+
   Future<void> fetchEateries() async {
     try {
-      final response = await http.get(Uri.parse('https://iskort-public-web.onrender.com/api/eatery'));
+      final response = await http.get(
+        Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -49,15 +64,16 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              children: const [
+              children: [
                 Text(
-                  "Hello Iska!",
-                  style: TextStyle(
+                  "Hello, ${user?['name'] ?? 'Iska'}!",
+                  style: const TextStyle(
                     color: Color(0xFF0A4423),
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+
                 Spacer(),
                 CircleAvatar(
                   radius: 30,
@@ -67,7 +83,10 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             const SizedBox(height: 20),
-            const Text("Recommended for you", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              "Recommended for you",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
 
             if (isLoading)
@@ -82,14 +101,16 @@ class _HomePageState extends State<HomePage> {
               )
             else
               Column(
-                children: eateries.map((eatery) {
-                  return ProductCard(
-                    title: eatery['name'],
-                    subtitle: "Tap to view menu",
-                    location: eatery['location'],
-                    imagePath: eatery['photo'] ?? "assets/images/placeholder.png",
-                  );
-                }).toList(),
+                children:
+                    eateries.map((eatery) {
+                      return ProductCard(
+                        title: eatery['name'],
+                        subtitle: "Tap to view menu",
+                        location: eatery['location'],
+                        imagePath:
+                            eatery['photo'] ?? "assets/images/placeholder.png",
+                      );
+                    }).toList(),
               ),
           ],
         ),
@@ -97,8 +118,21 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 0,
         onTap: (index) {
-          if (index == 1) Navigator.pushNamed(context, '/route');
-          if (index == 2) Navigator.pushNamed(context, '/profile');
+          if (index == 1) {
+            Navigator.pushNamed(context, '/route');
+          } else if (index == 2 && user != null) {
+            Navigator.pushNamed(
+              context,
+              '/profile',
+              arguments: {
+                'name': user!['name'],
+                'email': user!['email'],
+                'role': user!['role'],
+                'phone': user!['phone_num'],
+                'notifPreference': user!['notif_preference'],
+              },
+            );
+          }
         },
       ),
     );
@@ -139,7 +173,12 @@ class ProductCard extends StatelessWidget {
               child: Image.network(
                 imagePath,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 40, color: Color(0xFF791317)),
+                errorBuilder:
+                    (_, __, ___) => const Icon(
+                      Icons.broken_image,
+                      size: 40,
+                      color: Color(0xFF791317),
+                    ),
               ),
             ),
             const SizedBox(width: 12),
@@ -147,11 +186,21 @@ class ProductCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF791317))),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF791317),
+                    ),
+                  ),
                   Text(subtitle),
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 14, color: Color(0xFF791317)),
+                      const Icon(
+                        Icons.location_on,
+                        size: 14,
+                        color: Color(0xFF791317),
+                      ),
                       const SizedBox(width: 4),
                       Flexible(child: Text(location)),
                     ],

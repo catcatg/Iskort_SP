@@ -1,4 +1,4 @@
-import 'dart:convert'; 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:iskort/reusables.dart';
@@ -52,7 +52,7 @@ class _LoginPageState extends State<LoginPage> {
           // Normal user flow
           Navigator.pushNamed(
             context,
-            '/profile',
+            '/homepage',
             arguments: {
               'name': user['name'],
               'email': user['email'],
@@ -68,16 +68,18 @@ class _LoginPageState extends State<LoginPage> {
           );
         } catch (_) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unexpected server error (HTML response)')),
+            const SnackBar(
+              content: Text('Unexpected server error (HTML response)'),
+            ),
           );
         }
       }
     } catch (e, stackTrace) {
       print('🔥 Error during login: $e');
       print('📍 Stack trace:\n$stackTrace');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Network or backend error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Network or backend error')));
     }
   }
 
@@ -125,10 +127,7 @@ class _LoginPageState extends State<LoginPage> {
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Select your role:',
-              style: TextStyle(fontSize: 16),
-            ),
+            const Text('Select your role:', style: TextStyle(fontSize: 16)),
             const SizedBox(height: 10),
             Row(
               children: [
