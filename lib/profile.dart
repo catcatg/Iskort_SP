@@ -111,7 +111,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         ),
                         const SizedBox(height: 20),
 
-                        _buildMenuItem(Icons.bookmark, "Saved", () {
+                        _buildMenuItem(Icons.bookmark, "Saved Locations", () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -133,14 +133,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
                         _buildMenuItem(
                           Icons.notifications,
-                          "Notifications",
+                          "Acitivity Notifications",
                           () {
                             Navigator.pushNamed(context, '/notifications');
                           },
                         ),
-                        _buildMenuItem(Icons.comment, "Comments", () {
-                          Navigator.pushNamed(context, '/comments');
-                        }),
+
                         _buildMenuItem(Icons.settings, "Settings", () {
                           Navigator.pushNamed(
                             context,
@@ -189,7 +187,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             },
 
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green[700],
+                              backgroundColor: const Color(0xFF0A4423),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
@@ -197,11 +195,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             ),
                             child: const Text(
                               'Back to Homepage',
-                              style: TextStyle(color: Colors.white),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
@@ -249,7 +250,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             },
                             child: const Text(
                               "Logout",
-                              style: TextStyle(fontSize: 16),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
