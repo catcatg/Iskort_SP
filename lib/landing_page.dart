@@ -20,14 +20,13 @@ class _LandingPageState extends State<LandingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
-        child: Text(
-          'Iskort',
-          style: TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF791317),
-          ),
+        child: Image.asset(
+          'assets/images/splash.png',
+          width: 500,
+          height: 300,
+          fit: BoxFit.contain,
         ),
       ),
     );
