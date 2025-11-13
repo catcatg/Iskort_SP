@@ -13,10 +13,10 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// ✅ Serve static images
+// Serve static images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ Multer setup for file uploads
+// Multer setup for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) =>
@@ -24,7 +24,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ✅ MySQL connection (Railway)
+// MySQL connection (Railway)
 const db = mysql.createConnection({
   host: process.env.DB_HOST || 'switchyard.proxy.rlwy.net',
   user: process.env.DB_USER || 'root',
@@ -232,6 +232,48 @@ app.get('/api/eatery', (req, res) => {
   db.query('SELECT * FROM eatery', (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err });
     res.json({ success: true, eateries: results });
+  });
+});
+
+// 🔹 Get eatery owner info
+app.get('/api/eatery/owner/:owner_id', (req, res) => {
+  const { owner_id } = req.params;
+  const sql = `SELECT owner_id, name, email, phone_num FROM owner WHERE owner_id = ?`;
+  db.query(sql, [owner_id], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    if (results.length === 0)
+      return res.status(404).json({ success: false, message: 'Owner not found' });
+    res.json({ success: true, owner: results[0] });
+  });
+});
+
+
+// ===== HOUSING ROUTES =====
+app.post('/api/housing', (req, res) => {
+  const { owner_id, name, address, rent_price, room_count, contact_number } = req.body;
+  const sql = `INSERT INTO housing (owner_id, name, address, rent_price, room_count, contact_number) VALUES (?, ?, ?, ?, ?, ?)`;
+  db.query(sql, [owner_id, name, address, rent_price, room_count, contact_number], (err, result) => {
+    if (err) return res.status(500).send(err);
+    res.send({ success: true, housing_id: result.insertId });
+  });
+});
+
+app.get('/api/housing', (req, res) => {
+  db.query('SELECT * FROM housing', (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    res.json({ success: true, housings: results });
+  });
+});
+
+// 🔹 Get housing owner info
+app.get('/api/housing/owner/:owner_id', (req, res) => {
+  const { owner_id } = req.params;
+  const sql = `SELECT owner_id, name, email, phone_num FROM owner WHERE owner_id = ?`;
+  db.query(sql, [owner_id], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err });
+    if (results.length === 0)
+      return res.status(404).json({ success: false, message: 'Owner not found' });
+    res.json({ success: true, owner: results[0] });
   });
 });
 
