@@ -83,7 +83,7 @@ class CustomBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsetsGeometry.all(8),
+      padding: EdgeInsets.all(8),
       child: BottomNavigationBar(
         mouseCursor: SystemMouseCursors.click,
         backgroundColor: const Color(0xFF791317),
