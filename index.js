@@ -185,7 +185,7 @@ app.delete('/api/admin/reject/:id', (req, res) => {
   });
 });
 
-// ===== EATERY ROUTES =====
+// ===== EATERY ROUTES (with JOIN) =====
 app.post('/api/eatery', (req, res) => {
   const {
     owner_id,
@@ -211,22 +211,16 @@ app.post('/api/eatery', (req, res) => {
   );
 });
 
+// 🔹 UPDATED GET EATERIES WITH OWNER INFO
 app.get('/api/eatery', (req, res) => {
-  db.query('SELECT * FROM eatery', (err, results) => {
+  const sql = `
+    SELECT e.*, o.name AS owner_name, o.email AS owner_email, o.phone_num AS owner_phone
+    FROM eatery e
+    LEFT JOIN owner o ON e.owner_id = o.owner_id
+  `;
+  db.query(sql, (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, eateries: results });
-  });
-});
-
-// 🔹 Get eatery owner info
-app.get('/api/eatery/owner/:owner_id', (req, res) => {
-  const { owner_id } = req.params;
-  const sql = `SELECT owner_id, name, email, phone_num FROM owner WHERE owner_id = ?`;
-  db.query(sql, [owner_id], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length === 0)
-      return res.status(404).json({ success: false, message: 'Owner not found' });
-    res.json({ success: true, owner: results[0] });
   });
 });
 
@@ -259,7 +253,7 @@ app.delete('/api/admin/reject/eatery/:id', (req, res) => {
   });
 });
 
-// ===== HOUSING ROUTES =====
+// ===== HOUSING ROUTES (with JOIN) =====
 app.post('/api/housing', (req, res) => {
   const {
     owner_id,
@@ -280,22 +274,16 @@ app.post('/api/housing', (req, res) => {
   });
 });
 
+// 🔹 UPDATED GET HOUSINGS WITH OWNER INFO
 app.get('/api/housing', (req, res) => {
-  db.query('SELECT * FROM housing', (err, results) => {
+  const sql = `
+    SELECT h.*, o.name AS owner_name, o.email AS owner_email, o.phone_num AS owner_phone
+    FROM housing h
+    LEFT JOIN owner o ON h.owner_id = o.owner_id
+  `;
+  db.query(sql, (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, housings: results });
-  });
-});
-
-// 🔹 Get housing owner info
-app.get('/api/housing/owner/:owner_id', (req, res) => {
-  const { owner_id } = req.params;
-  const sql = `SELECT owner_id, name, email, phone_num FROM owner WHERE owner_id = ?`;
-  db.query(sql, [owner_id], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length === 0)
-      return res.status(404).json({ success: false, message: 'Owner not found' });
-    res.json({ success: true, owner: results[0] });
   });
 });
 
