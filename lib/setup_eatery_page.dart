@@ -3,16 +3,16 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'homepage.dart';
 
-class SetupBusinessPage extends StatefulWidget {
+class SetupEateryPage extends StatefulWidget {
   final Map<String, dynamic> currentUser;
 
-  const SetupBusinessPage({super.key, required this.currentUser});
+  const SetupEateryPage({super.key, required this.currentUser});
 
   @override
-  State<SetupBusinessPage> createState() => _SetupBusinessPageState();
+  State<SetupEateryPage> createState() => _SetupEateryPage();
 }
 
-class _SetupBusinessPageState extends State<SetupBusinessPage> {
+class _SetupEateryPage extends State<SetupEateryPage> {
   String selectedType = ''; // 'Eatery' or 'Housing'
   final _formKey = GlobalKey<FormState>();
 
