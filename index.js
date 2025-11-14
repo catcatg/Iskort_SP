@@ -228,6 +228,35 @@ app.get('/api/eatery/owner/:owner_id', (req, res) => {
   });
 });
 
+// ===== VERIFY EATERY =====
+app.put('/api/admin/verify/eatery/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    'UPDATE eatery SET is_verified = 1, verified_time = NOW() WHERE eatery_id = ?',
+    [id],
+    (err) => {
+      if (err) return res.status(500).json({ success: false, error: err.message });
+      db.query('SELECT * FROM eatery WHERE eatery_id = ?', [id], (err2, results) => {
+        if (err2) return res.status(500).json({ success: false, error: err2.message });
+        if (results.length === 0)
+          return res.status(404).json({ success: false, message: 'Eatery not found' });
+        const eatery = results[0];
+        res.json({ success: true, message: 'Eatery verified', eatery });
+      });
+    }
+  );
+});
+
+// ===== REJECT EATERY =====
+app.delete('/api/admin/reject/eatery/:id', (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM eatery WHERE eatery_id = ?', [id], (err) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, message: 'Eatery rejected and deleted' });
+  });
+});
+
 // ===== HOUSING ROUTES =====
 app.post('/api/housing', (req, res) => {
   const {
@@ -265,6 +294,35 @@ app.get('/api/housing/owner/:owner_id', (req, res) => {
     if (results.length === 0)
       return res.status(404).json({ success: false, message: 'Owner not found' });
     res.json({ success: true, owner: results[0] });
+  });
+});
+
+// ===== VERIFY HOUSING =====
+app.put('/api/admin/verify/housing/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    'UPDATE housing SET is_verified = 1, verified_time = NOW() WHERE housing_id = ?',
+    [id],
+    (err) => {
+      if (err) return res.status(500).json({ success: false, error: err.message });
+      db.query('SELECT * FROM housing WHERE housing_id = ?', [id], (err2, results) => {
+        if (err2) return res.status(500).json({ success: false, error: err2.message });
+        if (results.length === 0)
+          return res.status(404).json({ success: false, message: 'Housing not found' });
+        const house = results[0];
+        res.json({ success: true, message: 'Housing verified', house });
+      });
+    }
+  );
+});
+
+// ===== REJECT HOUSING =====
+app.delete('/api/admin/reject/housing/:id', (req, res) => {
+  const { id } = req.params;
+  db.query('DELETE FROM housing WHERE housing_id = ?', [id], (err) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, message: 'Housing rejected and deleted' });
   });
 });
 
