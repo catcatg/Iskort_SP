@@ -164,9 +164,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 eatery['owner_email'] = owner['email'] ?? 'Unknown';
                 eatery['owner_phone'] = owner['phone_num'] ?? 'Unknown';
               } else {
-                eatery['owner_name'] = 'Unknown';
-                eatery['owner_email'] = 'Unknown';
-                eatery['owner_phone'] = 'Unknown';
+                // fallback: check admin table
+                final adminResponse = await http.get(
+                  Uri.parse('https://iskort-public-web.onrender.com/api/admin/users'),
+                );
+                final adminData = jsonDecode(adminResponse.body);
+                final adminOwner = (adminData['users'] as List).firstWhere(
+                  (u) => u['id'] == eatery['owner_id'] && u['role'] == 'owner',
+                  orElse: () => null,
+                );
+                if (adminOwner != null) {
+                  eatery['owner_name'] = adminOwner['name'] ?? 'Unknown';
+                  eatery['owner_email'] = adminOwner['email'] ?? 'Unknown';
+                  eatery['owner_phone'] = adminOwner['phone_num'] ?? 'Unknown';
+                } else {
+                  eatery['owner_name'] = 'Unknown';
+                  eatery['owner_email'] = 'Unknown';
+                  eatery['owner_phone'] = 'Unknown';
+                }
               }
             } catch (e) {
               print('Error fetching owner for eatery $ownerId: $e');
@@ -292,9 +307,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 house['owner_email'] = owner['email'] ?? 'Unknown';
                 house['owner_phone'] = owner['phone_num'] ?? 'Unknown';
               } else {
-                house['owner_name'] = 'Unknown';
-                house['owner_email'] = 'Unknown';
-                house['owner_phone'] = 'Unknown';
+                // fallback: check admin table
+                final adminResponse = await http.get(
+                  Uri.parse('https://iskort-public-web.onrender.com/api/admin/users'),
+                );
+                final adminData = jsonDecode(adminResponse.body);
+                final adminOwner = (adminData['users'] as List).firstWhere(
+                  (u) => u['id'] == house['owner_id'] && u['role'] == 'owner',
+                  orElse: () => null,
+                );
+                if (adminOwner != null) {
+                  house['owner_name'] = adminOwner['name'] ?? 'Unknown';
+                  house['owner_email'] = adminOwner['email'] ?? 'Unknown';
+                  house['owner_phone'] = adminOwner['phone_num'] ?? 'Unknown';
+                } else {
+                  house['owner_name'] = 'Unknown';
+                  house['owner_email'] = 'Unknown';
+                  house['owner_phone'] = 'Unknown';
+                }
               }
             } catch (e) {
               print('Error fetching owner for housing $ownerId: $e');
