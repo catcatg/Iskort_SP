@@ -220,8 +220,8 @@ app.delete('/api/admin/reject/:id', (req, res) => {
 // ===== EATERY ROUTES =====
 app.post('/api/eatery', (req, res) => {
   const { owner_id, name, location, open_time, end_time } = req.body;
-  const sql = `INSERT INTO eatery (owner_id, name, location, open_time, end_time) VALUES (?, ?, ?, ?, ?)`;
-  db.query(sql, [owner_id, name, location, open_time, end_time], (err, result) => {
+  const sql = `INSERT INTO eatery (owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time, eatery_photo, open_time, end_time) VALUES (?, ?, ?, ?, ?)`;
+  db.query(sql, [owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time, eatery_photo, open_time, end_time], (err, result) => {
     if (err) return res.status(500).send(err);
     res.send({ success: true, eatery_id: result.insertId });
   });
@@ -249,9 +249,9 @@ app.get('/api/eatery/owner/:owner_id', (req, res) => {
 
 // ===== HOUSING ROUTES =====
 app.post('/api/housing', (req, res) => {
-  const { owner_id, name, address, rent_price, room_count, contact_number } = req.body;
-  const sql = `INSERT INTO housing (owner_id, name, address, rent_price, room_count, contact_number) VALUES (?, ?, ?, ?, ?, ?)`;
-  db.query(sql, [owner_id, name, address, rent_price, room_count, contact_number], (err, result) => {
+  const { owner_id, name, location, rent_price, room_count, contact_number } = req.body;
+  const sql = `INSERT INTO housing (owner_id, name, location, price, curfew, housing_photo, is_verified, verified_by_admin_id, verified_time) VALUES (?, ?, ?, ?, ?, ?)`;
+  db.query(sql, [owner_id, name, location, price, curfew, housing_photo, is_verified, verified_by_admin_id, verified_time], (err, result) => {
     if (err) return res.status(500).send(err);
     res.send({ success: true, housing_id: result.insertId });
   });
