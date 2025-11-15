@@ -114,7 +114,7 @@ class _FoodPageState extends State<FoodPage> {
               onChanged: _searchFood,
               decoration: InputDecoration(
                 hintText: 'Search food or restaurant',
-                suffixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: const Color(0xFFF0E1E1),
                 contentPadding: const EdgeInsets.symmetric(
