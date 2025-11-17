@@ -1,3 +1,7 @@
+// CLEAN + OPTIMIZED ADMIN DASHBOARD
+// Uses backend JOIN results (owner_name, owner_email, owner_phone)
+// Single-file admin dashboard with Users / Eateries / Housings
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -12,119 +16,78 @@ class AdminDashboardPage extends StatefulWidget {
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int selectedPage = 0; // 0 = Users, 1 = Eatery, 2 = Housing
 
-  // ---------------- USERS ----------------
+  // Base API URL
+  final String baseUrl = 'https://iskort-public-web.onrender.com';
+
+  // ========== USERS ==========
   List users = [];
-  bool isLoading = true;
+  bool isLoadingUsers = true;
 
   Future<void> fetchUsers() async {
+    setState(() => isLoadingUsers = true);
     try {
-      final response = await http.get(
-        Uri.parse('https://iskort-public-web.onrender.com/api/admin/users'),
-      );
+      final response = await http.get(Uri.parse('$baseUrl/api/admin/users'));
       final data = jsonDecode(response.body);
-
       if (data['success'] == true) {
         setState(() {
-          users = data['users'];
-          isLoading = false;
+          users = List.from(data['users'] ?? []);
+          isLoadingUsers = false;
         });
+      } else {
+        setState(() => isLoadingUsers = false);
       }
     } catch (e) {
-      print('Error fetching users: $e');
+      print('fetchUsers error: $e');
+      setState(() => isLoadingUsers = false);
     }
   }
 
-  Future<void> performAction(
-      String id, String role, String action, Map user) async {
+  Future<void> performUserAction(String id, String action) async {
     try {
-      late Uri url;
       if (action == 'verify') {
-        url = Uri.parse(
-            'https://iskort-public-web.onrender.com/api/admin/verify/$id');
-        final response = await http.put(url);
-        final data = jsonDecode(response.body);
-        print('Verify -> ${data['message']}');
-
-        // SEND notification
-        final pref = (user['notif_preference'] ?? 'email').toString().toLowerCase();
-        final email = user['email'] ?? 'unknown';
-        final phone = user['phone_num'] ?? 'unknown';
-        if (pref == 'email') {
-          print('Sent verification to $email via Email');
-        } else if (pref == 'sms') {
-          print('Sent verification to $phone via SMS');
-        } else {
-          print('Sent verification to $email via Email and $phone via SMS');
-        }
-      } else if (action == 'reject') {
-        url = Uri.parse(
-            'https://iskort-public-web.onrender.com/api/admin/reject/$id');
-        final response = await http.delete(url);
-        final data = jsonDecode(response.body);
-        print('Reject -> ${data['message']}');
-
-        // SEND notification
-        final pref = (user['notif_preference'] ?? 'email').toString().toLowerCase();
-        final email = user['email'] ?? 'unknown';
-        final phone = user['phone_num'] ?? 'unknown';
-        if (pref == 'email') {
-          print('Sent rejection to $email via Email');
-        } else if (pref == 'sms') {
-          print('Sent rejection to $phone via SMS');
-        } else {
-          print('Sent rejection to $email via Email and $phone via SMS');
-        }
+        await http.put(Uri.parse('$baseUrl/api/admin/verify/$id'));
+      } else {
+        await http.delete(Uri.parse('$baseUrl/api/admin/reject/$id'));
       }
-
-      fetchUsers();
+      await fetchUsers();
     } catch (e) {
-      print('Action error: $e');
+      print('performUserAction error: $e');
     }
   }
 
-  Widget buildUserVerificationPage() {
-    if (isLoading) return const Center(child: CircularProgressIndicator());
+  Widget buildUserPage() {
+    if (isLoadingUsers) return const Center(child: CircularProgressIndicator());
+    if (users.isEmpty) return const Center(child: Text('No users found'));
 
     return ListView.builder(
       itemCount: users.length,
       itemBuilder: (context, index) {
-        final user = users[index];
-        final isVerified = (user['is_verified'] ?? 0) == 1;
+        final u = users[index] as Map;
+        final verified = (u['is_verified'] ?? 0) == 1;
 
         return Card(
           margin: const EdgeInsets.all(8),
           child: ListTile(
-            title: Text('${user['name'] ?? 'Unknown'} (${user['role'] ?? 'No role'})'),
+            title: Text('${u['name'] ?? 'Unknown'} (${u['role'] ?? 'user'})'),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user['email'] ?? 'No email'),
-                Text('Phone: ${user['phone_num'] ?? 'N/A'}'),
-                Text('Joined: ${user['created_at'] ?? 'N/A'}'),
-                Text('Preference: ${user['notif_preference'] ?? 'email'}'),
+                Text(u['email'] ?? 'No email'),
+                Text('Phone: ${u['phone_num'] ?? 'N/A'}'),
+                Text('Joined: ${u['created_at'] ?? 'N/A'}'),
               ],
             ),
-            trailing: isVerified
+            trailing: verified
                 ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextButton(
-                        onPressed: () => performAction(
-                          (user['id'] ?? '').toString(),
-                          user['table_name'] ?? 'user',
-                          'verify',
-                          user,
-                        ),
+                        onPressed: () => performUserAction(u['id'].toString(), 'verify'),
                         child: const Text('Verify'),
                       ),
                       TextButton(
-                        onPressed: () => performAction(
-                          (user['id'] ?? '').toString(),
-                          user['table_name'] ?? 'user',
-                          'reject',
-                          user,
-                        ),
+                        onPressed: () => performUserAction(u['id'].toString(), 'reject'),
                         child: const Text('Reject', style: TextStyle(color: Colors.red)),
                       ),
                     ],
@@ -135,139 +98,80 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // ---------------- EATERIES ----------------
+  // ========== EATERIES ==========
   List eateries = [];
-  bool isEateryLoading = true;
+  bool isLoadingEateries = true;
 
   Future<void> fetchEateries() async {
+    setState(() => isLoadingEateries = true);
     try {
-      final response = await http.get(
-        Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
-      );
+      final response = await http.get(Uri.parse('$baseUrl/api/eatery'));
       final data = jsonDecode(response.body);
 
       if (data['success'] == true) {
-        List eateriesData = data['eateries'] ?? [];
-
-        for (var eatery in eateriesData) {
-          final ownerId = eatery['owner_id'];
-          if (ownerId != null) {
-            try {
-              final ownerResponse = await http.get(
-                Uri.parse('https://iskort-public-web.onrender.com/api/owner/$ownerId'),
-              );
-              final ownerData = jsonDecode(ownerResponse.body);
-
-              if (ownerData['success'] == true && ownerData['owner'] != null) {
-                final owner = ownerData['owner'];
-                eatery['owner_name'] = owner['name'] ?? 'Unknown';
-                eatery['owner_email'] = owner['email'] ?? 'Unknown';
-                eatery['owner_phone'] = owner['phone_num'] ?? 'Unknown';
-              } else {
-                // fallback: check admin table
-                final adminResponse = await http.get(
-                  Uri.parse('https://iskort-public-web.onrender.com/api/admin/users'),
-                );
-                final adminData = jsonDecode(adminResponse.body);
-                final adminOwner = (adminData['users'] as List).firstWhere(
-                  (u) => u['id'] == eatery['owner_id'] && u['role'] == 'owner',
-                  orElse: () => null,
-                );
-                if (adminOwner != null) {
-                  eatery['owner_name'] = adminOwner['name'] ?? 'Unknown';
-                  eatery['owner_email'] = adminOwner['email'] ?? 'Unknown';
-                  eatery['owner_phone'] = adminOwner['phone_num'] ?? 'Unknown';
-                } else {
-                  eatery['owner_name'] = 'Unknown';
-                  eatery['owner_email'] = 'Unknown';
-                  eatery['owner_phone'] = 'Unknown';
-                }
-              }
-            } catch (e) {
-              print('Error fetching owner for eatery $ownerId: $e');
-              eatery['owner_name'] = 'Unknown';
-              eatery['owner_email'] = 'Unknown';
-              eatery['owner_phone'] = 'Unknown';
-            }
-          }
-        }
-
+        // backend returns owner_name/owner_email/owner_phone via JOIN
         setState(() {
-          eateries = eateriesData;
-          isEateryLoading = false;
+          eateries = List.from(data['eateries'] ?? []);
+          isLoadingEateries = false;
         });
+      } else {
+        setState(() => isLoadingEateries = false);
       }
     } catch (e) {
-      print('Error fetching eateries: $e');
+      print('fetchEateries error: $e');
+      setState(() => isLoadingEateries = false);
     }
   }
 
-  Future<void> performEateryAction(String id, String action, Map eatery) async {
+  Future<void> performEateryAction(String id, String action) async {
     try {
-      late Uri url;
       if (action == 'verify') {
-        url = Uri.parse('https://iskort-public-web.onrender.com/api/admin/verify/eatery/$id');
-        final response = await http.put(url);
-        final data = jsonDecode(response.body);
-        print('Verify Eatery -> ${data['message']}');
-
-        final ownerEmail = eatery['owner_email'] ?? 'unknown';
-        final ownerPhone = eatery['owner_phone'] ?? 'unknown';
-        print('Sent verification to $ownerEmail / $ownerPhone');
-      } else if (action == 'reject') {
-        url = Uri.parse('https://iskort-public-web.onrender.com/api/admin/reject/eatery/$id');
-        final response = await http.delete(url);
-        final data = jsonDecode(response.body);
-        print('Reject Eatery -> ${data['message']}');
-
-        final ownerEmail = eatery['owner_email'] ?? 'unknown';
-        final ownerPhone = eatery['owner_phone'] ?? 'unknown';
-        print('Sent rejection to $ownerEmail / $ownerPhone');
+        await http.put(Uri.parse('$baseUrl/api/admin/verify/eatery/$id'));
+      } else {
+        await http.delete(Uri.parse('$baseUrl/api/admin/reject/eatery/$id'));
       }
-
-      fetchEateries();
+      await fetchEateries();
     } catch (e) {
-      print('Eatery Action Error: $e');
+      print('performEateryAction error: $e');
     }
   }
 
   Widget buildEateryPage() {
-    if (isEateryLoading) return const Center(child: CircularProgressIndicator());
+    if (isLoadingEateries) return const Center(child: CircularProgressIndicator());
     if (eateries.isEmpty) return const Center(child: Text('No eateries to verify'));
 
     return ListView.builder(
       itemCount: eateries.length,
       itemBuilder: (context, index) {
-        final eatery = eateries[index];
-        final isVerified = (eatery['is_verified'] ?? 0) == 1;
+        final e = eateries[index] as Map;
+        final verified = (e['is_verified'] ?? 0) == 1;
+        final eateryId = e['eatery_id']?.toString() ?? e['id']?.toString() ?? '';
 
         return Card(
           margin: const EdgeInsets.all(8),
           child: ListTile(
-            title: Text(eatery['name'] ?? 'Unnamed Eatery'),
+            title: Text(e['name'] ?? 'Unnamed Eatery'),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Owner: ${eatery['owner_name'] ?? 'Unknown'}'),
-                Text('Email: ${eatery['owner_email'] ?? 'Unknown'}'),
-                Text('Phone: ${eatery['owner_phone'] ?? 'Unknown'}'),
-                Text('Location: ${eatery['location'] ?? 'Unknown'}'),
-                Text('Min Price: ${eatery['min_price'] ?? 'N/A'}'),
+                Text('Owner: ${e['owner_name'] ?? 'Unknown'}'),
+                Text('Email: ${e['owner_email'] ?? 'Unknown'}'),
+                Text('Phone: ${e['owner_phone'] ?? 'Unknown'}'),
+                Text('Location: ${e['location'] ?? 'Unknown'}'),
+                Text('Min Price: ${e['min_price'] ?? 'N/A'}'),
               ],
             ),
-            trailing: isVerified
+            trailing: verified
                 ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextButton(
-                        onPressed: () => performEateryAction(
-                            (eatery['id'] ?? '').toString(), 'verify', eatery),
+                        onPressed: () => performEateryAction(eateryId, 'verify'),
                         child: const Text('Verify'),
                       ),
                       TextButton(
-                        onPressed: () => performEateryAction(
-                            (eatery['id'] ?? '').toString(), 'reject', eatery),
+                        onPressed: () => performEateryAction(eateryId, 'reject'),
                         child: const Text('Reject', style: TextStyle(color: Colors.red)),
                       ),
                     ],
@@ -278,139 +182,79 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // ---------------- HOUSINGS ----------------
+  // ========== HOUSINGS ==========
   List housings = [];
-  bool isHousingLoading = true;
+  bool isLoadingHousings = true;
 
   Future<void> fetchHousings() async {
+    setState(() => isLoadingHousings = true);
     try {
-      final response = await http.get(
-        Uri.parse('https://iskort-public-web.onrender.com/api/housing'),
-      );
+      final response = await http.get(Uri.parse('$baseUrl/api/housing'));
       final data = jsonDecode(response.body);
 
       if (data['success'] == true) {
-        List housingData = data['housings'] ?? [];
-
-        for (var house in housingData) {
-          final ownerId = house['owner_id'];
-          if (ownerId != null) {
-            try {
-              final ownerResponse = await http.get(
-                Uri.parse('https://iskort-public-web.onrender.com/api/housing/owner/$ownerId'),
-              );
-              final ownerData = jsonDecode(ownerResponse.body);
-
-              if (ownerData['success'] == true && ownerData['owner'] != null) {
-                final owner = ownerData['owner'];
-                house['owner_name'] = owner['name'] ?? 'Unknown';
-                house['owner_email'] = owner['email'] ?? 'Unknown';
-                house['owner_phone'] = owner['phone_num'] ?? 'Unknown';
-              } else {
-                // fallback: check admin table
-                final adminResponse = await http.get(
-                  Uri.parse('https://iskort-public-web.onrender.com/api/admin/users'),
-                );
-                final adminData = jsonDecode(adminResponse.body);
-                final adminOwner = (adminData['users'] as List).firstWhere(
-                  (u) => u['id'] == house['owner_id'] && u['role'] == 'owner',
-                  orElse: () => null,
-                );
-                if (adminOwner != null) {
-                  house['owner_name'] = adminOwner['name'] ?? 'Unknown';
-                  house['owner_email'] = adminOwner['email'] ?? 'Unknown';
-                  house['owner_phone'] = adminOwner['phone_num'] ?? 'Unknown';
-                } else {
-                  house['owner_name'] = 'Unknown';
-                  house['owner_email'] = 'Unknown';
-                  house['owner_phone'] = 'Unknown';
-                }
-              }
-            } catch (e) {
-              print('Error fetching owner for housing $ownerId: $e');
-              house['owner_name'] = 'Unknown';
-              house['owner_email'] = 'Unknown';
-              house['owner_phone'] = 'Unknown';
-            }
-          }
-        }
-
         setState(() {
-          housings = housingData;
-          isHousingLoading = false;
+          housings = List.from(data['housings'] ?? []);
+          isLoadingHousings = false;
         });
+      } else {
+        setState(() => isLoadingHousings = false);
       }
     } catch (e) {
-      print('Error fetching housings: $e');
+      print('fetchHousings error: $e');
+      setState(() => isLoadingHousings = false);
     }
   }
 
-  Future<void> performHousingAction(String id, String action, Map housing) async {
+  Future<void> performHousingAction(String id, String action) async {
     try {
-      late Uri url;
       if (action == 'verify') {
-        url = Uri.parse('https://iskort-public-web.onrender.com/api/admin/verify/housing/$id');
-        final response = await http.put(url);
-        final data = jsonDecode(response.body);
-        print('Verify Housing -> ${data['message']}');
-
-        final ownerEmail = housing['owner_email'] ?? 'unknown';
-        final ownerPhone = housing['owner_phone'] ?? 'unknown';
-        print('Sent verification to $ownerEmail / $ownerPhone');
-      } else if (action == 'reject') {
-        url = Uri.parse('https://iskort-public-web.onrender.com/api/admin/reject/housing/$id');
-        final response = await http.delete(url);
-        final data = jsonDecode(response.body);
-        print('Reject Housing -> ${data['message']}');
-
-        final ownerEmail = housing['owner_email'] ?? 'unknown';
-        final ownerPhone = housing['owner_phone'] ?? 'unknown';
-        print('Sent rejection to $ownerEmail / $ownerPhone');
+        await http.put(Uri.parse('$baseUrl/api/admin/verify/housing/$id'));
+      } else {
+        await http.delete(Uri.parse('$baseUrl/api/admin/reject/housing/$id'));
       }
-
-      fetchHousings();
+      await fetchHousings();
     } catch (e) {
-      print('Housing Action Error: $e');
+      print('performHousingAction error: $e');
     }
   }
 
   Widget buildHousingPage() {
-    if (isHousingLoading) return const Center(child: CircularProgressIndicator());
+    if (isLoadingHousings) return const Center(child: CircularProgressIndicator());
     if (housings.isEmpty) return const Center(child: Text('No housings to verify'));
 
     return ListView.builder(
       itemCount: housings.length,
       itemBuilder: (context, index) {
-        final house = housings[index];
-        final isVerified = (house['is_verified'] ?? 0) == 1;
+        final h = housings[index] as Map;
+        final verified = (h['is_verified'] ?? 0) == 1;
+        final housingId = h['housing_id']?.toString() ?? h['id']?.toString() ?? '';
 
         return Card(
           margin: const EdgeInsets.all(8),
           child: ListTile(
-            title: Text(house['name'] ?? 'Unnamed Housing'),
+            title: Text(h['name'] ?? 'Unnamed Housing'),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Owner: ${house['owner_name'] ?? 'Unknown'}'),
-                Text('Email: ${house['owner_email'] ?? 'Unknown'}'),
-                Text('Phone: ${house['owner_phone'] ?? 'Unknown'}'),
-                Text('Address: ${house['address'] ?? 'Unknown'}'),
-                Text('Rent Price: ${house['rent_price'] ?? 'N/A'}'),
+                Text('Owner: ${h['owner_name'] ?? 'Unknown'}'),
+                Text('Email: ${h['owner_email'] ?? 'Unknown'}'),
+                Text('Phone: ${h['owner_phone'] ?? 'Unknown'}'),
+                Text('Address: ${h['location'] ?? h['address'] ?? 'Unknown'}'),
+                Text('Price: ${h['price'] ?? h['rent_price'] ?? 'N/A'}'),
               ],
             ),
-            trailing: isVerified
+            trailing: verified
                 ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextButton(
-                        onPressed: () => performHousingAction(
-                            (house['id'] ?? '').toString(), 'verify', house),
+                        onPressed: () => performHousingAction(housingId, 'verify'),
                         child: const Text('Verify'),
                       ),
                       TextButton(
-                        onPressed: () => performHousingAction(
-                            (house['id'] ?? '').toString(), 'reject', house),
+                        onPressed: () => performHousingAction(housingId, 'reject'),
                         child: const Text('Reject', style: TextStyle(color: Colors.red)),
                       ),
                     ],
@@ -421,29 +265,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // ---------------- PAGE BUILDER ----------------
-  Widget buildPageContent() {
-    switch (selectedPage) {
-      case 0:
-        return buildUserVerificationPage();
-      case 1:
-        return buildEateryPage();
-      case 2:
-        return buildHousingPage();
-      default:
-        return const Center(child: Text('Invalid Page'));
-    }
+  // ========== UI & Lifecycle ==========
+  @override
+  void initState() {
+    super.initState();
+    fetchUsers();
+    fetchEateries();
+    fetchHousings();
   }
 
-  // ---------------- SIDEBAR ----------------
   Widget buildSidebarItem(String title, IconData icon, int index) {
     final bool isActive = selectedPage == index;
     return InkWell(
-      onTap: () {
-        setState(() {
-          selectedPage = index;
-        });
-      },
+      onTap: () => setState(() => selectedPage = index),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
         decoration: BoxDecoration(
@@ -467,13 +301,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  // ---------------- INIT ----------------
-  @override
-  void initState() {
-    super.initState();
-    fetchUsers();
-    fetchEateries();
-    fetchHousings();
+  Widget buildPageContent() {
+    switch (selectedPage) {
+      case 0:
+        return buildUserPage();
+      case 1:
+        return buildEateryPage();
+      case 2:
+        return buildHousingPage();
+      default:
+        return const Center(child: Text('Invalid Page'));
+    }
   }
 
   @override
@@ -491,10 +329,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 const SizedBox(height: 40),
                 const Text(
                   'Admin Panel',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 30),
                 buildSidebarItem('Users Verification', Icons.people, 0),
