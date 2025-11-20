@@ -133,7 +133,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
                         _buildMenuItem(
                           Icons.notifications,
-                          "Acitivity Notifications",
+                          "Activity Notifications",
                           () {
                             Navigator.pushNamed(context, '/notifications');
                           },
