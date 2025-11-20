@@ -80,26 +80,45 @@ app.post('/api/admin/register', (req, res) => {
   });
 });
 
-// ===== LOGIN (Admin) =====
+// ===== LOGIN (Auto Role Detection) =====
 app.post('/api/admin/login', (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password } = req.body;
 
-  db.query('SELECT * FROM admin WHERE email = ? AND password = ?', [email, password], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length === 0)
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+  db.query(
+    'SELECT * FROM admin WHERE email = ? AND password = ?',
+    [email, password],
+    (err, results) => {
+      if (err) 
+        return res.status(500).json({ success: false, error: err.message });
 
-    const user = results[0];
+      if (results.length === 0)
+        return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    if (user.role !== role)
-      return res.status(403).json({ success: false, message: `You are not registered as a ${role.toUpperCase()}.` });
+      const user = results[0];
 
-    if (!user.is_verified)
-      return res.status(403).json({ success: false, message: 'Your account is not verified yet by admin.' });
+      // Check if account is verified
+      if (!user.is_verified)
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is not verified yet by admin.',
+        });
 
-    res.json({ success: true, message: 'Login successful', user });
-  });
+      // SUCCESS → return user with detected role
+      return res.json({
+        success: true,
+        message: 'Login successful',
+        user: {
+          admin_id: user.admin_id,
+          name: user.name,
+          email: user.email,
+          role: user.role,       // ← IMPORTANT
+          phone_num: user.phone_num,
+        },
+      });
+    }
+  );
 });
+
 
 // ===== GET ALL USERS =====
 app.get('/api/admin/users', (req, res) => {
