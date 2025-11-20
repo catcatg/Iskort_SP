@@ -1,7 +1,8 @@
 const express = require('express');
 const mysql = require('mysql2');
 const dotenv = require('dotenv');
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 //const twilio = require('twilio');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -11,17 +12,9 @@ const path = require('path');
 dotenv.config();
 const app = express();
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
-
+sgMail.send(mailOptions)
+  .then(() => console.log("Email sent"))
+  .catch(err => console.error("Email error:", err));
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -153,24 +146,26 @@ app.put('/api/admin/verify/:id', (req, res) => {
 
         const user = results[0];
 
-        // Helper function to send verification email
-        const sendVerificationEmail = (userEmail, userName) => {
-          const mailOptions = {
-            from: process.env.EMAIL_USER,
+        const sendVerificationEmail = async (userEmail, userName) => {
+          const msg = {
             to: userEmail,
+            from: process.env.EMAIL_FROM,
             subject: 'Your Iskort Account is Verified!',
             html: `
               <p>Hi ${userName},</p>
-              <p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>
+              <p>Your account has been successfully verified. You can now log in and use Iskort!</p>
               <p>Thank you for registering.</p>
             `,
           };
 
-          transporter.sendMail(mailOptions, (err, info) => {
-            if (err) console.error('Error sending email:', err);
-            else console.log('Verification email sent:', info.response);
-          });
+          try {
+            await sgMail.send(msg);
+            console.log('Verification email sent');
+          } catch (err) {
+            console.error('SendGrid error:', err.response?.body || err);
+          }
         };
+
 
         // If it's a user or owner, copy them to their table
         if (user.role === 'owner' || user.role === 'user') {
@@ -217,22 +212,22 @@ app.put('/api/admin/verify/:id', (req, res) => {
 
 // ===== TEST EMAIL =====
 app.get('/api/test-email', async (req, res) => {
-  try {
-    const info = await transporter.sendMail({
-      from: `"Iskort Test" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER, // send to yourself for testing
-      subject: 'Test Email from Iskort',
-      text: 'Hello! This is a test email from your Iskort backend.',
-      html: '<b>Hello! This is a test email from your Iskort backend.</b>',
-    });
+  const msg = {
+    to: process.env.EMAIL_FROM,
+    from: process.env.EMAIL_FROM,
+    subject: 'Test Email from Iskort',
+    html: '<p>Hello! This is a test email from your Iskort backend.</p>',
+  };
 
-    console.log('Email sent: ', info.messageId);
-    res.json({ success: true, message: 'Test email sent', info });
+  try {
+    await sgMail.send(msg);
+    res.json({ success: true, message: 'Test email sent!' });
   } catch (err) {
-    console.error('Test email error: ', err);
+    console.error(err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 
 // ===== REJECT ACCOUNT WITH EMAIL NOTIFICATION =====
@@ -246,24 +241,24 @@ app.delete('/api/admin/reject/:id', (req, res) => {
 
     const user = results[0];
 
-    // Helper function to send rejection email
-    const sendRejectionEmail = (userEmail, userName) => {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
+    const sendRejectionEmail = async (userEmail, userName) => {
+      const msg = {
         to: userEmail,
+        from: process.env.EMAIL_FROM,
         subject: 'Your Iskort Account Registration',
         html: `
           <p>Hi ${userName},</p>
-          <p>We’re sorry to inform you that your account registration has been rejected by the admin.</p>
-          <p>If you believe this is a mistake, you may contact support for further assistance.</p>
-          <p>Thank you for your interest in Iskort.</p>
+          <p>Your account registration has been rejected by the admin.</p>
+          <p>If you think this is a mistake, contact support.</p>
         `,
       };
 
-      transporter.sendMail(mailOptions, (err, info) => {
-        if (err) console.error('Error sending email:', err);
-        else console.log('Rejection email sent:', info.response);
-      });
+      try {
+        await sgMail.send(msg);
+        console.log('Rejection email sent');
+      } catch (err) {
+        console.error('SendGrid error:', err.response?.body || err);
+      }
     };
 
     db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
