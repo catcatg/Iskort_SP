@@ -1,20 +1,19 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const mysql = require('mysql2');
-const dotenv = require('dotenv');
+
 const sgMail = require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 //const twilio = require('twilio');
+
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 
-dotenv.config();
 const app = express();
-
-sgMail.send(mailOptions)
-  .then(() => console.log("Email sent"))
-  .catch(err => console.error("Email error:", err));
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -35,7 +34,7 @@ const db = mysql.createConnection({
   host: process.env.DB_HOST || 'switchyard.proxy.rlwy.net',
   user: process.env.DB_USER || 'root',
   password:
-    process.env.DB_PASSWORD || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
+    process.env.DB_PASS || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
   database: process.env.DB_NAME || 'railway',
   port: process.env.DB_PORT || 43301,
 });
