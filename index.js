@@ -4,7 +4,9 @@ dotenv.config();
 const express = require('express');
 const mysql = require('mysql2');
 
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 //const twilio = require('twilio');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -12,18 +14,6 @@ const multer = require('multer');
 const path = require('path');
 
 const app = express();
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
-
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -44,9 +34,12 @@ const db = mysql.createConnection({
   host: process.env.DB_HOST || 'switchyard.proxy.rlwy.net',
   user: process.env.DB_USER || 'root',
   password:
-    process.env.DB_PASSWORD || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
+    process.env.DB_PASS || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
   database: process.env.DB_NAME || 'railway',
   port: process.env.DB_PORT || 43301,
+  ssl: {
+    rejectUnauthorized: false, // important for Render DB
+  },
 });
 
 db.connect((err) => {
@@ -158,143 +151,112 @@ app.get('/api/admin/users', (req, res) => {
 app.put('/api/admin/verify/:id', (req, res) => {
   const { id } = req.params;
 
-  db.query(
-    `UPDATE admin SET is_verified = TRUE, status = 'verified' WHERE admin_id = ?`,
-    [id],
-    (err) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
+  db.query(`UPDATE admin SET is_verified = TRUE, status = 'verified' WHERE admin_id = ?`, [id], (err) => {
+  if (err) return res.status(500).json({ success: false, error: err.message });
 
-      // Fetch the updated user
-      db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err2, results) => {
-        if (err2) return res.status(500).json({ success: false, error: err2.message });
-        if (results.length === 0)
-          return res.status(404).json({ success: false, message: 'User not found' });
 
-        const user = results[0];
+  db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err2, results) => {
+    if (err2) return res.status(500).json({ success: false, error: err2.message });
+    if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
 
-        // Helper function to send verification email
-        const sendVerificationEmail = (userEmail, userName) => {
-          const mailOptions = {
-            from: process.env.EMAIL_USER,
-            to: userEmail,
-            subject: 'Your Iskort Account is Verified!',
-            html: `
-              <p>Hi ${userName},</p>
-              <p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>
-              <p>Thank you for registering.</p>
-            `,
-          };
 
-          transporter.sendMail(mailOptions, (err, info) => {
-            if (err) console.error('Error sending email:', err);
-            else console.log('Verification email sent:', info.response);
-          });
-        };
+    const user = results[0];
 
-        // If it's a user or owner, copy them to their table
-        if (user.role === 'owner' || user.role === 'user') {
-          const table = user.role;
-          db.query(
-            `INSERT INTO ${table} (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              user.name,
-              user.email,
-              user.password,
-              user.role,
-              user.phone_num,
-              1,
-              'verified',
-              user.notif_preference,
-              user.created_at,
-            ],
-            (err3) => {
-              if (err3) return res.status(500).json({ success: false, error: err3.message });
 
-              // Send verification email
-              sendVerificationEmail(user.email, user.name);
+    const sendVerificationEmail = async (email, name) => {
+      const msg = {
+        to: email,
+        from: process.env.EMAIL_FROM,
+        subject: 'Your Iskort Account is Verified!',
+        html: `<p>Hi ${name},</p><p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>`
+    };
+    try { await sgMail.send(msg); console.log('Verification email sent to', email); }
+    catch (err) { console.error('Error sending verification email:', err); }
+  };
 
-              console.log(`${user.role} account copied to ${table} table`);
-              res.json({
-                success: true,
-                message: `${user.role} verified, copied, and email sent successfully`,
-              });
-            }
-          );
-        } else {
-          // Admin verification only
-          sendVerificationEmail(user.email, user.name);
-          res.json({
-            success: true,
-            message: `Admin account verified and email sent successfully`,
-          });
-        }
-      });
-    }
+
+  if (user.role === 'owner' || user.role === 'user') {
+  const table = user.role;
+  db.query(`INSERT INTO ${table} (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  [user.name, user.email, user.password, user.role, user.phone_num, 1, 'verified', user.notif_preference, user.created_at],
+  (err3) => {
+  if (err3) return res.status(500).json({ success: false, error: err3.message });
+
+
+  (async () => {
+  await sendVerificationEmail(user.email, user.name);
+  res.json({ success: true, message: `${user.role} verified, copied, and email sent successfully` });
+  })();
+  }
   );
+  } else {
+  (async () => {
+  await sendVerificationEmail(user.email, user.name);
+  res.json({ success: true, message: `Admin account verified and email sent successfully` });
+  })();
+  }
+  });
+  });
 });
 
 // ===== TEST EMAIL =====
 app.get('/api/test-email', async (req, res) => {
-  try {
-    const info = await transporter.sendMail({
-      from: `"Iskort Test" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER, // send to yourself for testing
-      subject: 'Test Email from Iskort',
-      text: 'Hello! This is a test email from your Iskort backend.',
-      html: '<b>Hello! This is a test email from your Iskort backend.</b>',
-    });
+try {
+const msg = {
+to: process.env.EMAIL_FROM, // send to yourself for testing
+from: process.env.EMAIL_FROM,
+subject: 'Test Email from Iskort',
+text: 'Hello! This is a test email from your Iskort backend.',
+html: '<b>Hello! This is a test email from your Iskort backend.</b>',
+};
 
-    console.log('Email sent: ', info.messageId);
-    res.json({ success: true, message: 'Test email sent', info });
-  } catch (err) {
-    console.error('Test email error: ', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
+
+await sgMail.send(msg);
+console.log('Test email sent to', process.env.EMAIL_FROM);
+res.json({ success: true, message: 'Test email sent' });
+
+
+} catch (err) {
+console.error('Test email error: ', err);
+res.status(500).json({ success: false, error: err.message });
+}
 });
-
 
 // ===== REJECT ACCOUNT WITH EMAIL NOTIFICATION =====
 app.delete('/api/admin/reject/:id', (req, res) => {
-  const { id } = req.params;
+const { id } = req.params;
 
-  db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length === 0)
-      return res.status(404).json({ success: false, message: 'User not found' });
 
-    const user = results[0];
+db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err, results) => {
+if (err) return res.status(500).json({ success: false, error: err.message });
+if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Helper function to send rejection email
-    const sendRejectionEmail = (userEmail, userName) => {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: userEmail,
-        subject: 'Your Iskort Account Registration',
-        html: `
-          <p>Hi ${userName},</p>
-          <p>We’re sorry to inform you that your account registration has been rejected by the admin.</p>
-          <p>If you believe this is a mistake, you may contact support for further assistance.</p>
-          <p>Thank you for your interest in Iskort.</p>
-        `,
-      };
 
-      transporter.sendMail(mailOptions, (err, info) => {
-        if (err) console.error('Error sending email:', err);
-        else console.log('Rejection email sent:', info.response);
-      });
-    };
+const user = results[0];
 
-    db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
-      if (err2) return res.status(500).json({ success: false, error: err2.message });
 
-      // Send rejection email
-      sendRejectionEmail(user.email, user.name);
+const sendRejectionEmail = async (email, name) => {
+const msg = {
+to: email,
+from: process.env.EMAIL_FROM,
+subject: 'Your Iskort Account Registration',
+html: `<p>Hi ${name},</p><p>We’re sorry to inform you that your account registration has been rejected by the admin.</p>`
+};
+try { await sgMail.send(msg); console.log('Rejection email sent to', email); }
+catch (err) { console.error('Error sending rejection email:', err); }
+};
 
-      console.log(`${user.role} (${user.email}) rejected and removed`);
-      res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
-    });
-  });
+
+db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
+if (err2) return res.status(500).json({ success: false, error: err2.message });
+
+
+(async () => {
+await sendRejectionEmail(user.email, user.name);
+res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
+})();
+});
+});
 });
 
 
