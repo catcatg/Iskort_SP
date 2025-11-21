@@ -198,7 +198,108 @@ app.put('/api/admin/verify/:id', (req, res) => {
   });
   });
 });
+/*
+// ===== VERIFY ACCOUNT WITH EMAIL NOTIFICATION =====
+app.put('/api/admin/verify/:id', (req, res) => {
+  const { id } = req.params;
 
+  // Step 1: Mark admin as verified
+  db.query(
+    `UPDATE admin SET is_verified = TRUE, status = 'verified' WHERE admin_id = ?`,
+    [id],
+    (err) => {
+      if (err) return res.status(500).json({ success: false, error: err.message });
+
+      // Step 2: Fetch updated admin record
+      db.query('SELECT * FROM admin WHERE admin_id = ?', [id], async (err2, results) => {
+        if (err2) return res.status(500).json({ success: false, error: err2.message });
+        if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+
+        const user = results[0];
+
+        // Step 3: Send verification email
+        const msg = {
+          to: user.email,
+          from: process.env.EMAIL_FROM,
+          subject: 'Your Iskort Account is Verified!',
+          html: `<p>Hi ${user.name},</p>
+                 <p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>`,
+        };
+
+        try {
+          await sgMail.send(msg);
+          console.log('Verification email sent to', user.email);
+        } catch (err) {
+          console.error('Error sending verification email:', err);
+        }
+
+        // Step 4: If role is owner or user, copy into correct table
+        if (user.role === 'owner') {
+          db.query(
+            `INSERT INTO owner (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at, admin_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              user.name,
+              user.email,
+              user.password,
+              user.role,
+              user.phone_num,
+              1,
+              'verified',
+              user.notif_preference,
+              user.created_at,
+              user.admin_id, // keep reference to original admin_id
+            ],
+            (err3, result) => {
+              if (err3) return res.status(500).json({ success: false, error: err3.message });
+
+              const newOwnerId = result.insertId; // ✅ this is the correct owner_id
+              return res.json({
+                success: true,
+                owner_id: newOwnerId,
+                message: 'Owner verified, copied, and email sent successfully',
+              });
+            }
+          );
+        } else if (user.role === 'user') {
+          db.query(
+            `INSERT INTO user (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at, admin_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              user.name,
+              user.email,
+              user.password,
+              user.role,
+              user.phone_num,
+              1,
+              'verified',
+              user.notif_preference,
+              user.created_at,
+              user.admin_id,
+            ],
+            (err3, result) => {
+              if (err3) return res.status(500).json({ success: false, error: err3.message });
+
+              const newUserId = result.insertId;
+              return res.json({
+                success: true,
+                user_id: newUserId,
+                message: 'User verified, copied, and email sent successfully',
+              });
+            }
+          );
+        } else {
+          // Admin role stays in admin table only
+          return res.json({
+            success: true,
+            message: 'Admin account verified and email sent successfully',
+          });
+        }
+      });
+    }
+  );
+}); 
+*/
 // ===== TEST EMAIL =====
 app.get('/api/test-email', async (req, res) => {
 try {
