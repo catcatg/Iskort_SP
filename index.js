@@ -1,6 +1,9 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const mysql = require('mysql2');
-const dotenv = require('dotenv');
+
 const nodemailer = require('nodemailer');
 //const twilio = require('twilio');
 const bodyParser = require('body-parser');
@@ -8,7 +11,6 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 
-dotenv.config();
 const app = express();
 
 const transporter = nodemailer.createTransport({
@@ -96,14 +98,12 @@ app.post('/api/admin/login', (req, res) => {
 
       const user = results[0];
 
-      // Check if account is verified
       if (!user.is_verified)
         return res.status(403).json({
           success: false,
           message: 'Your account is not verified yet by admin.',
         });
 
-      // SUCCESS → return user with detected role
       return res.json({
         success: true,
         message: 'Login successful',
@@ -111,7 +111,7 @@ app.post('/api/admin/login', (req, res) => {
           admin_id: user.admin_id,
           name: user.name,
           email: user.email,
-          role: user.role,       // ← IMPORTANT
+          role: user.role,       // IMPORTANT
           phone_num: user.phone_num,
         },
       });
