@@ -6,6 +6,8 @@ const mysql = require('mysql2');
 
 const sgMail = require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+console.log("SENDGRID KEY EXISTS:", process.env.SENDGRID_API_KEY ? "YES" : "NO");
+console.log("EMAIL_FROM:", process.env.EMAIL_FROM);
 
 //const twilio = require('twilio');
 const bodyParser = require('body-parser');
