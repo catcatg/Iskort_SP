@@ -9,7 +9,8 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 console.log("SENDGRID KEY EXISTS:", process.env.SENDGRID_API_KEY ? "YES" : "NO");
 console.log("EMAIL_FROM:", process.env.EMAIL_FROM);
 
-//const twilio = require('twilio');
+const axios = require('axios');
+
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
@@ -149,159 +150,111 @@ app.get('/api/admin/users', (req, res) => {
   });
 });
 
-// ===== VERIFY ACCOUNT WITH EMAIL NOTIFICATION =====
+// ===== SEND VERIFICATION SMS =====
+const sendVerificationSMS = async (phoneNum, name) => {
+  if (!phoneNum) return; // skip if no phone number
+
+  const message = `Hi ${name}, your Iskort account has been verified! You can now log in.`;
+
+  try {
+    const res = await axios.post('https://api.semaphore.co/api/v4/messages', null, {
+      params: {
+        apikey: process.env.SEMAPHORE_API_KEY, // add this in your .env
+        number: phoneNum,
+        message: message,
+        sendername: 'ISKORT',
+      }
+    });
+    console.log('Verification SMS sent to', phoneNum, res.data);
+  } catch (err) {
+    console.error('Error sending verification SMS:', err.response?.data || err.message);
+  }
+};
+
+// ===== VERIFY ACCOUNT WITH EMAIL + SMS (Based on notif_preference) =====
 app.put('/api/admin/verify/:id', (req, res) => {
   const { id } = req.params;
 
   db.query(`UPDATE admin SET is_verified = TRUE, status = 'verified' WHERE admin_id = ?`, [id], (err) => {
-  if (err) return res.status(500).json({ success: false, error: err.message });
+    if (err) return res.status(500).json({ success: false, error: err.message });
 
+    db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err2, results) => {
+      if (err2) return res.status(500).json({ success: false, error: err2.message });
+      if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
 
-  db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err2, results) => {
-    if (err2) return res.status(500).json({ success: false, error: err2.message });
-    if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+      const user = results[0];
 
-
-    const user = results[0];
-
-
-    const sendVerificationEmail = async (email, name) => {
-      const msg = {
-        to: email,
-        from: process.env.EMAIL_FROM,
-        subject: 'Your Iskort Account is Verified!',
-        html: `<p>Hi ${name},</p><p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>`
-    };
-    try { await sgMail.send(msg); console.log('Verification email sent to', email); }
-    catch (err) { console.error('Error sending verification email:', err); }
-  };
-
-
-  if (user.role === 'owner' || user.role === 'user') {
-  const table = user.role;
-  db.query(`INSERT INTO ${table} (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  [user.name, user.email, user.password, user.role, user.phone_num, 1, 'verified', user.notif_preference, user.created_at],
-  (err3) => {
-  if (err3) return res.status(500).json({ success: false, error: err3.message });
-
-
-  (async () => {
-  await sendVerificationEmail(user.email, user.name);
-  res.json({ success: true, message: `${user.role} verified, copied, and email sent successfully` });
-  })();
-  }
-  );
-  } else {
-  (async () => {
-  await sendVerificationEmail(user.email, user.name);
-  res.json({ success: true, message: `Admin account verified and email sent successfully` });
-  })();
-  }
-  });
-  });
-});
-/*
-// ===== VERIFY ACCOUNT WITH EMAIL NOTIFICATION =====
-app.put('/api/admin/verify/:id', (req, res) => {
-  const { id } = req.params;
-
-  // Step 1: Mark admin as verified
-  db.query(
-    `UPDATE admin SET is_verified = TRUE, status = 'verified' WHERE admin_id = ?`,
-    [id],
-    (err) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
-
-      // Step 2: Fetch updated admin record
-      db.query('SELECT * FROM admin WHERE admin_id = ?', [id], async (err2, results) => {
-        if (err2) return res.status(500).json({ success: false, error: err2.message });
-        if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
-
-        const user = results[0];
-
-        // Step 3: Send verification email
+      // EMAIL FUNCTION (unchanged)
+      const sendVerificationEmail = async (email, name) => {
         const msg = {
-          to: user.email,
+          to: email,
           from: process.env.EMAIL_FROM,
           subject: 'Your Iskort Account is Verified!',
-          html: `<p>Hi ${user.name},</p>
-                 <p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>`,
+          html: `<p>Hi ${name},</p><p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>`
         };
+        try { await sgMail.send(msg); console.log('Verification email sent to', email); }
+        catch (err) { console.error('Error sending verification email:', err); }
+      };
 
-        try {
-          await sgMail.send(msg);
-          console.log('Verification email sent to', user.email);
-        } catch (err) {
-          console.error('Error sending verification email:', err);
-        }
+      // If USER or OWNER → copy to their table
+      if (user.role === 'owner' || user.role === 'user') {
+        const table = user.role;
 
-        // Step 4: If role is owner or user, copy into correct table
-        if (user.role === 'owner') {
-          db.query(
-            `INSERT INTO owner (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at, admin_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              user.name,
-              user.email,
-              user.password,
-              user.role,
-              user.phone_num,
-              1,
-              'verified',
-              user.notif_preference,
-              user.created_at,
-              user.admin_id, // keep reference to original admin_id
-            ],
-            (err3, result) => {
-              if (err3) return res.status(500).json({ success: false, error: err3.message });
+        db.query(
+          `INSERT INTO ${table} (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            user.name,
+            user.email,
+            user.password,
+            user.role,
+            user.phone_num,
+            1,
+            'verified',
+            user.notif_preference,
+            user.created_at
+          ],
+          async (err3) => {
+            if (err3) return res.status(500).json({ success: false, error: err3.message });
 
-              const newOwnerId = result.insertId; // ✅ this is the correct owner_id
-              return res.json({
-                success: true,
-                owner_id: newOwnerId,
-                message: 'Owner verified, copied, and email sent successfully',
-              });
+            // 🔥 SEND NOTIFICATIONS BASED ON PREFERENCE
+            if (user.notif_preference === 'sms') {
+              await sendVerificationSMS(user.phone_num, user.name);
+            } else if (user.notif_preference === 'email') {
+              await sendVerificationEmail(user.email, user.name);
+            } else if (user.notif_preference === 'both') {
+              await sendVerificationEmail(user.email, user.name);
+              await sendVerificationSMS(user.phone_num, user.name);
             }
-          );
-        } else if (user.role === 'user') {
-          db.query(
-            `INSERT INTO user (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at, admin_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              user.name,
-              user.email,
-              user.password,
-              user.role,
-              user.phone_num,
-              1,
-              'verified',
-              user.notif_preference,
-              user.created_at,
-              user.admin_id,
-            ],
-            (err3, result) => {
-              if (err3) return res.status(500).json({ success: false, error: err3.message });
 
-              const newUserId = result.insertId;
-              return res.json({
-                success: true,
-                user_id: newUserId,
-                message: 'User verified, copied, and email sent successfully',
-              });
-            }
-          );
-        } else {
-          // Admin role stays in admin table only
+            return res.json({
+              success: true,
+              message: `${user.role} verified, copied, and notifications sent`
+            });
+          }
+        );
+      } else {
+        // ADMIN
+        (async () => {
+          if (user.notif_preference === 'sms') {
+            await sendVerificationSMS(user.phone_num, user.name);
+          } else if (user.notif_preference === 'email') {
+            await sendVerificationEmail(user.email, user.name);
+          } else if (user.notif_preference === 'both') {
+            await sendVerificationEmail(user.email, user.name);
+            await sendVerificationSMS(user.phone_num, user.name);
+          }
+
           return res.json({
             success: true,
-            message: 'Admin account verified and email sent successfully',
+            message: `Admin verified and notifications sent`
           });
-        }
-      });
-    }
-  );
-}); 
-*/
+        })();
+      }
+    });
+  });
+});
+
 // ===== TEST EMAIL =====
 app.get('/api/test-email', async (req, res) => {
 try {
@@ -355,13 +308,12 @@ if (err2) return res.status(500).json({ success: false, error: err2.message });
 
 
 (async () => {
-await sendRejectionEmail(user.email, user.name);
-res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
-})();
+  await sendRejectionEmail(user.email, user.name);
+    res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
+    })();
+    });
+  });
 });
-});
-});
-
 
 // ===== EATERY ROUTES (with JOIN) =====
 app.post('/api/eatery', (req, res) => {
