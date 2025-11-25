@@ -162,7 +162,7 @@ const sendVerificationSMS = async (phoneNum, name) => {
         apikey: process.env.SEMAPHORE_API_KEY, // add this in your .env
         number: phoneNum,
         message: message,
-        sendername: 'SEMAPHORE', //placeholder since name application is pending
+        //sendername: 'SEMAPHORE', //placeholder since name application is pending
       }
     });
     console.log('Verification SMS sent to', phoneNum, res.data);
