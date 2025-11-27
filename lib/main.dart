@@ -6,13 +6,14 @@ import 'package:iskort/page_routes/food.dart';
 import 'package:iskort/page_routes/housing.dart';
 import 'package:iskort/page_routes/map_route.dart';
 import 'package:iskort/page_routes/notifications.dart';
-import 'package:iskort/page_routes/saved_locations.dart';
+//import 'package:iskort/page_routes/saved_locations.dart';
 import 'package:iskort/page_routes/profile_settings.dart';
 import 'package:iskort/profile.dart';
+import 'package:iskort/select_role.dart';
 
 import 'landing_page.dart';
 import 'login_page.dart';
-import 'signup_page.dart';
+//import 'signup_page.dart';
 import 'admin_dashboard.dart';
 //import 'setup_eatery_page.dart';
 import 'user_manage.dart';
@@ -41,9 +42,9 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => LandingPage(),
-        '/welcome': (context) => WelcomePage(),
         '/login': (context) => LoginPage(),
-        '/signup': (context) => SignupPage(),
+        //'/signup': (context) => SignupPage(preselectedRole: preselectedRole),
+        '/select_role': (context) => ChooseRolePage(),
         '/homepage': (context) => HomePage(),
         '/profile': (context) => const UserProfilePage(),
         '/admin-dashboard': (context) => const AdminDashboardPage(),

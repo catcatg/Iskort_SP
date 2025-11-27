@@ -1,21 +1,33 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const mysql = require('mysql2');
+<<<<<<< HEAD
 const dotenv = require('dotenv');
 const sgMail = require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+=======
+
+const sgMail = require('@sendgrid/mail');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+>>>>>>> d4151bbf4445ef3ab5463d2c60344bc66a0d8059
 //const twilio = require('twilio');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 
-dotenv.config();
 const app = express();
 
+<<<<<<< HEAD
 sgMail.send(mailOptions)
   .then(() => console.log("Email sent"))
   .catch(err => console.error("Email error:", err));
 
+=======
+>>>>>>> d4151bbf4445ef3ab5463d2c60344bc66a0d8059
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -35,9 +47,12 @@ const db = mysql.createConnection({
   host: process.env.DB_HOST || 'switchyard.proxy.rlwy.net',
   user: process.env.DB_USER || 'root',
   password:
-    process.env.DB_PASSWORD || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
+    process.env.DB_PASS || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
   database: process.env.DB_NAME || 'railway',
   port: process.env.DB_PORT || 43301,
+  ssl: {
+    rejectUnauthorized: false, // important for Render DB
+  },
 });
 
 db.connect((err) => {
@@ -73,26 +88,43 @@ app.post('/api/admin/register', (req, res) => {
   });
 });
 
-// ===== LOGIN (Admin) =====
+// ===== LOGIN (Auto Role Detection) =====
 app.post('/api/admin/login', (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password } = req.body;
 
-  db.query('SELECT * FROM admin WHERE email = ? AND password = ?', [email, password], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length === 0)
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+  db.query(
+    'SELECT * FROM admin WHERE email = ? AND password = ?',
+    [email, password],
+    (err, results) => {
+      if (err) 
+        return res.status(500).json({ success: false, error: err.message });
 
-    const user = results[0];
+      if (results.length === 0)
+        return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    if (user.role !== role)
-      return res.status(403).json({ success: false, message: `You are not registered as a ${role.toUpperCase()}.` });
+      const user = results[0];
 
-    if (!user.is_verified)
-      return res.status(403).json({ success: false, message: 'Your account is not verified yet by admin.' });
+      if (!user.is_verified)
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is not verified yet by admin.',
+        });
 
-    res.json({ success: true, message: 'Login successful', user });
-  });
+      return res.json({
+        success: true,
+        message: 'Login successful',
+        user: {
+          admin_id: user.admin_id,
+          name: user.name,
+          email: user.email,
+          role: user.role,       // IMPORTANT
+          phone_num: user.phone_num,
+        },
+      });
+    }
+  );
 });
+
 
 // ===== GET ALL USERS =====
 app.get('/api/admin/users', (req, res) => {
@@ -132,20 +164,15 @@ app.get('/api/admin/users', (req, res) => {
 app.put('/api/admin/verify/:id', (req, res) => {
   const { id } = req.params;
 
-  db.query(
-    `UPDATE admin SET is_verified = TRUE, status = 'verified' WHERE admin_id = ?`,
-    [id],
-    (err) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
+  db.query(`UPDATE admin SET is_verified = TRUE, status = 'verified' WHERE admin_id = ?`, [id], (err) => {
+  if (err) return res.status(500).json({ success: false, error: err.message });
 
-      // Fetch the updated user
-      db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err2, results) => {
-        if (err2) return res.status(500).json({ success: false, error: err2.message });
-        if (results.length === 0)
-          return res.status(404).json({ success: false, message: 'User not found' });
 
-        const user = results[0];
+  db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err2, results) => {
+    if (err2) return res.status(500).json({ success: false, error: err2.message });
+    if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
 
+<<<<<<< HEAD
         const sendVerificationEmail = async (userEmail, userName) => {
           const msg = {
             to: userEmail,
@@ -186,32 +213,51 @@ app.put('/api/admin/verify/:id', (req, res) => {
             ],
             (err3) => {
               if (err3) return res.status(500).json({ success: false, error: err3.message });
+=======
 
-              // Send verification email
-              sendVerificationEmail(user.email, user.name);
+    const user = results[0];
 
-              console.log(`${user.role} account copied to ${table} table`);
-              res.json({
-                success: true,
-                message: `${user.role} verified, copied, and email sent successfully`,
-              });
-            }
-          );
-        } else {
-          // Admin verification only
-          sendVerificationEmail(user.email, user.name);
-          res.json({
-            success: true,
-            message: `Admin account verified and email sent successfully`,
-          });
-        }
-      });
-    }
+>>>>>>> d4151bbf4445ef3ab5463d2c60344bc66a0d8059
+
+    const sendVerificationEmail = async (email, name) => {
+      const msg = {
+        to: email,
+        from: process.env.EMAIL_FROM,
+        subject: 'Your Iskort Account is Verified!',
+        html: `<p>Hi ${name},</p><p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>`
+    };
+    try { await sgMail.send(msg); console.log('Verification email sent to', email); }
+    catch (err) { console.error('Error sending verification email:', err); }
+  };
+
+
+  if (user.role === 'owner' || user.role === 'user') {
+  const table = user.role;
+  db.query(`INSERT INTO ${table} (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  [user.name, user.email, user.password, user.role, user.phone_num, 1, 'verified', user.notif_preference, user.created_at],
+  (err3) => {
+  if (err3) return res.status(500).json({ success: false, error: err3.message });
+
+
+  (async () => {
+  await sendVerificationEmail(user.email, user.name);
+  res.json({ success: true, message: `${user.role} verified, copied, and email sent successfully` });
+  })();
+  }
   );
+  } else {
+  (async () => {
+  await sendVerificationEmail(user.email, user.name);
+  res.json({ success: true, message: `Admin account verified and email sent successfully` });
+  })();
+  }
+  });
+  });
 });
 
 // ===== TEST EMAIL =====
 app.get('/api/test-email', async (req, res) => {
+<<<<<<< HEAD
   const msg = {
     to: process.env.EMAIL_FROM,
     from: process.env.EMAIL_FROM,
@@ -230,17 +276,39 @@ app.get('/api/test-email', async (req, res) => {
 
 
 
+=======
+try {
+const msg = {
+to: process.env.EMAIL_FROM, // send to yourself for testing
+from: process.env.EMAIL_FROM,
+subject: 'Test Email from Iskort',
+text: 'Hello! This is a test email from your Iskort backend.',
+html: '<b>Hello! This is a test email from your Iskort backend.</b>',
+};
+
+
+await sgMail.send(msg);
+console.log('Test email sent to', process.env.EMAIL_FROM);
+res.json({ success: true, message: 'Test email sent' });
+
+
+} catch (err) {
+console.error('Test email error: ', err);
+res.status(500).json({ success: false, error: err.message });
+}
+});
+
+>>>>>>> d4151bbf4445ef3ab5463d2c60344bc66a0d8059
 // ===== REJECT ACCOUNT WITH EMAIL NOTIFICATION =====
 app.delete('/api/admin/reject/:id', (req, res) => {
-  const { id } = req.params;
+const { id } = req.params;
 
-  db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length === 0)
-      return res.status(404).json({ success: false, message: 'User not found' });
 
-    const user = results[0];
+db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err, results) => {
+if (err) return res.status(500).json({ success: false, error: err.message });
+if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
 
+<<<<<<< HEAD
     const sendRejectionEmail = async (userEmail, userName) => {
       const msg = {
         to: userEmail,
@@ -260,17 +328,34 @@ app.delete('/api/admin/reject/:id', (req, res) => {
         console.error('SendGrid error:', err.response?.body || err);
       }
     };
+=======
 
-    db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
-      if (err2) return res.status(500).json({ success: false, error: err2.message });
+const user = results[0];
+>>>>>>> d4151bbf4445ef3ab5463d2c60344bc66a0d8059
 
-      // Send rejection email
-      sendRejectionEmail(user.email, user.name);
 
-      console.log(`${user.role} (${user.email}) rejected and removed`);
-      res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
-    });
-  });
+const sendRejectionEmail = async (email, name) => {
+const msg = {
+to: email,
+from: process.env.EMAIL_FROM,
+subject: 'Your Iskort Account Registration',
+html: `<p>Hi ${name},</p><p>We’re sorry to inform you that your account registration has been rejected by the admin.</p>`
+};
+try { await sgMail.send(msg); console.log('Rejection email sent to', email); }
+catch (err) { console.error('Error sending rejection email:', err); }
+};
+
+
+db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
+if (err2) return res.status(500).json({ success: false, error: err2.message });
+
+
+(async () => {
+await sendRejectionEmail(user.email, user.name);
+res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
+})();
+});
+});
 });
 
 
