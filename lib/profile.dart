@@ -139,7 +139,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           },
                         ),
 
-                        _buildMenuItem(Icons.settings, "Settings", () {
+                        _buildMenuItem(Icons.settings, "Profile Settings", () {
                           Navigator.pushNamed(
                             context,
                             '/profile_settings',
