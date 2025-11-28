@@ -367,7 +367,7 @@ app.put('/api/admin/verify/eatery/:id', (req, res) => {
       const ownerName = eatery.owner_name;
       const ownerEmail = eatery.owner_email;
       const ownerPhone = eatery.owner_phone;
-      const notifPref = eatery.notif_preference || 'email';
+      const notifPref = eatery.notif_preference;
       const businessName = eatery.name;
 
       // 🔹 Email function scoped inside the route
@@ -431,7 +431,7 @@ app.delete('/api/admin/reject/eatery/:id', (req, res) => {
     const ownerName = eatery.owner_name;
     const ownerEmail = eatery.owner_email;
     const ownerPhone = eatery.owner_phone;
-    const notifPref = eatery.notif_preference || 'email';
+    const notifPref = eatery.notif_preference;
     const businessName = eatery.name;
 
     // 🔹 Email function scoped inside
@@ -535,7 +535,7 @@ app.put('/api/admin/verify/housing/:id', (req, res) => {
       const ownerName = housing.owner_name;
       const ownerEmail = housing.owner_email;
       const ownerPhone = housing.owner_phone;
-      const notifPref = housing.notif_preference || 'email';
+      const notifPref = housing.notif_preference;
       const businessName = housing.name;
 
       const sendHousingVerificationEmail = async () => {
@@ -596,7 +596,7 @@ app.delete('/api/admin/reject/housing/:id', (req, res) => {
     const ownerName = housing.owner_name;
     const ownerEmail = housing.owner_email;
     const ownerPhone = housing.owner_phone;
-    const notifPref = housing.notif_preference || 'email';
+    const notifPref = housing.notif_preference;
     const businessName = housing.name;
 
     const sendHousingRejectionEmail = async () => {
