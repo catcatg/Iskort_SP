@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'reusables.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'page_routes/preference_popup.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,11 +17,16 @@ class _HomePageState extends State<HomePage> {
   bool isLoading = true;
   Map<String, dynamic>? user;
 
+  // Preference lists
+  List<String> currentFoodPrefs = [];
+  List<String> currentHousingPrefs = [];
+
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
     final args = ModalRoute.of(context)?.settings.arguments as Map?;
     if (args != null && user == null) {
       setState(() {
@@ -28,10 +35,53 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // SEARCH BAR WIDGET
+  //Load preferences from SharedPreferences
+  Future<void> loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    currentFoodPrefs = prefs.getStringList("foodPrefs") ?? [];
+    currentHousingPrefs = prefs.getStringList("housingPrefs") ?? [];
+  }
+
+  // Save preferences
+  Future<void> savePreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList("foodPrefs", currentFoodPrefs);
+    await prefs.setStringList("housingPrefs", currentHousingPrefs);
+    await prefs.setBool("hasSeenPreferences", true);
+  }
+
+  // First-Time Preference Popup
+  Future<void> checkFirstTimeUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool hasSeen = prefs.getBool("hasSeenPreferences") ?? false;
+
+    if (!hasSeen) {
+      // Wait for UI build
+      Future.delayed(Duration.zero, () {
+        showDialog(
+          context: context,
+          builder:
+              (_) => PreferencePopup(
+                initialFoodPrefs: currentFoodPrefs,
+                initialHousingPrefs: currentHousingPrefs,
+                onSave: (prefsSelected) async {
+                  setState(() {
+                    currentFoodPrefs = prefsSelected["food"];
+                    currentHousingPrefs = prefsSelected["housing"];
+                  });
+                  await savePreferences();
+                },
+              ),
+        );
+      });
+    }
+  }
+
+  // -------------------------------------------------------
+  // SEARCH BAR
+  // -------------------------------------------------------
   Widget GeneralSearchBar() {
     return Container(
-      //padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: const Color(0xFFF0E1E1),
         borderRadius: BorderRadius.circular(30),
@@ -42,14 +92,14 @@ class _HomePageState extends State<HomePage> {
         decoration: const InputDecoration(
           hintText: 'Search',
           border: InputBorder.none,
-          prefixIcon: const Icon(Icons.search),
+          prefixIcon: Icon(Icons.search),
           contentPadding: EdgeInsets.all(12),
         ),
       ),
     );
   }
 
-  // NAVIGATION CARDS (HOUSING + FOOD)
+  // NAVIGATION CARDS
   Widget _buildNavCardsRow() {
     final navCards = [
       {'name': 'Housing', 'route': '/housing', 'icon': Icons.home},
@@ -84,7 +134,7 @@ class _HomePageState extends State<HomePage> {
                       Icon(
                         card['icon'] as IconData,
                         size: 30,
-                        color: const Color(0xFF791317),
+                        color: Color(0xFF791317),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -104,11 +154,14 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // -------------------------------------------------------
+  // FETCH ENTRIES
+  // -------------------------------------------------------
   Future<void> fetchEntries() async {
     try {
       List entries = [];
 
-      // Fetch eateries
+      // 1. Fetch eateries
       final eateryResp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
       );
@@ -121,30 +174,11 @@ class _HomePageState extends State<HomePage> {
         for (var eatery in verifiedEateries) {
           eatery['type'] = 'Eatery';
           eatery['photo'] = eatery['eatery_photo'] ?? '';
-          final ownerId = eatery['owner_id'];
-          if (ownerId != null) {
-            try {
-              final ownerResp = await http.get(
-                Uri.parse(
-                  'https://iskort-public-web.onrender.com/api/owner/$ownerId',
-                ),
-              );
-              final ownerData = jsonDecode(ownerResp.body);
-              if (ownerData['success'] == true && ownerData['owner'] != null) {
-                eatery['owner_name'] = ownerData['owner']['name'] ?? 'Unknown';
-                eatery['owner_email'] =
-                    ownerData['owner']['email'] ?? 'Unknown';
-                eatery['owner_phone'] =
-                    ownerData['owner']['phone_num'] ?? 'Unknown';
-                eatery['owner_photo'] = ownerData['owner']['photo'] ?? '';
-              }
-            } catch (_) {}
-          }
           entries.add(eatery);
         }
       }
 
-      // Fetch housing
+      // 2. Fetch housing
       final housingResp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/housing'),
       );
@@ -157,24 +191,6 @@ class _HomePageState extends State<HomePage> {
         for (var house in verifiedHousing) {
           house['type'] = 'Housing';
           house['photo'] = house['housing_photo'] ?? '';
-          final ownerId = house['owner_id'];
-          if (ownerId != null) {
-            try {
-              final ownerResp = await http.get(
-                Uri.parse(
-                  'https://iskort-public-web.onrender.com/api/owner/$ownerId',
-                ),
-              );
-              final ownerData = jsonDecode(ownerResp.body);
-              if (ownerData['success'] == true && ownerData['owner'] != null) {
-                house['owner_name'] = ownerData['owner']['name'] ?? 'Unknown';
-                house['owner_email'] = ownerData['owner']['email'] ?? 'Unknown';
-                house['owner_phone'] =
-                    ownerData['owner']['phone_num'] ?? 'Unknown';
-                house['owner_photo'] = ownerData['owner']['photo'] ?? '';
-              }
-            } catch (_) {}
-          }
           entries.add(house);
         }
       }
@@ -183,150 +199,24 @@ class _HomePageState extends State<HomePage> {
         allEntries = entries;
         isLoading = false;
       });
+
+      await loadPreferences();
+      await checkFirstTimeUser();
     } catch (e) {
       print("Error fetching entries: $e");
       setState(() => isLoading = false);
     }
   }
 
-  // MINI NOTIFICATION POPUP
-  void _showMiniNotif(BuildContext avatarContext) {
-    final overlay = Overlay.of(avatarContext);
-    final renderBox = avatarContext.findRenderObject() as RenderBox?;
-    final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
-
-    late OverlayEntry overlayEntry;
-
-    overlayEntry = OverlayEntry(
-      builder:
-          (context) => GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => overlayEntry.remove(),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: offset.dy + renderBox!.size.height + 5,
-                  left: offset.dx + renderBox.size.width - 220,
-                  width: 220,
-                  child: Material(
-                    elevation: 6,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            leading: const Icon(
-                              size: 20,
-                              Icons.notifications,
-                              color: Color(0xFF0A4423),
-                            ),
-                            title: const Text(
-                              "3 new notifications",
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: const Text(
-                              "Tap to view all",
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            onTap: () {
-                              overlayEntry.remove();
-                              Navigator.pushNamed(context, '/notifications');
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-    );
-
-    overlay?.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 3), () {
-      overlayEntry.remove();
-    });
-  }
-
-  // SHOW ENTRY DETAILS
-  void showEntryDetails(Map entry) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text("${entry['name'] ?? 'Details'} (${entry['type']})"),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Personal Info",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  if ((entry['owner_photo'] ?? '').isNotEmpty)
-                    Image.network(
-                      entry['owner_photo'],
-                      width: 100,
-                      height: 100,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.person),
-                    ),
-                  Text("Owner: ${entry['owner_name'] ?? 'Unknown'}"),
-                  Text("Email: ${entry['owner_email'] ?? 'Unknown'}"),
-                  Text("Phone: ${entry['owner_phone'] ?? 'Unknown'}"),
-                  const SizedBox(height: 12),
-                  const Text(
-                    "Business Details",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  if ((entry['photo'] ?? '').isNotEmpty)
-                    Image.network(
-                      entry['photo'],
-                      width: double.infinity,
-                      height: 150,
-                      fit: BoxFit.cover,
-                      errorBuilder:
-                          (_, __, ___) => const Icon(Icons.broken_image),
-                    ),
-                  Text("Location: ${entry['location'] ?? 'Unknown'}"),
-                  if (entry['type'] == 'Eatery')
-                    Text(
-                      "Open: ${entry['open_time'] ?? 'N/A'} - ${entry['end_time'] ?? 'N/A'}",
-                    ),
-                  Text(
-                    "Price: ${entry['min_price'] ?? entry['price'] ?? 'N/A'}",
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Close"),
-              ),
-            ],
-          ),
-    );
-  }
-
+  // -------------------------------------------------------
+  // UI BUILD
+  // -------------------------------------------------------
   @override
   void initState() {
     super.initState();
     fetchEntries();
   }
 
-  // PAGE UI
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -346,42 +236,13 @@ class _HomePageState extends State<HomePage> {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const Spacer(),
-                  Builder(
-                    builder:
-                        (avatarContext) => GestureDetector(
-                          onTap: () => _showMiniNotif(avatarContext),
-                          child: CircleAvatar(
-                            radius: 30,
-                            backgroundColor: Colors.grey[300],
-                            backgroundImage:
-                                (user!['photo'] ?? '').isNotEmpty
-                                    ? NetworkImage(user!['photo'])
-                                    : null,
-                            child:
-                                (user!['photo'] ?? '').isEmpty
-                                    ? const Icon(
-                                      Icons.person,
-                                      size: 30,
-                                      color: Color(0xFF0A4423),
-                                    )
-                                    : null,
-                          ),
-                        ),
-                  ),
                 ],
               ),
 
             const SizedBox(height: 25),
-
-            // NEW SEARCH BAR
             GeneralSearchBar(),
-
             const SizedBox(height: 30),
-
-            // NEW NAV CARDS
             _buildNavCardsRow(),
-
             const SizedBox(height: 30),
 
             const Text(
@@ -397,16 +258,19 @@ class _HomePageState extends State<HomePage> {
             else
               Column(
                 children:
-                    allEntries.map((entry) {
-                      return ProductCard(
-                        title: entry['name'] ?? '',
-                        subtitle: "Tap to view details",
-                        location: entry['location'] ?? '',
-                        imagePath:
-                            entry['photo'] ?? "assets/images/placeholder.png",
-                        onTap: () => showEntryDetails(entry),
-                      );
-                    }).toList(),
+                    allEntries
+                        .map(
+                          (entry) => ProductCard(
+                            title: entry['name'] ?? '',
+                            subtitle: "Tap to view details",
+                            location: entry['location'] ?? '',
+                            imagePath:
+                                entry['photo'] ??
+                                "assets/images/placeholder.png",
+                            onTap: () => showEntryDetails(entry),
+                          ),
+                        )
+                        .toList(),
               ),
           ],
         ),
@@ -434,9 +298,29 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  // Show entry details
+  void showEntryDetails(Map entry) {
+    showDialog(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: Text("${entry['name'] ?? 'Details'} (${entry['type']})"),
+            content: Text("Details here..."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text("Close"),
+              ),
+            ],
+          ),
+    );
+  }
 }
 
+// --------------------------
 // PRODUCT CARD
+// --------------------------
 class ProductCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -459,59 +343,17 @@ class ProductCard extends StatelessWidget {
       onTap: onTap,
       child: Card(
         margin: const EdgeInsets.symmetric(vertical: 6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              Container(
-                width: 80,
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey.shade300,
-                ),
-                clipBehavior: Clip.hardEdge,
-                child: Image.network(
-                  imagePath,
-                  fit: BoxFit.cover,
-                  errorBuilder:
-                      (_, __, ___) => const Icon(
-                        Icons.broken_image,
-                        size: 40,
-                        color: Color(0xFF791317),
-                      ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF791317),
-                      ),
-                    ),
-                    Text(subtitle),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Color(0xFF791317),
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(child: Text(location)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        child: ListTile(
+          leading: Image.network(
+            imagePath,
+            width: 60,
+            height: 60,
+            fit: BoxFit.cover,
+            errorBuilder:
+                (_, __, ___) => const Icon(Icons.broken_image, size: 30),
           ),
+          title: Text(title),
+          subtitle: Text("$subtitle • $location"),
         ),
       ),
     );
