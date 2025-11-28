@@ -53,30 +53,24 @@ db.connect((err) => {
   }
 });
 
-// ===== REGISTER (All roles register under admin first) =====
-app.post('/api/admin/register', (req, res) => {
-  const { name, email, password, role, phone_num, notif_preference } = req.body;
+// ===== BUSINESS VERIFICATION NOTIFICATIONS =====
+const sendBusinessVerificationEmail = async (email, ownerName, businessName, type) => {
+  const msg = {
+    to: email,
+    from: process.env.EMAIL_FROM,
+    subject: `Your ${type} has been verified!`,
+    html: `<p>Hi ${ownerName},</p>
+           <p>Admin verified your ${type} "<b>${businessName}</b>".</p>
+           <p>You can edit details in your Profile → Edit Business.</p>`
+  };
+  try { 
+    await sgMail.send(msg); 
+    console.log(`${type} verification email sent to`, email); 
+  } catch (err) { 
+    console.error(`Error sending ${type} verification email:`, err); 
+  }
+};
 
-  db.query('SELECT * FROM admin WHERE email = ?', [email], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length > 0)
-      return res.status(409).json({ success: false, message: 'Email already exists' });
-
-    db.query(
-      `INSERT INTO admin 
-       (name, email, password, role, is_verified, phone_num, notif_preference, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
-      [name, email, password, role, 0, phone_num, notif_preference || 'email'],
-      (err2) => {
-        if (err2) return res.status(500).json({ success: false, error: err2.message });
-        res.status(201).json({
-          success: true,
-          message: 'Registration successful. Waiting for admin verification.',
-        });
-      }
-    );
-  });
-});
 
 // ===== LOGIN (Auto Role Detection) =====
 app.post('/api/admin/login', (req, res) => {
@@ -162,7 +156,7 @@ const sendVerificationSMS = async (phoneNum, name) => {
         apikey: process.env.SEMAPHORE_API_KEY, // add this in your .env
         number: phoneNum,
         message: message,
-        //sendername: 'SEMAPHORE', //placeholder since name application is pending
+        //sendername: undefined, //placeholder since name application is pending
       }
     });
     console.log('Verification SMS sent to', phoneNum, res.data);
@@ -288,31 +282,30 @@ if (err) return res.status(500).json({ success: false, error: err.message });
 if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
 
 
-const user = results[0];
+    const user = results[0];
+
+    const sendRejectionEmail = async (email, name) => {
+    const msg = {
+    to: email,
+    from: process.env.EMAIL_FROM,
+    subject: 'Your Iskort Account Registration',
+    html: `<p>Hi ${name},</p><p>We’re sorry to inform you that your account registration has been rejected by the admin.</p>`
+    };
+    try { await sgMail.send(msg); console.log('Rejection email sent to', email); }
+    catch (err) { console.error('Error sending rejection email:', err); }
+    };
 
 
-const sendRejectionEmail = async (email, name) => {
-const msg = {
-to: email,
-from: process.env.EMAIL_FROM,
-subject: 'Your Iskort Account Registration',
-html: `<p>Hi ${name},</p><p>We’re sorry to inform you that your account registration has been rejected by the admin.</p>`
-};
-try { await sgMail.send(msg); console.log('Rejection email sent to', email); }
-catch (err) { console.error('Error sending rejection email:', err); }
-};
+    db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
+    if (err2) return res.status(500).json({ success: false, error: err2.message });
 
 
-db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
-if (err2) return res.status(500).json({ success: false, error: err2.message });
-
-
-(async () => {
-  await sendRejectionEmail(user.email, user.name);
-    res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
-    })();
-    });
-  });
+    (async () => {
+      await sendRejectionEmail(user.email, user.name);
+        res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
+        })();
+        });
+      });
 });
 
 // ===== EATERY ROUTES (with JOIN) =====
@@ -354,34 +347,139 @@ app.get('/api/eatery', (req, res) => {
   });
 });
 
-// ===== VERIFY EATERY =====
+//VERIFY EATERY
 app.put('/api/admin/verify/eatery/:id', (req, res) => {
   const { id } = req.params;
 
-  db.query(
-    'UPDATE eatery SET is_verified = 1, verified_time = NOW() WHERE eatery_id = ?',
-    [id],
-    (err) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
-      db.query('SELECT * FROM eatery WHERE eatery_id = ?', [id], (err2, results) => {
-        if (err2) return res.status(500).json({ success: false, error: err2.message });
-        if (results.length === 0)
-          return res.status(404).json({ success: false, message: 'Eatery not found' });
-        const eatery = results[0];
-        res.json({ success: true, message: 'Eatery verified', eatery });
-      });
-    }
-  );
-});
-
-// ===== REJECT EATERY =====
-app.delete('/api/admin/reject/eatery/:id', (req, res) => {
-  const { id } = req.params;
-  db.query('DELETE FROM eatery WHERE eatery_id = ?', [id], (err) => {
+  db.query('UPDATE eatery SET is_verified = 1, verified_time = NOW() WHERE eatery_id = ?', [id], (err) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, message: 'Eatery rejected and deleted' });
+
+    const sql = `
+      SELECT e.*, o.name AS owner_name, o.email AS owner_email, o.phone_num AS owner_phone, o.notif_preference
+      FROM eatery e
+      LEFT JOIN owner o ON e.owner_id = o.owner_id
+      WHERE e.eatery_id = ?`;
+    db.query(sql, [id], async (err2, results) => {
+      if (err2) return res.status(500).json({ success: false, error: err2.message });
+      if (results.length === 0) return res.status(404).json({ success: false, message: 'Eatery not found' });
+
+      const eatery = results[0];
+      const ownerName = eatery.owner_name;
+      const ownerEmail = eatery.owner_email;
+      const ownerPhone = eatery.owner_phone;
+      const notifPref = eatery.notif_preference || 'email';
+      const businessName = eatery.name;
+
+      // 🔹 Email function scoped inside the route
+      const sendEateryVerificationEmail = async () => {
+        const msg = {
+          to: ownerEmail,
+          from: process.env.EMAIL_FROM,
+          subject: `Your eatery has been verified!`,
+          html: `<p>Hi ${ownerName},</p>
+                 <p>Admin verified your eatery "<b>${businessName}</b>".</p>
+                 <p>You can edit details in your Profile → Edit Business.</p>`
+        };
+        try { await sgMail.send(msg); console.log('Eatery verification email sent to', ownerEmail); }
+        catch (err) { console.error('Error sending eatery verification email:', err); }
+      };
+
+      // 🔹 SMS function scoped inside the route
+      const sendEateryVerificationSMS = async () => {
+        if (!ownerPhone) return;
+        const message = `Hi ${ownerName}, your eatery "${businessName}" has been verified. Edit details in Profile → Edit Business.`;
+        try {
+          const resp = await axios.post('https://api.semaphore.co/api/v4/messages', null, {
+            params: { apikey: process.env.SEMAPHORE_API_KEY, number: ownerPhone, message }
+          });
+          console.log('Eatery verification SMS sent to', ownerPhone, resp.data);
+        } catch (err) {
+          console.error('Error sending eatery verification SMS:', err.response?.data || err.message);
+        }
+      };
+
+      // 🔹 Send based on preference
+      if (notifPref === 'sms') {
+        await sendEateryVerificationSMS();
+      } else if (notifPref === 'email') {
+        await sendEateryVerificationEmail();
+      } else if (notifPref === 'both') {
+        await sendEateryVerificationEmail();
+        await sendEateryVerificationSMS();
+      }
+
+      res.json({ success: true, message: 'Eatery verified and owner notified', eatery });
+    });
   });
 });
+
+//REJECT EATERY
+app.delete('/api/admin/reject/eatery/:id', (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT e.*, o.name AS owner_name, o.email AS owner_email, o.phone_num AS owner_phone, o.notif_preference
+    FROM eatery e
+    LEFT JOIN owner o ON e.owner_id = o.owner_id
+    WHERE e.eatery_id = ?`;
+
+  db.query(sql, [id], async (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (results.length === 0) return res.status(404).json({ success: false, message: 'Eatery not found' });
+
+    const eatery = results[0];
+    const ownerName = eatery.owner_name;
+    const ownerEmail = eatery.owner_email;
+    const ownerPhone = eatery.owner_phone;
+    const notifPref = eatery.notif_preference || 'email';
+    const businessName = eatery.name;
+
+    // 🔹 Email function scoped inside
+    const sendEateryRejectionEmail = async () => {
+      const msg = {
+        to: ownerEmail,
+        from: process.env.EMAIL_FROM,
+        subject: `Your eatery was rejected`,
+        html: `<p>Hi ${ownerName},</p>
+               <p>We’re sorry to inform you that your eatery "<b>${businessName}</b>" was rejected by the admin.</p>
+               <p>You may reapply or contact support for clarification.</p>`
+      };
+      try { await sgMail.send(msg); console.log('Eatery rejection email sent to', ownerEmail); }
+      catch (err) { console.error('Error sending eatery rejection email:', err); }
+    };
+
+    // 🔹 SMS function scoped inside
+    const sendEateryRejectionSMS = async () => {
+      if (!ownerPhone) return;
+      const message = `Hi ${ownerName}, your eatery "${businessName}" was rejected by admin.`;
+      try {
+        const resp = await axios.post('https://api.semaphore.co/api/v4/messages', null, {
+          params: { apikey: process.env.SEMAPHORE_API_KEY, number: ownerPhone, message }
+        });
+        console.log('Eatery rejection SMS sent to', ownerPhone, resp.data);
+      } catch (err) {
+        console.error('Error sending eatery rejection SMS:', err.response?.data || err.message);
+      }
+    };
+
+    // 🔹 Send based on preference
+    if (notifPref === 'sms') {
+      await sendEateryRejectionSMS();
+    } else if (notifPref === 'email') {
+      await sendEateryRejectionEmail();
+    } else if (notifPref === 'both') {
+      await sendEateryRejectionEmail();
+      await sendEateryRejectionSMS();
+    }
+
+    // Delete after notifying
+    db.query('DELETE FROM eatery WHERE eatery_id = ?', [id], (err2) => {
+      if (err2) return res.status(500).json({ success: false, error: err2.message });
+      res.json({ success: true, message: 'Eatery rejected, deleted, and owner notified' });
+    });
+  });
+});
+
 
 // ===== HOUSING ROUTES (with JOIN) =====
 app.post('/api/housing', (req, res) => {
@@ -421,28 +519,125 @@ app.get('/api/housing', (req, res) => {
 app.put('/api/admin/verify/housing/:id', (req, res) => {
   const { id } = req.params;
 
-  db.query(
-    'UPDATE housing SET is_verified = 1, verified_time = NOW() WHERE housing_id = ?',
-    [id],
-    (err) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
-      db.query('SELECT * FROM housing WHERE housing_id = ?', [id], (err2, results) => {
-        if (err2) return res.status(500).json({ success: false, error: err2.message });
-        if (results.length === 0)
-          return res.status(404).json({ success: false, message: 'Housing not found' });
-        const house = results[0];
-        res.json({ success: true, message: 'Housing verified', house });
-      });
-    }
-  );
+  db.query('UPDATE housing SET is_verified = 1, verified_time = NOW() WHERE housing_id = ?', [id], (err) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+
+    const sql = `
+      SELECT h.*, o.name AS owner_name, o.email AS owner_email, o.phone_num AS owner_phone, o.notif_preference
+      FROM housing h
+      LEFT JOIN owner o ON h.owner_id = o.owner_id
+      WHERE h.housing_id = ?`;
+    db.query(sql, [id], async (err2, results) => {
+      if (err2) return res.status(500).json({ success: false, error: err2.message });
+      if (results.length === 0) return res.status(404).json({ success: false, message: 'Housing not found' });
+
+      const housing = results[0];
+      const ownerName = housing.owner_name;
+      const ownerEmail = housing.owner_email;
+      const ownerPhone = housing.owner_phone;
+      const notifPref = housing.notif_preference || 'email';
+      const businessName = housing.name;
+
+      const sendHousingVerificationEmail = async () => {
+        const msg = {
+          to: ownerEmail,
+          from: process.env.EMAIL_FROM,
+          subject: `Your housing has been verified!`,
+          html: `<p>Hi ${ownerName},</p>
+                 <p>Admin verified your housing "<b>${businessName}</b>".</p>
+                 <p>You can edit details in your Profile → Edit Business.</p>`
+        };
+        try { await sgMail.send(msg); console.log('Housing verification email sent to', ownerEmail); }
+        catch (err) { console.error('Error sending housing verification email:', err); }
+      };
+
+      const sendHousingVerificationSMS = async () => {
+        if (!ownerPhone) return;
+        const message = `Hi ${ownerName}, your housing "${businessName}" has been verified. Edit details in Profile → Edit Business.`;
+        try {
+          const resp = await axios.post('https://api.semaphore.co/api/v4/messages', null, {
+            params: { apikey: process.env.SEMAPHORE_API_KEY, number: ownerPhone, message }
+          });
+          console.log('Housing verification SMS sent to', ownerPhone, resp.data);
+        } catch (err) {
+          console.error('Error sending housing verification SMS:', err.response?.data || err.message);
+        }
+      };
+
+      if (notifPref === 'sms') {
+        await sendHousingVerificationSMS();
+      } else if (notifPref === 'email') {
+        await sendHousingVerificationEmail();
+      } else if (notifPref === 'both') {
+        await sendHousingVerificationEmail();
+        await sendHousingVerificationSMS();
+      }
+
+      res.json({ success: true, message: 'Housing verified and owner notified', housing });
+    });
+  });
 });
 
 // ===== REJECT HOUSING =====
 app.delete('/api/admin/reject/housing/:id', (req, res) => {
   const { id } = req.params;
-  db.query('DELETE FROM housing WHERE housing_id = ?', [id], (err) => {
+
+  const sql = `
+    SELECT h.*, o.name AS owner_name, o.email AS owner_email, o.phone_num AS owner_phone, o.notif_preference
+    FROM housing h
+    LEFT JOIN owner o ON h.owner_id = o.owner_id
+    WHERE h.housing_id = ?`;
+
+  db.query(sql, [id], async (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, message: 'Housing rejected and deleted' });
+    if (results.length === 0) return res.status(404).json({ success: false, message: 'Housing not found' });
+
+    const housing = results[0];
+    const ownerName = housing.owner_name;
+    const ownerEmail = housing.owner_email;
+    const ownerPhone = housing.owner_phone;
+    const notifPref = housing.notif_preference || 'email';
+    const businessName = housing.name;
+
+    const sendHousingRejectionEmail = async () => {
+      const msg = {
+        to: ownerEmail,
+        from: process.env.EMAIL_FROM,
+        subject: `Your housing was rejected`,
+        html: `<p>Hi ${ownerName},</p>
+               <p>We’re sorry to inform you that your housing "<b>${businessName}</b>" was rejected by the admin.</p>
+               <p>You may reapply or contact support for clarification.</p>`
+      };
+      try { await sgMail.send(msg); console.log('Housing rejection email sent to', ownerEmail); }
+      catch (err) { console.error('Error sending housing rejection email:', err); }
+    };
+
+    const sendHousingRejectionSMS = async () => {
+      if (!ownerPhone) return;
+      const message = `Hi ${ownerName}, your housing "${businessName}" was rejected by admin.`;
+      try {
+        const resp = await axios.post('https://api.semaphore.co/api/v4/messages', null, {
+          params: { apikey: process.env.SEMAPHORE_API_KEY, number: ownerPhone, message }
+        });
+        console.log('Housing rejection SMS sent to', ownerPhone, resp.data);
+      } catch (err) {
+        console.error('Error sending housing rejection SMS:', err.response?.data || err.message);
+      }
+    };
+
+    if (notifPref === 'sms') {
+      await sendHousingRejectionSMS();
+    } else if (notifPref === 'email') {
+      await sendHousingRejectionEmail();
+    } else if (notifPref === 'both') {
+      await sendHousingRejectionEmail();
+      await sendHousingRejectionSMS();
+    }
+
+    db.query('DELETE FROM housing WHERE housing_id = ?', [id], (err2) => {
+      if (err2) return res.status(500).json({ success: false, error: err2.message });
+      res.json({ success: true, message: 'Housing rejected, deleted, and owner notified' });
+    });
   });
 });
 
@@ -484,6 +679,8 @@ app.get('/api/owner/:id', (req, res) => {
     res.json({ success: true, owner: results[0] });
   });
 });
+
+
 
 // ===== BASE ROUTE =====
 app.get('/', (req, res) => {

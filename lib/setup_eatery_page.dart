@@ -41,6 +41,7 @@ class _SetupEateryPage extends State<SetupEateryPage> {
   @override
   void initState() {
     super.initState();
+    print("DEBUG owner_id: ${widget.currentUser['owner_id']}"); // 🔹 check if null or not
     ownerNameController =
         TextEditingController(text: widget.currentUser['name'] ?? '');
     phoneController =
@@ -132,7 +133,7 @@ class _SetupEateryPage extends State<SetupEateryPage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$selectedType submitted! Waiting for verification.')),
+          SnackBar(content: Text('$selectedType submitted! Waiting for verification. Check your email/sms for updates.')),
         );
         Navigator.pushReplacement(
           context,
@@ -301,7 +302,7 @@ class _SetupEateryPage extends State<SetupEateryPage> {
                 Center(
                   child: ElevatedButton(
                     onPressed: submitForm,
-                    child: const Text('Submit / Save'),
+                    child: const Text('Submit Application'),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
                       backgroundColor: const Color(0xFF387C44),

@@ -151,7 +151,7 @@ class _HomePageState extends State<HomePage> {
       if (housingResp.statusCode == 200) {
         final data = jsonDecode(housingResp.body);
         final verifiedHousing =
-            (data['housing'] ?? [])
+            (data['housings'] ?? [])
                 .where((h) => h['is_verified'] == 1)
                 .toList();
         for (var house in verifiedHousing) {

@@ -17,60 +17,87 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
 
   Future<void> login() async {
-    setState(() => isLoading = true);
+  setState(() => isLoading = true);
 
-    try {
-      final response = await http.post(
-        Uri.parse('https://iskort-public-web.onrender.com/api/admin/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': emailController.text,
-          'password': passwordController.text,
-        }),
-      );
+  try {
+    final response = await http.post(
+      Uri.parse('https://iskort-public-web.onrender.com/api/admin/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': emailController.text.trim(), 
+        'password': passwordController.text,
+      }),
+    );
 
-      if (!mounted) return;
-      setState(() => isLoading = false);
+    if (!mounted) return;
+    setState(() => isLoading = false);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final user = data['user'];
-        final role = user['role'];
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      Map<String, dynamic> user = data['user'];
+      final role = user['role'];
 
-        if (role == 'admin') {
-          Navigator.pushNamed(context, '/admin-dashboard');
-        } else if (role == 'owner') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SetupEateryPage(currentUser: user),
-            ),
-          );
-        } else {
-          Navigator.pushNamed(context, '/homepage', arguments: user);
-        }
-      } else if (response.statusCode == 404) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Account not registered")));
-      } else if (response.statusCode == 401) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Invalid credentials")));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Login failed: ${response.statusCode}")),
+      // 🔹 If role is owner, fetch owner_id from /api/owner
+      if (role == 'owner') {
+        final ownerResp = await http.get(
+          Uri.parse('https://iskort-public-web.onrender.com/api/owner'),
         );
+        final ownerData = jsonDecode(ownerResp.body);
+
+        if (ownerData['success'] == true) {
+          final owners = List<Map<String, dynamic>>.from(ownerData['owners']);
+          print("DEBUG owners list: $owners"); // see what comes back
+
+          final match = owners.firstWhere(
+            (o) => o['email'].toString().trim().toLowerCase() ==
+                   user['email'].toString().trim().toLowerCase(),
+            orElse: () => {},
+          );
+
+          print("DEBUG matched owner: $match");
+
+          if (match.isNotEmpty) {
+            user['owner_id'] = match['id']; // attach owner_id
+            print("DEBUG attached owner_id: ${user['owner_id']}");
+          } else {
+            print("DEBUG no matching owner found for email ${user['email']}");
+          }
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SetupEateryPage(currentUser: user),
+          ),
+        );
+      } else if (role == 'admin') {
+        Navigator.pushNamed(context, '/admin-dashboard');
+      } else {
+        Navigator.pushNamed(context, '/homepage', arguments: user);
       }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Network or server error: $e")));
-      print('Network error: $e');
+    } else if (response.statusCode == 404) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Account not registered")),
+      );
+    } else if (response.statusCode == 401) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid credentials")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Login failed: ${response.statusCode}")),
+      );
     }
+  } catch (e) {
+    if (!mounted) return;
+    setState(() => isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Network or server error: $e")),
+    );
+    print('Network error: $e');
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

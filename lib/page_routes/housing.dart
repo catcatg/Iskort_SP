@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class HousingPage extends StatefulWidget {
   const HousingPage({super.key});
@@ -10,6 +12,7 @@ class HousingPage extends StatefulWidget {
 class _HousingPageState extends State<HousingPage> {
   final TextEditingController _searchController = TextEditingController();
 
+  // Hardcoded sample data
   final List<Map<String, dynamic>> housingData = [
     {
       'name': 'Nonato’s Boarding',
@@ -25,37 +28,59 @@ class _HousingPageState extends State<HousingPage> {
       'pax': '6pax',
       'image': 'assets/images/housing.jpg',
     },
-    {
-      'name': 'Aonang House',
-      'location': 'Mat-y',
-      'price': 761,
-      'image': 'assets/images/housing.jpg',
-      'pax': '2pax',
-    },
-    {
-      'name': 'Tara Rent',
-      'location': 'Mat-y',
-      'price': 857,
-      'image': 'assets/images/housing.jpg',
-      'pax': '2pax',
-    },
   ];
 
-  // Filtered housing data to show in UI
   late List<Map<String, dynamic>> filteredHousingData;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
     filteredHousingData = housingData;
-
-    // search field changes
     _searchController.addListener(_onSearchChanged);
+    fetchVerifiedHousing();
+  }
+
+  // Normalize API housing into same format as hardcoded
+  Map<String, dynamic> normalizeHousing(Map house) {
+    return {
+      'name': house['name'] ?? '',
+      'location': house['location'] ?? '',
+      'price': house['price'] ?? 0,
+      'pax': house['pax'] ?? 'N/A', // fallback if API doesn’t provide pax
+      'image': house['housing_photo'] ?? 'assets/images/housing.jpg',
+    };
+  }
+
+  Future<void> fetchVerifiedHousing() async {
+    try {
+      final resp = await http.get(
+        Uri.parse('https://iskort-public-web.onrender.com/api/housing'),
+      );
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final verifiedHousing =
+            (data['housings'] ?? [])
+                .where((h) => h['is_verified'] == 1)
+                .map<Map<String, dynamic>>((h) => normalizeHousing(h))
+                .toList();
+
+        setState(() {
+          housingData.addAll(verifiedHousing);
+          filteredHousingData = housingData;
+          isLoading = false;
+        });
+      } else {
+        setState(() => isLoading = false);
+      }
+    } catch (e) {
+      print("Error fetching housing: $e");
+      setState(() => isLoading = false);
+    }
   }
 
   void _onSearchChanged() {
     final query = _searchController.text.toLowerCase();
-
     setState(() {
       if (query.isEmpty) {
         filteredHousingData = housingData;
@@ -119,45 +144,30 @@ class _HousingPageState extends State<HousingPage> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.sort),
-                  label: const Text("Sort"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF7A1E1E),
-                    side: const BorderSide(color: Color(0xFF7A1E1E)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
             Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.fromLTRB(1, 16, 1, 16),
-                itemCount: filteredHousingData.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.75,
-                ),
-                itemBuilder: (context, index) {
-                  final house = filteredHousingData[index];
-                  return HousingCard(
-                    name: house['name'],
-                    location: house['location'],
-                    price: house['price'],
-                    pax: house['pax'],
-                    imagePath: house['image'],
-                  );
-                },
-              ),
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(1, 16, 1, 16),
+                      itemCount: filteredHousingData.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.75,
+                      ),
+                      itemBuilder: (context, index) {
+                        final house = filteredHousingData[index];
+                        return HousingCard(
+                          name: house['name'],
+                          location: house['location'],
+                          price: house['price'],
+                          pax: house['pax'],
+                          imagePath: house['image'],
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -209,15 +219,14 @@ class _HousingCardState extends State<HousingCard> {
                 padding: const EdgeInsets.all(10),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.asset(
+                  child: Image.network(
                     widget.imagePath,
                     fit: BoxFit.cover,
                     width: double.infinity,
-                    errorBuilder:
-                        (context, error, stackTrace) => Container(
-                          color: Colors.grey.shade300,
-                          child: const Icon(Icons.broken_image, size: 40),
-                        ),
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.broken_image, size: 40),
+                    ),
                   ),
                 ),
               ),
@@ -250,13 +259,12 @@ class _HousingCardState extends State<HousingCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+                Text(widget.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 Row(
                   children: [
-                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                    const Icon(Icons.location_on,
+                        size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -270,22 +278,21 @@ class _HousingCardState extends State<HousingCard> {
                 const SizedBox(height: 4),
                 Text(
                   "₱${widget.price}/Person",
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.green.shade100,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(widget.pax, style: const TextStyle(fontSize: 12)),
+                  child: Text(widget.pax,
+                      style: const TextStyle(fontSize: 12)),
                 ),
               ],
             ),
