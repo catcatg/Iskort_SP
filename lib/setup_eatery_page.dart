@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'homepage.dart';
+import 'profile.dart';
 
 class SetupEateryPage extends StatefulWidget {
   final Map<String, dynamic> currentUser;
@@ -137,7 +137,7 @@ class _SetupEateryPage extends State<SetupEateryPage> {
         );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(builder: (context) => const UserProfilePage()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -154,14 +154,15 @@ class _SetupEateryPage extends State<SetupEateryPage> {
         title: const Text('Setup Your Business'),
         backgroundColor: const Color(0xFF387C44),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePage()),
-            );
-          },
-        ),
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () {
+          Navigator.pushReplacementNamed(
+            context,
+            '/profile',
+            arguments: widget.currentUser,
+          );
+        },
+      ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

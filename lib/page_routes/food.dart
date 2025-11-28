@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:iskort/reusables.dart';
-import 'restaurants.dart';
 
 class FoodPage extends StatefulWidget {
   const FoodPage({super.key});
@@ -12,68 +13,65 @@ class FoodPage extends StatefulWidget {
 class _FoodPageState extends State<FoodPage> {
   final TextEditingController _searchController = TextEditingController();
 
-  final List<Map<String, String>> _allFoods = [
-    {
-      "name": "Adobo",
-      "restaurant": "Juan’s Eatery",
-      "location": "Miag-ao, Iloilo",
-      "priceRange": "₱80–₱120",
-      "image": "assets/images/angels.png",
-      "distance": "2.3 km",
-    },
-    {
-      "name": "Sinigang",
-      "restaurant": "Bahay Kubo Grill",
-      "location": "Miag-ao, Iloilo",
-      "priceRange": "₱90–₱130",
-      "image": "assets/images/angels.png",
-      "distance": "1.8 km",
-    },
-    {
-      "name": "Lechon",
-      "restaurant": "Crispy Corner",
-      "location": "Miag-ao, Iloilo",
-      "priceRange": "₱150–₱200",
-      "image": "assets/images/angels.png",
-      "distance": "3.5 km",
-    },
-    {
-      "name": "Kare-Kare",
-      "restaurant": "Kapamilya Karinderia",
-      "location": "Miag-ao, Iloilo",
-      "priceRange": "₱120–₱180",
-      "image": "assets/images/angels.png",
-      "distance": "4.0 km",
-    },
-    {
-      "name": "Tocino",
-      "restaurant": "Juan’s Eatery",
-      "location": "Miag-ao, Iloilo",
-      "priceRange": "₱75–₱100",
-      "image": "assets/images/angels.png",
-      "distance": "2.3 km",
-    },
-  ];
-
-  List<Map<String, String>> _filteredFoods = [];
+  List<Map<String, dynamic>> _allFoods = [];
+  List<Map<String, dynamic>> _filteredFoods = [];
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _filteredFoods = _allFoods;
+    fetchVerifiedEateries();
+    _searchController.addListener(() {
+      _searchFood(_searchController.text);
+    });
+  }
+
+  // Normalize API eatery into UI format
+  Map<String, dynamic> normalizeEatery(Map eatery) {
+    return {
+      "name": eatery['name'] ?? '',
+      "restaurant": eatery['name'] ?? '',
+      "location": eatery['location'] ?? '',
+      "priceRange": "₱${eatery['min_price'] ?? 'N/A'}",
+      "image": eatery['eatery_photo'] ?? 'assets/images/placeholder.png',
+      "open_time": eatery['open_time'] ?? '',
+      "end_time": eatery['end_time'] ?? '',
+    };
+  }
+
+  Future<void> fetchVerifiedEateries() async {
+    try {
+      final resp = await http.get(
+        Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
+      );
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final verifiedEateries = (data['eateries'] ?? [])
+            .where((e) => e['is_verified'] == 1)
+            .map<Map<String, dynamic>>((e) => normalizeEatery(e))
+            .toList();
+
+        setState(() {
+          _allFoods = verifiedEateries;
+          _filteredFoods = verifiedEateries;
+          isLoading = false;
+        });
+      } else {
+        setState(() => isLoading = false);
+      }
+    } catch (e) {
+      print("Error fetching eateries: $e");
+      setState(() => isLoading = false);
+    }
   }
 
   void _searchFood(String query) {
-    final results =
-        _allFoods
-            .where(
-              (food) =>
-                  food["name"]!.toLowerCase().contains(query.toLowerCase()) ||
-                  food["restaurant"]!.toLowerCase().contains(
-                    query.toLowerCase(),
-                  ),
-            )
-            .toList();
+    final results = _allFoods.where((food) {
+      final name = food["name"].toString().toLowerCase();
+      final restaurant = food["restaurant"].toString().toLowerCase();
+      return name.contains(query.toLowerCase()) ||
+          restaurant.contains(query.toLowerCase());
+    }).toList();
 
     setState(() {
       _filteredFoods = results;
@@ -111,7 +109,6 @@ class _FoodPageState extends State<FoodPage> {
             padding: const EdgeInsets.all(12.0),
             child: TextField(
               controller: _searchController,
-              onChanged: _searchFood,
               decoration: InputDecoration(
                 hintText: 'Search food or restaurant',
                 prefixIcon: const Icon(Icons.search),
@@ -129,48 +126,55 @@ class _FoodPageState extends State<FoodPage> {
             ),
           ),
           Expanded(
-            child:
-                _filteredFoods.isEmpty
-                    ? const Center(child: Text("No food found"))
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredFoods.isEmpty
+                    ? const Center(child: Text("No eateries found"))
                     : GridView.builder(
-                      padding: const EdgeInsets.all(12),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 0.70,
-                          ),
-                      itemCount: _filteredFoods.length,
-                      itemBuilder: (context, index) {
-                        final food = _filteredFoods[index];
-                        return DisplayCard(
-                          food: food,
-                          onTap: () {
-                            final restaurantMenu =
-                                _allFoods
-                                    .where(
-                                      (item) =>
-                                          item["restaurant"] ==
-                                          food["restaurant"],
-                                    )
-                                    .toList();
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => RestaurantProfilePage(
-                                      restaurantName: food["restaurant"]!,
-                                      location: food["location"]!,
-                                      menu: restaurantMenu,
+                        padding: const EdgeInsets.all(12),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.70,
+                        ),
+                        itemCount: _filteredFoods.length,
+                        itemBuilder: (context, index) {
+                          final food = _filteredFoods[index];
+                          return GestureDetector(
+                            onTap: () => _showEateryDetails(food),
+                            child: Card(
+                              child: Column(
+                                children: [
+                                  Image.network(
+                                    food['image'],
+                                    height: 120,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        const Icon(Icons.broken_image, size: 40),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(food['name'],
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold)),
+                                        Text(food['location']),
+                                        Text(food['priceRange']),
+                                      ],
                                     ),
+                                  ),
+                                ],
                               ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -183,6 +187,34 @@ class _FoodPageState extends State<FoodPage> {
             Navigator.pushNamed(context, '/profile');
           }
         },
+      ),
+    );
+  }
+
+  void _showEateryDetails(Map<String, dynamic> eatery) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(eatery['name']),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Image.network(eatery['image'],
+                height: 150, width: double.infinity, fit: BoxFit.cover),
+            const SizedBox(height: 12),
+            Text("Location: ${eatery['location']}"),
+            Text("Minimum Price: ${eatery['priceRange']}"),
+            Text("Open: ${eatery['open_time']}"),
+            Text("Close: ${eatery['end_time']}"),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
       ),
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iskort/page_routes/saved_locations.dart';
+import 'package:iskort/page_routes/edit_establishments.dart'; 
+import 'setup_eatery_page.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -14,6 +16,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   String? _role;
   String? _phone;
   String? _notifPreference;
+  int? _ownerId; // <-- added ownerId
 
   @override
   void didChangeDependencies() {
@@ -25,6 +28,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
       _role = args['role'] ?? _role;
       _phone = args['phone'] ?? _phone;
       _notifPreference = args['notifPreference'] ?? _notifPreference;
+      _ownerId = args['owner_id']; // <-- capture owner_id
     }
   }
 
@@ -91,53 +95,39 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          email,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                        Text(
-                          'Role: $role',
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                        Text(name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 18)),
+                        Text(email,
+                            style: const TextStyle(
+                                color: Colors.grey, fontSize: 14)),
+                        Text('Role: $role',
+                            style: const TextStyle(fontSize: 14)),
                         const SizedBox(height: 20),
 
                         _buildMenuItem(Icons.bookmark, "Saved Locations", () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder:
-                                  (_) => SavedLocations(
-                                    onSelect: (record) {
-                                      Navigator.pushNamed(
-                                        context,
-                                        '/map_route',
-                                        arguments: {
-                                          'destination': record.coordinates,
-                                        },
-                                      );
+                              builder: (_) => SavedLocations(
+                                onSelect: (record) {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/map_route',
+                                    arguments: {
+                                      'destination': record.coordinates,
                                     },
-                                  ),
+                                  );
+                                },
+                              ),
                             ),
                           );
                         }),
 
-                        _buildMenuItem(
-                          Icons.notifications,
-                          "Activity Notifications",
-                          () {
-                            Navigator.pushNamed(context, '/notifications');
-                          },
-                        ),
+                        _buildMenuItem(Icons.notifications,
+                            "Activity Notifications", () {
+                          Navigator.pushNamed(context, '/notifications');
+                        }),
 
                         _buildMenuItem(Icons.settings, "Profile Settings", () {
                           Navigator.pushNamed(
@@ -155,22 +145,66 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         _buildMenuItem(Icons.help, "Help", () {
                           _showHelpDialog(context);
                         }, iconColor: const Color(0xFF7A1E1E)),
+
                         const Spacer(),
-                        if (role.toLowerCase() == "owner")
+
+                        // <-- OWNER SPECIFIC BUTTONS
+                        if (role.toLowerCase() == "owner") ...[
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
                               onPressed: () {
-                                Navigator.pushNamed(context, '/setup-page');
+                                if (_ownerId != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => EditEstablishmentsPage(
+                                        ownerId: _ownerId!,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: const Text(
+                                "Edit Establishment(s)",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => SetupEateryPage(
+                                      currentUser: {
+                                        'name': _name,
+                                        'email': _email,
+                                        'role': _role,
+                                        'phone_num': _phone,
+                                        'notif_preference': _notifPreference,
+                                        'owner_id': _ownerId,
+                                      },
+                                    ),
+                                  ),
+                                );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
                               ),
                               child: const Text(
                                 "Set up your business",
@@ -178,6 +212,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               ),
                             ),
                           ),
+                        ],
+
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
@@ -185,7 +221,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             onPressed: () {
                               Navigator.pop(context);
                             },
-
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF0A4423),
                               shape: RoundedRectangleBorder(
@@ -216,36 +251,34 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             onPressed: () {
                               showDialog(
                                 context: context,
-                                builder:
-                                    (context) => AlertDialog(
-                                      title: const Text("Confirm Logout"),
-                                      content: const Text(
-                                        "Are you sure you want to log out?",
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed:
-                                              () => Navigator.pop(context),
-                                          child: const Text("Cancel"),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {
-                                            _name = null;
-                                            _email = null;
-                                            _role = null;
-                                            _phone = null;
-                                            _notifPreference = null;
-                                            Navigator.pop(context);
-                                            Navigator.pushNamedAndRemoveUntil(
-                                              context,
-                                              '/login',
-                                              (route) => false,
-                                            );
-                                          },
-                                          child: const Text("Yes"),
-                                        ),
-                                      ],
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Confirm Logout"),
+                                  content: const Text(
+                                      "Are you sure you want to log out?"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context),
+                                      child: const Text("Cancel"),
                                     ),
+                                    TextButton(
+                                      onPressed: () {
+                                        _name = null;
+                                        _email = null;
+                                        _role = null;
+                                        _phone = null;
+                                        _notifPreference = null;
+                                        Navigator.pop(context);
+                                        Navigator.pushNamedAndRemoveUntil(
+                                          context,
+                                          '/login',
+                                          (route) => false,
+                                        );
+                                      },
+                                      child: const Text("Yes"),
+                                    ),
+                                  ],
+                                ),
                               );
                             },
                             child: const Text(
@@ -306,19 +339,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
   void _showHelpDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text("Help"),
-            content: const Text(
-              "Need assistance?\nContact support@gmail.com or call 09123456789.",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Close"),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text("Help"),
+        content: const Text(
+          "Need assistance?\nContact iskort.system@gmail.com or call 09123456789.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
           ),
+        ],
+      ),
     );
   }
 }
