@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
-import 'package:iskort/reusables.dart';
+import 'package:iskort/widgets/reusables.dart';
 
 class SignupPage extends StatefulWidget {
   final String preselectedRole; // role from ChooseRolePage
