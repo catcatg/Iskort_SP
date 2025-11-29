@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:iskort/reusables.dart';
+import 'package:iskort/widgets/reusables.dart';
 
 class FoodPage extends StatefulWidget {
   const FoodPage({super.key});
@@ -46,10 +46,11 @@ class _FoodPageState extends State<FoodPage> {
       );
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        final verifiedEateries = (data['eateries'] ?? [])
-            .where((e) => e['is_verified'] == 1)
-            .map<Map<String, dynamic>>((e) => normalizeEatery(e))
-            .toList();
+        final verifiedEateries =
+            (data['eateries'] ?? [])
+                .where((e) => e['is_verified'] == 1)
+                .map<Map<String, dynamic>>((e) => normalizeEatery(e))
+                .toList();
 
         setState(() {
           _allFoods = verifiedEateries;
@@ -66,12 +67,13 @@ class _FoodPageState extends State<FoodPage> {
   }
 
   void _searchFood(String query) {
-    final results = _allFoods.where((food) {
-      final name = food["name"].toString().toLowerCase();
-      final restaurant = food["restaurant"].toString().toLowerCase();
-      return name.contains(query.toLowerCase()) ||
-          restaurant.contains(query.toLowerCase());
-    }).toList();
+    final results =
+        _allFoods.where((food) {
+          final name = food["name"].toString().toLowerCase();
+          final restaurant = food["restaurant"].toString().toLowerCase();
+          return name.contains(query.toLowerCase()) ||
+              restaurant.contains(query.toLowerCase());
+        }).toList();
 
     setState(() {
       _filteredFoods = results;
@@ -126,55 +128,62 @@ class _FoodPageState extends State<FoodPage> {
             ),
           ),
           Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredFoods.isEmpty
+            child:
+                isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filteredFoods.isEmpty
                     ? const Center(child: Text("No eateries found"))
                     : GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.70,
-                        ),
-                        itemCount: _filteredFoods.length,
-                        itemBuilder: (context, index) {
-                          final food = _filteredFoods[index];
-                          return GestureDetector(
-                            onTap: () => _showEateryDetails(food),
-                            child: Card(
-                              child: Column(
-                                children: [
-                                  Image.network(
-                                    food['image'],
-                                    height: 120,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        const Icon(Icons.broken_image, size: 40),
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.70,
+                          ),
+                      itemCount: _filteredFoods.length,
+                      itemBuilder: (context, index) {
+                        final food = _filteredFoods[index];
+                        return GestureDetector(
+                          onTap: () => _showEateryDetails(food),
+                          child: Card(
+                            child: Column(
+                              children: [
+                                Image.network(
+                                  food['image'],
+                                  height: 120,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (_, __, ___) => const Icon(
+                                        Icons.broken_image,
+                                        size: 40,
+                                      ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        food['name'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(food['location']),
+                                      Text(food['priceRange']),
+                                    ],
                                   ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(food['name'],
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold)),
-                                        Text(food['location']),
-                                        Text(food['priceRange']),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -194,28 +203,33 @@ class _FoodPageState extends State<FoodPage> {
   void _showEateryDetails(Map<String, dynamic> eatery) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(eatery['name']),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Image.network(eatery['image'],
-                height: 150, width: double.infinity, fit: BoxFit.cover),
-            const SizedBox(height: 12),
-            Text("Location: ${eatery['location']}"),
-            Text("Minimum Price: ${eatery['priceRange']}"),
-            Text("Open: ${eatery['open_time']}"),
-            Text("Close: ${eatery['end_time']}"),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
+      builder:
+          (_) => AlertDialog(
+            title: Text(eatery['name']),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Image.network(
+                  eatery['image'],
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+                const SizedBox(height: 12),
+                Text("Location: ${eatery['location']}"),
+                Text("Minimum Price: ${eatery['priceRange']}"),
+                Text("Open: ${eatery['open_time']}"),
+                Text("Close: ${eatery['end_time']}"),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Close"),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }
