@@ -18,9 +18,10 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
   String? _email;
   String? _role;
   String? _phone;
+  String? _address;
   String? _password;
   String? _notifPreference;
-
+  String? _businessType;
   File? _imageFile;
 
   List<String> _selectedFoodPrefs = [];
@@ -32,10 +33,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     _loadStoredPreferences();
   }
 
-  // Load saved preferences
   Future<void> _loadStoredPreferences() async {
     final prefs = await SharedPreferences.getInstance();
-
     setState(() {
       _selectedFoodPrefs = prefs.getStringList("foodPrefs") ?? [];
       _selectedHousingPrefs = prefs.getStringList("housingPrefs") ?? [];
@@ -52,10 +51,11 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
       _role = args['role'];
       _phone = args['phone'];
       _notifPreference = args['notifPreference'];
+      _address = args['address'];
+      _businessType = args['businessType'];
     }
   }
 
-  // Pick profile image
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -64,17 +64,15 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     }
   }
 
-  // Change user preferences
   void _changePreferences() {
     showDialog(
       context: context,
       builder:
           (_) => PreferencePopup(
-            initialFoodPrefs: _selectedFoodPrefs, // Persist selections
+            initialFoodPrefs: _selectedFoodPrefs,
             initialHousingPrefs: _selectedHousingPrefs,
             onSave: (prefsData) async {
               final prefs = await SharedPreferences.getInstance();
-
               await prefs.setStringList(
                 "foodPrefs",
                 List<String>.from(prefsData["food"] ?? []),
@@ -83,7 +81,6 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                 "housingPrefs",
                 List<String>.from(prefsData["housing"] ?? []),
               );
-
               setState(() {
                 _selectedFoodPrefs = List<String>.from(prefsData["food"] ?? []);
                 _selectedHousingPrefs = List<String>.from(
@@ -95,20 +92,15 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
     );
   }
 
-  // Save profile updates
   void _saveProfile() {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
-
-    print("Food Prefs: $_selectedFoodPrefs");
-    print("Housing Prefs: $_selectedHousingPrefs");
 
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text("Profile updated!")));
   }
 
-  // Render preference chips
   Widget _buildPreferenceChips(List<String> selectedPrefs) {
     if (selectedPrefs.isEmpty) return const Text("No preferences selected");
     return Wrap(
@@ -124,31 +116,93 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isOwner = _role?.toLowerCase() == 'owner';
+
     return Scaffold(
       appBar: AppBar(
         foregroundColor: Colors.white,
         title: const Text("Profile Settings"),
-        backgroundColor: Color.fromARGB(255, 150, 29, 20),
+        backgroundColor: const Color.fromARGB(255, 150, 29, 20),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            GestureDetector(
-              onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey[200],
-                backgroundImage:
-                    _imageFile != null ? FileImage(_imageFile!) : null,
-                child:
-                    _imageFile == null
-                        ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                        : null,
-              ),
+            // Profile Picture with Edit Icon
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.grey[200],
+                  backgroundImage:
+                      _imageFile != null ? FileImage(_imageFile!) : null,
+                  child:
+                      _imageFile == null
+                          ? const Icon(
+                            Icons.person,
+                            size: 50,
+                            color: Colors.grey,
+                          )
+                          : null,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: InkWell(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.edit, size: 18, color: Colors.black87),
+                    ),
+                  ),
+                ),
+              ],
             ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.email, color: Color(0xFF0A4423)),
+                const SizedBox(width: 8),
+                Text(
+                  _email ?? 'N/A',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 20),
 
+                Icon(Icons.notifications, color: Color(0xFF0A4423)),
+                const SizedBox(width: 8),
+                Text(
+                  _notifPreference ?? 'N/A',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
+
+            //  Business Type
+            if (isOwner) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.business, color: Color(0xFF0A4423)),
+                  const SizedBox(width: 8),
+                  Text(
+                    _businessType != null
+                        ? (_businessType!.toLowerCase() == 'eatery'
+                            ? "Food / Eatery"
+                            : "Housing")
+                        : "N/A",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+            ],
 
             Form(
               key: _formKey,
@@ -160,45 +214,49 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     decoration: const InputDecoration(labelText: "Name"),
                     onSaved: (val) => _name = val,
                   ),
-                  TextFormField(
-                    initialValue: _email,
-                    decoration: const InputDecoration(labelText: "Email"),
-                    onSaved: (val) => _email = val,
-                  ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     initialValue: _phone,
-                    decoration: const InputDecoration(labelText: "Phone"),
+                    decoration: const InputDecoration(
+                      labelText: "Phone Number",
+                    ),
                     onSaved: (val) => _phone = val,
+                  ),
+
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _phone,
+                    decoration: const InputDecoration(labelText: "Address"),
+                    onSaved: (val) => _address = val,
                   ),
 
                   const SizedBox(height: 20),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Preferences",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                  // Preferences for non-owners
+                  if (!isOwner) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Preferences",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: _changePreferences,
-                        child: const Text("Change Preferences"),
-                      ),
-                    ],
-                  ),
-
-                  const Text("Food:"),
-                  _buildPreferenceChips(_selectedFoodPrefs),
-
-                  const SizedBox(height: 8),
-
-                  const Text("Housing:"),
-                  _buildPreferenceChips(_selectedHousingPrefs),
-
-                  const SizedBox(height: 24),
+                        TextButton(
+                          onPressed: _changePreferences,
+                          child: const Text("Change Preferences"),
+                        ),
+                      ],
+                    ),
+                    const Text("Food:"),
+                    _buildPreferenceChips(_selectedFoodPrefs),
+                    const SizedBox(height: 8),
+                    const Text("Housing:"),
+                    _buildPreferenceChips(_selectedHousingPrefs),
+                    const SizedBox(height: 24),
+                  ],
 
                   SizedBox(
                     width: double.infinity,
