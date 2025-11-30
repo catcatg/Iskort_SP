@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:iskort/widgets/reusables.dart';
 import 'owner/setup_eatery_page.dart';
+import 'owner/owner_homepage.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -65,12 +66,33 @@ class _LoginPageState extends State<LoginPage> {
             }
           }
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SetupEateryPage(currentUser: user),
+          // 2. Check if owner already has an eatery/housing
+          final businessResp = await http.get(
+            Uri.parse(
+              'https://iskort-public-web.onrender.com/api/eatery?owner_id=${user['owner_id']}',
             ),
           );
+
+          final businessData = jsonDecode(businessResp.body);
+
+          final bool hasBusiness = (businessData['eateries'] ?? []).isNotEmpty;
+
+          // 3. Route based on business status
+          if (!hasBusiness) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SetupEateryPage(currentUser: user),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OwnerHomePage(currentUser: user),
+              ),
+            );
+          }
         } else if (role == 'admin') {
           Navigator.pushNamed(context, '/admin-dashboard');
         } else {
