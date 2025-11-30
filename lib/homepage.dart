@@ -307,29 +307,36 @@ class _HomePageState extends State<HomePage> {
           (_) => AlertDialog(
             title: Text("${entry['name'] ?? 'Details'} (${entry['type']})"),
             content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Image.network(
-                    entry['photo'] ?? "assets/images/placeholder.png",
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (_, __, ___) =>
-                            const Icon(Icons.broken_image, size: 40),
-                  ),
-                  const SizedBox(height: 12),
-                  Text("Location: ${entry['location'] ?? ''}"),
-                  if (entry['type'] == 'Eatery') ...[
-                    Text("Minimum Price: ₱${entry['min_price'] ?? 'N/A'}"),
-                    Text("Open: ${entry['open_time'] ?? ''}"),
-                    Text("Close: ${entry['end_time'] ?? ''}"),
-                  ] else if (entry['type'] == 'Housing') ...[
-                    Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
-                    Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 400,
+                ), // finite width
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: double.infinity, // ensure finite width
+                      child: Image.network(
+                        entry['photo'] ?? "assets/images/placeholder.png",
+                        height: 200,
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (_, __, ___) =>
+                                const Icon(Icons.broken_image, size: 40),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text("Location: ${entry['location'] ?? ''}"),
+                    if (entry['type'] == 'Eatery') ...[
+                      Text("Minimum Price: ₱${entry['min_price'] ?? 'N/A'}"),
+                      Text("Open: ${entry['open_time'] ?? ''}"),
+                      Text("Close: ${entry['end_time'] ?? ''}"),
+                    ] else if (entry['type'] == 'Housing') ...[
+                      Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
+                      Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
             actions: [
