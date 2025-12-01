@@ -1,5 +1,7 @@
 const dotenv = require('dotenv');
-dotenv.config();
+dotenv.config({ path: __dirname + '/.env' });  // force load from root
+console.log("EMAIL_FROM raw:", process.env.EMAIL_FROM);
+console.log("SENDGRID raw:", process.env.SENDGRID_API_KEY);
 
 const express = require('express');
 const mysql = require('mysql2');
@@ -34,20 +36,20 @@ const upload = multer({ storage });
 
 // MySQL connection (Railway)
 const db = mysql.createConnection({
-  host: process.env.DB_HOST || 'switchyard.proxy.rlwy.net',
-  user: process.env.DB_USER || 'root',
-  password:
-    process.env.DB_PASS || 'nkAzvuvCsuhTymYgnMhwCTsqYqHlUBHX',
-  database: process.env.DB_NAME || 'railway',
-  port: process.env.DB_PORT || 43301,
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
   ssl: {
-    rejectUnauthorized: false, // important for Render DB
-  },
+    // Railway requires SSL, but self-signed certs need this flag
+    rejectUnauthorized: false
+  }
 });
 
 db.connect((err) => {
   if (err) {
-    console.error('MySQL connection failed:', err);
+    console.error('MySQL connection failed:', err.message);
   } else {
     console.log('Connected to Railway MySQL successfully!');
   }
@@ -480,7 +482,6 @@ app.delete('/api/admin/reject/eatery/:id', (req, res) => {
   });
 });
 
-
 // ===== HOUSING ROUTES (with JOIN) =====
 app.post('/api/housing', (req, res) => {
   const {
@@ -679,8 +680,6 @@ app.get('/api/owner/:id', (req, res) => {
     res.json({ success: true, owner: results[0] });
   });
 });
-
-
 
 // ===== BASE ROUTE =====
 app.get('/', (req, res) => {
