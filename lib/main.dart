@@ -16,8 +16,8 @@ import 'package:iskort/select_role.dart';
 import 'landing_page.dart';
 import 'login_page.dart';
 //import 'signup_page.dart';
-import 'admin_dashboard.dart';
-import 'setup_eatery_page.dart';
+import 'admin/admin_dashboard.dart';
+import 'owner/setup_eatery_page.dart';
 import 'package:iskort/page_routes/edit_establishments.dart';
 
 void main() {
