@@ -17,6 +17,9 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   Map<String, dynamic>? business;
   bool loading = true;
   List<String> businessTags = [];
+  List<dynamic> ownerEateries = [];
+  List<dynamic> ownerHousings = [];
+
 
   // Reviews sorting state
   String reviewSortOrder = 'Newest';
@@ -37,30 +40,34 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   Future<void> fetchBusiness() async {
     try {
       final ownerId = widget.currentUser["owner_id"];
-      final response = await http.get(
-        Uri.parse(
-          "https://iskort-public-web.onrender.com/api/eatery?owner_id=$ownerId",
-        ),
+
+      final eateryResp = await http.get(
+        Uri.parse("https://iskort-public-web.onrender.com/api/eatery"),
+      );
+      final housingResp = await http.get(
+        Uri.parse("https://iskort-public-web.onrender.com/api/housing"),
       );
 
-      final data = jsonDecode(response.body);
-      final eateries = data['eateries'] ?? [];
-      final fetchedBusiness = eateries.isNotEmpty ? eateries.first : null;
+      final eateryData = jsonDecode(eateryResp.body);
+      final housingData = jsonDecode(housingResp.body);
 
       setState(() {
-        business = fetchedBusiness;
-        businessTags =
-            (fetchedBusiness?['tags'] != null &&
-                    fetchedBusiness['tags'] is List)
-                ? List<String>.from(fetchedBusiness['tags'])
-                : [];
+        ownerEateries = (eateryData['eateries'] ?? [])
+            .where((e) => e['owner_id'] == ownerId)
+            .toList();
+
+        ownerHousings = (housingData['housings'] ?? [])
+            .where((h) => h['owner_id'] == ownerId)
+            .toList();
+
         loading = false;
       });
     } catch (e) {
-      print("Error fetching owner business: $e");
+      print("Error fetching owner establishments: $e");
       setState(() => loading = false);
     }
   }
+
 
   // Computed sorted reviews based on dropdown selection
   List<Map<String, dynamic>> get sortedReviews {
@@ -237,15 +244,41 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-                                business == null
-                                    ? const Center(
-                                      child: Text("No products available"),
-                                    )
-                                    : Expanded(
-                                      child: ListView(
-                                        children: [_businessCard(business!)],
+                                Expanded(
+                                  child: ListView(
+                                    children: [
+                                      const Text(
+                                        "Your Eateries",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: Color(0xFF0A4423),
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(height: 8),
+
+                                      ...ownerEateries.map(
+                                        (e) => _establishmentCard(e, isEatery: true),
+                                      ),
+
+                                      const SizedBox(height: 20),
+                                      const Text(
+                                        "Your Housings",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                          color: Color(0xFF0A4423),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+
+                                      ...ownerHousings.map(
+                                        (h) => _establishmentCard(h, isEatery: false),
+                                      ),
+                                    ],
+                                  ),
+                                )
+
                               ],
                             ),
                           ),
@@ -668,6 +701,48 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       ),
     );
   }
+
+  Widget _establishmentCard(Map<String, dynamic> est, {required bool isEatery}) {
+  return Card(
+    elevation: 3,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: ListTile(
+      contentPadding: const EdgeInsets.all(15),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          est['eatery_photo'] ??
+              est['photo'] ??
+              "", // supports both eatery & housing
+          width: 70,
+          height: 70,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              const Icon(Icons.store, size: 40, color: Color(0xFF791317)),
+        ),
+      ),
+      title: Text(
+        est['name'] ?? '',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF0A4423),
+        ),
+      ),
+      subtitle: Text(est['location'] ?? ''),
+      trailing: IconButton(
+        icon: const Icon(Icons.edit, color: Color(0xFF0A4423)),
+        onPressed: () {
+          Navigator.pushNamed(
+            context,
+            isEatery ? '/edit-eatery' : '/edit-housing',
+            arguments: est,
+          );
+        },
+      ),
+    ),
+  );
+}
+
 
   void _editBioDialog() {
     final TextEditingController bioController = TextEditingController(
