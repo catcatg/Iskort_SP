@@ -1,5 +1,7 @@
+import 'package:iskort/admin/user_manage.dart';
+import 'package:iskort/owner/setup_details.dart';
+import 'package:iskort/widgets/menu_state.dart';
 import 'package:provider/provider.dart'; // <-- 1. Added Provider Import
-import 'package:iskort/widgets/menu_state.dart'; // state
 import 'package:flutter/material.dart';
 import 'package:iskort/homepage.dart';
 import 'package:iskort/page_routes/food.dart';
@@ -14,10 +16,9 @@ import 'package:iskort/select_role.dart';
 import 'landing_page.dart';
 import 'login_page.dart';
 //import 'signup_page.dart';
-import 'admin/admin_dashboard.dart';
-//import 'setup_eatery_page.dart';
-import 'admin/user_manage.dart';
-import 'owner/setup_details.dart';
+import 'admin_dashboard.dart';
+import 'setup_eatery_page.dart';
+import 'package:iskort/page_routes/edit_establishments.dart';
 
 void main() {
   // Wrapping MyApp with the Provider to make MenuState available globally
@@ -43,7 +44,6 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => LandingPage(),
         '/login': (context) => LoginPage(),
-        //'/signup': (context) => SignupPage(preselectedRole: preselectedRole),
         '/select_role': (context) => ChooseRolePage(),
         '/homepage': (context) => HomePage(),
         '/profile': (context) => const UserProfilePage(),
@@ -54,8 +54,15 @@ class MyApp extends StatelessWidget {
         '/route': (context) => const MapRoutePage(),
         '/setup-details': (context) => const SetupDetailsPage(),
         '/notifications': (context) => const NotificationsPage(),
-
         '/profile_settings': (context) => const ProfileSettingsPage(),
+        '/setup-eatery-page': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+          return SetupEateryPage(currentUser: args);
+        },
+        '/edit-establishments': (context) { 
+          final args = ModalRoute.of(context)!.settings.arguments as int; 
+          return EditEstablishmentsPage(ownerId: args); 
+        },
       },
     );
   }
