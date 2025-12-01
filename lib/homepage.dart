@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'reusables.dart';
+import 'widgets/reusables.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'page_routes/preference_popup.dart';
 
@@ -229,7 +229,7 @@ class _HomePageState extends State<HomePage> {
               Row(
                 children: [
                   Text(
-                    "Hello, ${user!['name'] ?? 'Iska'}!",
+                    "Hello, ${user!['name'] ?? 'Isko!'}!",
                     style: const TextStyle(
                       color: Color(0xFF0A4423),
                       fontSize: 24,
@@ -303,42 +303,51 @@ class _HomePageState extends State<HomePage> {
   void showEntryDetails(Map entry) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text("${entry['name'] ?? 'Details'} (${entry['type']})"),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Image.network(
-                entry['photo'] ?? "assets/images/placeholder.png",
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.broken_image, size: 40),
+      builder:
+          (_) => AlertDialog(
+            title: Text("${entry['name'] ?? 'Details'} (${entry['type']})"),
+            content: SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 400,
+                ), // finite width
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: double.infinity, // ensure finite width
+                      child: Image.network(
+                        entry['photo'] ?? "assets/images/placeholder.png",
+                        height: 200,
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (_, __, ___) =>
+                                const Icon(Icons.broken_image, size: 40),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text("Location: ${entry['location'] ?? ''}"),
+                    if (entry['type'] == 'Eatery') ...[
+                      Text("Minimum Price: ₱${entry['min_price'] ?? 'N/A'}"),
+                      Text("Open: ${entry['open_time'] ?? ''}"),
+                      Text("Close: ${entry['end_time'] ?? ''}"),
+                    ] else if (entry['type'] == 'Housing') ...[
+                      Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
+                      Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              Text("Location: ${entry['location'] ?? ''}"),
-              if (entry['type'] == 'Eatery') ...[
-                Text("Minimum Price: ₱${entry['min_price'] ?? 'N/A'}"),
-                Text("Open: ${entry['open_time'] ?? ''}"),
-                Text("Close: ${entry['end_time'] ?? ''}"),
-              ] else if (entry['type'] == 'Housing') ...[
-                Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
-                Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
-              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Close"),
+              ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
-          ),
-        ],
-      ),
     );
-}
+  }
 }
 
 // --------------------------

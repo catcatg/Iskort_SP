@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../menu_state.dart';
+import 'menu_state.dart';
 
 // 1. Sidebar Widget
 class Sidebar extends StatelessWidget {

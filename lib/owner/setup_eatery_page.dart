@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'profile.dart';
+import '../profile.dart';
 
 class SetupEateryPage extends StatefulWidget {
   final Map<String, dynamic> currentUser;
@@ -25,8 +25,7 @@ class _SetupEateryPage extends State<SetupEateryPage> {
   // Shared fields
   TextEditingController locationController = TextEditingController();
   TextEditingController photoUrlController = TextEditingController(
-    text:
-        'https://upload.wikimedia.org/wikipedia/en/b/ba/UP_Visayas_Logo.svg',
+    text: 'https://upload.wikimedia.org/wikipedia/en/b/ba/UP_Visayas_Logo.svg',
   );
 
   // Eatery-specific
@@ -41,13 +40,18 @@ class _SetupEateryPage extends State<SetupEateryPage> {
   @override
   void initState() {
     super.initState();
-    print("DEBUG owner_id: ${widget.currentUser['owner_id']}"); // 🔹 check if null or not
-    ownerNameController =
-        TextEditingController(text: widget.currentUser['name'] ?? '');
-    phoneController =
-        TextEditingController(text: widget.currentUser['phone_num'] ?? '');
-    emailController =
-        TextEditingController(text: widget.currentUser['email'] ?? '');
+    print(
+      "DEBUG owner_id: ${widget.currentUser['owner_id']}",
+    ); // 🔹 check if null or not
+    ownerNameController = TextEditingController(
+      text: widget.currentUser['name'] ?? '',
+    );
+    phoneController = TextEditingController(
+      text: widget.currentUser['phone_num'] ?? '',
+    );
+    emailController = TextEditingController(
+      text: widget.currentUser['email'] ?? '',
+    );
     businessNameController = TextEditingController();
   }
 
@@ -86,7 +90,9 @@ class _SetupEateryPage extends State<SetupEateryPage> {
       if (selectedType == 'Eatery') {
         if (openTime == null || closeTime == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please pick opening and closing times!')),
+            const SnackBar(
+              content: Text('Please pick opening and closing times!'),
+            ),
           );
           return;
         }
@@ -133,16 +139,20 @@ class _SetupEateryPage extends State<SetupEateryPage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$selectedType submitted! Waiting for verification. Check your email/sms for updates.')),
+          SnackBar(
+            content: Text(
+              '$selectedType submitted! Waiting for verification. Check your email/sms for updates.',
+            ),
+          ),
         );
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const UserProfilePage()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${response.body}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${response.body}')));
       }
     }
   }
@@ -154,15 +164,15 @@ class _SetupEateryPage extends State<SetupEateryPage> {
         title: const Text('Setup Your Business'),
         backgroundColor: const Color(0xFF387C44),
         leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () {
-          Navigator.pushReplacementNamed(
-            context,
-            '/profile',
-            arguments: widget.currentUser,
-          );
-        },
-      ),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacementNamed(
+              context,
+              '/profile',
+              arguments: widget.currentUser,
+            );
+          },
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -195,54 +205,55 @@ class _SetupEateryPage extends State<SetupEateryPage> {
               const SizedBox(height: 20),
 
               if (selectedType.isNotEmpty) ...[
-                const Text('Personal Information',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Personal Information',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: businessNameController,
-                  decoration:
-                      const InputDecoration(labelText: 'Establishment Name'),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Establishment Name',
+                  ),
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
                 TextFormField(
                   controller: ownerNameController,
                   decoration: const InputDecoration(labelText: 'Owner Name'),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null,
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
                 TextFormField(
                   controller: phoneController,
-                  decoration:
-                      const InputDecoration(labelText: 'Phone Number'),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null,
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
                 TextFormField(
                   controller: emailController,
-                  decoration:
-                      const InputDecoration(labelText: 'Email (read-only)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Email (read-only)',
+                  ),
                   readOnly: true,
                 ),
                 const SizedBox(height: 20),
 
                 // Common fields
-                const Text('Business Information',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Business Information',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: photoUrlController,
                   decoration: const InputDecoration(
-                      labelText: 'Profile Photo (Upload URL)'),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null,
+                    labelText: 'Profile Photo (Upload URL)',
+                  ),
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: locationController,
                   decoration: const InputDecoration(labelText: 'Location'),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Required' : null,
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 10),
 
@@ -253,18 +264,22 @@ class _SetupEateryPage extends State<SetupEateryPage> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () => pickTime(true),
-                          child: Text(openTime == null
-                              ? 'Select Opening Time'
-                              : 'Opening: ${openTime!.format(context)}'),
+                          child: Text(
+                            openTime == null
+                                ? 'Select Opening Time'
+                                : 'Opening: ${openTime!.format(context)}',
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () => pickTime(false),
-                          child: Text(closeTime == null
-                              ? 'Select Closing Time'
-                              : 'Closing: ${closeTime!.format(context)}'),
+                          child: Text(
+                            closeTime == null
+                                ? 'Select Closing Time'
+                                : 'Closing: ${closeTime!.format(context)}',
+                          ),
                         ),
                       ),
                     ],
@@ -272,11 +287,12 @@ class _SetupEateryPage extends State<SetupEateryPage> {
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: minPriceController,
-                    decoration:
-                        const InputDecoration(labelText: 'Minimum Price'),
+                    decoration: const InputDecoration(
+                      labelText: 'Minimum Price',
+                    ),
                     keyboardType: TextInputType.number,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Required' : null,
+                    validator:
+                        (v) => v == null || v.isEmpty ? 'Required' : null,
                   ),
                 ],
 
@@ -284,18 +300,21 @@ class _SetupEateryPage extends State<SetupEateryPage> {
                 if (selectedType == 'Housing') ...[
                   ElevatedButton(
                     onPressed: () => pickTime(false),
-                    child: Text(curfewTime == null
-                        ? 'Select Curfew Time'
-                        : 'Curfew: ${curfewTime!.format(context)}'),
+                    child: Text(
+                      curfewTime == null
+                          ? 'Select Curfew Time'
+                          : 'Curfew: ${curfewTime!.format(context)}',
+                    ),
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: priceController,
-                    decoration:
-                        const InputDecoration(labelText: 'Monthly Price'),
+                    decoration: const InputDecoration(
+                      labelText: 'Monthly Price',
+                    ),
                     keyboardType: TextInputType.number,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Required' : null,
+                    validator:
+                        (v) => v == null || v.isEmpty ? 'Required' : null,
                   ),
                 ],
 
