@@ -176,24 +176,16 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                           const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
+                            children: const [
                               Icon(
-                                business != null &&
-                                        business!['type'] == 'eatery'
-                                    ? Icons.restaurant
-                                    : Icons.apartment,
+                                Icons.storefront,
                                 color: Colors.white,
                               ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: 8),
                               Text(
-                                business != null
-                                    ? (business!['type'] == 'eatery'
-                                        ? "Food / Eatery"
-                                        : "Housing")
-                                    : "N/A",
-                                style: const TextStyle(
+                                "Business Page",
+                                style: TextStyle(
                                   fontSize: 16,
-
                                   color: Colors.white,
                                 ),
                               ),
@@ -703,45 +695,47 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   }
 
   Widget _establishmentCard(Map<String, dynamic> est, {required bool isEatery}) {
-  return Card(
-    elevation: 3,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    child: ListTile(
-      contentPadding: const EdgeInsets.all(15),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.network(
-          est['eatery_photo'] ??
-              est['photo'] ??
-              "", // supports both eatery & housing
-          width: 70,
-          height: 70,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-              const Icon(Icons.store, size: 40, color: Color(0xFF791317)),
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(15),
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.network(
+            est['eatery_photo'] ?? est['photo'] ?? "",
+            width: 70,
+            height: 70,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                const Icon(Icons.store, size: 40, color: Color(0xFF791317)),
+          ),
+        ),
+        title: Text(
+          est['name'] ?? '',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0A4423),
+          ),
+        ),
+        subtitle: Text(est['location'] ?? ''),
+        trailing: IconButton(
+          icon: const Icon(Icons.edit, color: Color(0xFF0A4423)),
+          onPressed: () {
+            Navigator.pushNamed(
+              context,
+              '/edit-establishments',
+              arguments: {
+                ...est,
+                'type': isEatery ? 'eatery' : 'housing', // pass type explicitly
+              },
+            );
+          },
         ),
       ),
-      title: Text(
-        est['name'] ?? '',
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF0A4423),
-        ),
-      ),
-      subtitle: Text(est['location'] ?? ''),
-      trailing: IconButton(
-        icon: const Icon(Icons.edit, color: Color(0xFF0A4423)),
-        onPressed: () {
-          Navigator.pushNamed(
-            context,
-            isEatery ? '/edit-eatery' : '/edit-housing',
-            arguments: est,
-          );
-        },
-      ),
-    ),
-  );
-}
+    );
+  }
+
 
 
   void _editBioDialog() {

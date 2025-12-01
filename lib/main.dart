@@ -59,9 +59,9 @@ class MyApp extends StatelessWidget {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
           return SetupEateryPage(currentUser: args);
         },
-        '/edit-establishments': (context) { 
-          final args = ModalRoute.of(context)!.settings.arguments as int; 
-          return EditEstablishmentsPage(ownerId: args); 
+        '/edit-establishments': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return EditEstablishmentsPage(business: args);
         },
       },
     );

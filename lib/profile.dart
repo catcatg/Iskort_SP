@@ -164,37 +164,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
                         // <-- OWNER SPECIFIC BUTTONS
                         if (role.toLowerCase() == "owner") ...[
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                if (_ownerId != null) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (_) => EditEstablishmentsPage(
-                                            ownerId: _ownerId!,
-                                          ),
-                                    ),
-                                  );
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                              ),
-                              child: const Text(
-                                "Edit Establishment(s)",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ),
                           const SizedBox(height: 12),
                           SizedBox(
                             width: double.infinity,

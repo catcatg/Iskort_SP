@@ -1,7 +1,6 @@
 const dotenv = require('dotenv');
 dotenv.config({ path: __dirname + '/.env' });  // force load from root
 console.log("EMAIL_FROM raw:", process.env.EMAIL_FROM);
-console.log("SENDGRID raw:", process.env.SENDGRID_API_KEY);
 
 const express = require('express');
 const mysql = require('mysql2');
@@ -349,6 +348,19 @@ app.get('/api/eatery', (req, res) => {
   });
 });
 
+// Update eatery
+app.put('/api/eatery/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, location, open_time, end_time } = req.body;
+
+  const sql = `UPDATE eatery SET name=?, location=?, open_time=?, end_time=? WHERE eatery_id=?`;
+  db.query(sql, [name, location, open_time, end_time, id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Eatery not found' });
+    res.json({ success: true, message: 'Eatery updated successfully' });
+  });
+});
+
 //VERIFY EATERY
 app.put('/api/admin/verify/eatery/:id', (req, res) => {
   const { id } = req.params;
@@ -516,6 +528,19 @@ app.get('/api/housing', (req, res) => {
   });
 });
 
+// Update housing
+app.put('/api/housing/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, location, price, curfew } = req.body;
+
+  const sql = `UPDATE housing SET name=?, location=?, price=?, curfew=? WHERE housing_id=?`;
+  db.query(sql, [name, location, price, curfew, id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Housing not found' });
+    res.json({ success: true, message: 'Housing updated successfully' });
+  });
+});
+
 // ===== VERIFY HOUSING =====
 app.put('/api/admin/verify/housing/:id', (req, res) => {
   const { id } = req.params;
@@ -644,9 +669,9 @@ app.delete('/api/admin/reject/housing/:id', (req, res) => {
 
 // ===== FOOD ROUTES =====
 app.post('/api/food', (req, res) => {
-  const { name, eatery_id, classification, price, photo } = req.body;
-  const sql = `INSERT INTO foods (name, eatery_id, classification, price, photo) VALUES (?, ?, ?, ?, ?)`;
-  db.query(sql, [name, eatery_id, classification, price, photo], (err, result) => {
+  const { name, eatery_id, classification, price, food_pic } = req.body;
+  const sql = `INSERT INTO food (name, eatery_id, classification, price, food_pic) VALUES (?, ?, ?, ?, ?)`; 
+  db.query(sql, [name, eatery_id, classification, price, food_pic], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, food_id: result.insertId });
   });
@@ -654,10 +679,33 @@ app.post('/api/food', (req, res) => {
 
 app.get('/api/foods/:eatery_id', (req, res) => {
   const { eatery_id } = req.params;
-  const sql = `SELECT * FROM foods WHERE eatery_id = ?`;
+  const sql = `SELECT * FROM food WHERE eatery_id = ?`; 
   db.query(sql, [eatery_id], (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, foods: results });
+  });
+});
+
+app.put('/api/food/:food_id', (req, res) => {
+  const { food_id } = req.params;
+  const { name, eatery_id, classification, price, food_pic } = req.body;
+
+  if (!eatery_id) {
+    return res.status(400).json({ success: false, message: 'eatery_id is required' });
+  }
+
+  const sql = `
+    UPDATE food
+    SET name = ?, eatery_id = ?, classification = ?, price = ?, food_pic = ?
+    WHERE food_id = ?
+  `;
+
+  db.query(sql, [name, eatery_id, classification, price, food_pic, food_id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Food not found' });
+    }
+    res.json({ success: true, message: 'Food updated successfully' });
   });
 });
 
