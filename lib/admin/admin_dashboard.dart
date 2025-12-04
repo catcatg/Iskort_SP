@@ -14,12 +14,11 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  int selectedPage = 0; // 0 = Users, 1 = Eatery, 2 = Housing
+  int selectedPage = 0; // 0 = Dashboard, 1 = Users, 2 = Eatery, 3 = Housing
 
-  // Base API URL
   final String baseUrl = 'https://iskort-public-web.onrender.com';
 
-  // ========== USERS ==========
+  // USERS
   List users = [];
   bool isLoadingUsers = true;
 
@@ -55,50 +54,153 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
+  /////////////////USER MANAGEMENT/////////////////////////////////////////////
   Widget buildUserPage() {
     if (isLoadingUsers) return const Center(child: CircularProgressIndicator());
     if (users.isEmpty) return const Center(child: Text('No users found'));
 
-    return ListView.builder(
-      itemCount: users.length,
-      itemBuilder: (context, index) {
-        final u = users[index] as Map;
-        final verified = (u['is_verified'] ?? 0) == 1;
+    // Deduplicate users by email (latest created_at wins)
+    final Map<String, Map<String, dynamic>> uniqueUsersMap = {};
+    for (var u in users) {
+      final email = u['email'] ?? u['id'].toString();
+      final existing = uniqueUsersMap[email];
+      if (existing == null) {
+        uniqueUsersMap[email] = Map<String, dynamic>.from(u);
+      } else {
+        DateTime existingDate =
+            DateTime.tryParse(existing['created_at'] ?? '') ?? DateTime(2000);
+        DateTime currentDate =
+            DateTime.tryParse(u['created_at'] ?? '') ?? DateTime(2000);
+        if (currentDate.isAfter(existingDate)) {
+          uniqueUsersMap[email] = Map<String, dynamic>.from(u);
+        }
+      }
+    }
+    final uniqueUsers = uniqueUsersMap.values.toList();
 
-        return Card(
-          margin: const EdgeInsets.all(8),
-          child: ListTile(
-            title: Text('${u['name'] ?? 'Unknown'} (${u['role'] ?? 'user'})'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(u['email'] ?? 'No email'),
-                Text('Phone: ${u['phone_num'] ?? 'N/A'}'),
-                Text('Joined: ${u['created_at'] ?? 'N/A'}'),
+    // Separate users into categories
+    final verifiedUsers =
+        uniqueUsers.where((u) => (u['is_verified'] ?? 0) == 1).toList();
+    final unverifiedUsers =
+        uniqueUsers.where((u) => (u['is_verified'] ?? 0) == 0).toList();
+    final rejectedUsers =
+        uniqueUsers.where((u) => (u['is_verified'] ?? 0) == -1).toList();
+
+    // Sort by created_at descending
+    int sortByDate(Map a, Map b) {
+      DateTime dateA =
+          DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(2000);
+      DateTime dateB =
+          DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(2000);
+      return dateB.compareTo(dateA);
+    }
+
+    verifiedUsers.sort(sortByDate);
+    unverifiedUsers.sort(sortByDate);
+    rejectedUsers.sort(sortByDate);
+
+    Widget buildUserList(List<Map<String, dynamic>> list) {
+      if (list.isEmpty)
+        return const Center(child: Text('No users in this category'));
+
+      return ListView.builder(
+        itemCount: list.length,
+        itemBuilder: (context, index) {
+          final u = list[index];
+          final verified = (u['is_verified'] ?? 0) == 1;
+
+          return Card(
+            margin: const EdgeInsets.all(8),
+            child: ListTile(
+              title: Text('${u['name'] ?? 'Unknown'} (${u['role'] ?? 'user'})'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(u['email'] ?? 'No email'),
+                  Text('Phone: ${u['phone_num'] ?? 'N/A'}'),
+                  Text('Joined: ${u['created_at'] ?? 'N/A'}'),
+                ],
+              ),
+              trailing:
+                  verified
+                      ? const Text(
+                        '✅ Verified',
+                        style: TextStyle(color: Colors.green),
+                      )
+                      : u['is_verified'] == -1
+                      ? const Text(
+                        '❌ Rejected',
+                        style: TextStyle(color: Colors.red),
+                      )
+                      : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextButton(
+                            onPressed:
+                                () => performUserAction(
+                                  u['id'].toString(),
+                                  'verify',
+                                ),
+                            child: const Text('Verify'),
+                          ),
+                          TextButton(
+                            onPressed:
+                                () => performUserAction(
+                                  u['id'].toString(),
+                                  'reject',
+                                ),
+                            child: const Text(
+                              'Reject',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+            ),
+          );
+        },
+      );
+    }
+
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          Container(
+            color: Colors.grey.shade200,
+            child: TabBar(
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.black54,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.normal,
+              ),
+              indicator: const BoxDecoration(
+                color: Color.fromARGB(231, 10, 68, 35),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              tabs: [
+                Tab(text: 'Verified (${verifiedUsers.length})'),
+                Tab(text: 'Unverified (${unverifiedUsers.length})'),
+                Tab(text: 'Rejected (${rejectedUsers.length})'),
               ],
             ),
-            trailing: verified
-                ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextButton(
-                        onPressed: () => performUserAction(u['id'].toString(), 'verify'),
-                        child: const Text('Verify'),
-                      ),
-                      TextButton(
-                        onPressed: () => performUserAction(u['id'].toString(), 'reject'),
-                        child: const Text('Reject', style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
-                  ),
           ),
-        );
-      },
+          Expanded(
+            child: TabBarView(
+              children: [
+                buildUserList(verifiedUsers),
+                buildUserList(unverifiedUsers),
+                buildUserList(rejectedUsers),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ========== EATERIES ==========
+  // EATERIES
   List eateries = [];
   bool isLoadingEateries = true;
 
@@ -107,9 +209,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     try {
       final response = await http.get(Uri.parse('$baseUrl/api/eatery'));
       final data = jsonDecode(response.body);
-
       if (data['success'] == true) {
-        // backend returns owner_name/owner_email/owner_phone via JOIN
         setState(() {
           eateries = List.from(data['eateries'] ?? []);
           isLoadingEateries = false;
@@ -137,15 +237,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget buildEateryPage() {
-    if (isLoadingEateries) return const Center(child: CircularProgressIndicator());
-    if (eateries.isEmpty) return const Center(child: Text('No eateries to verify'));
+    if (isLoadingEateries)
+      return const Center(child: CircularProgressIndicator());
+    if (eateries.isEmpty)
+      return const Center(child: Text('No eateries to verify'));
 
     return ListView.builder(
       itemCount: eateries.length,
       itemBuilder: (context, index) {
         final e = eateries[index] as Map;
         final verified = (e['is_verified'] ?? 0) == 1;
-        final eateryId = e['eatery_id']?.toString() ?? e['id']?.toString() ?? '';
+        final eateryId =
+            e['eatery_id']?.toString() ?? e['id']?.toString() ?? '';
 
         return Card(
           margin: const EdgeInsets.all(8),
@@ -161,28 +264,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 Text('Min Price: ${e['min_price'] ?? 'N/A'}'),
               ],
             ),
-            trailing: verified
-                ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextButton(
-                        onPressed: () => performEateryAction(eateryId, 'verify'),
-                        child: const Text('Verify'),
-                      ),
-                      TextButton(
-                        onPressed: () => performEateryAction(eateryId, 'reject'),
-                        child: const Text('Reject', style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
-                  ),
+            trailing:
+                verified
+                    ? const Text(
+                      '✅ Verified',
+                      style: TextStyle(color: Colors.green),
+                    )
+                    : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed:
+                              () => performEateryAction(eateryId, 'verify'),
+                          child: const Text('Verify'),
+                        ),
+                        TextButton(
+                          onPressed:
+                              () => performEateryAction(eateryId, 'reject'),
+                          child: const Text(
+                            'Reject',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         );
       },
     );
   }
 
-  // ========== HOUSINGS ==========
+  // HOUSINGS
   List housings = [];
   bool isLoadingHousings = true;
 
@@ -191,7 +303,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     try {
       final response = await http.get(Uri.parse('$baseUrl/api/housing'));
       final data = jsonDecode(response.body);
-
       if (data['success'] == true) {
         setState(() {
           housings = List.from(data['housings'] ?? []);
@@ -220,15 +331,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget buildHousingPage() {
-    if (isLoadingHousings) return const Center(child: CircularProgressIndicator());
-    if (housings.isEmpty) return const Center(child: Text('No housings to verify'));
+    if (isLoadingHousings)
+      return const Center(child: CircularProgressIndicator());
+    if (housings.isEmpty)
+      return const Center(child: Text('No housings to verify'));
 
     return ListView.builder(
       itemCount: housings.length,
       itemBuilder: (context, index) {
         final h = housings[index] as Map;
         final verified = (h['is_verified'] ?? 0) == 1;
-        final housingId = h['housing_id']?.toString() ?? h['id']?.toString() ?? '';
+        final housingId =
+            h['housing_id']?.toString() ?? h['id']?.toString() ?? '';
 
         return Card(
           margin: const EdgeInsets.all(8),
@@ -244,28 +358,133 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 Text('Price: ${h['price'] ?? h['rent_price'] ?? 'N/A'}'),
               ],
             ),
-            trailing: verified
-                ? const Text('✅ Verified', style: TextStyle(color: Colors.green))
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextButton(
-                        onPressed: () => performHousingAction(housingId, 'verify'),
-                        child: const Text('Verify'),
-                      ),
-                      TextButton(
-                        onPressed: () => performHousingAction(housingId, 'reject'),
-                        child: const Text('Reject', style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
-                  ),
+            trailing:
+                verified
+                    ? const Text(
+                      '✅ Verified',
+                      style: TextStyle(color: Colors.green),
+                    )
+                    : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed:
+                              () => performHousingAction(housingId, 'verify'),
+                          child: const Text('Verify'),
+                        ),
+                        TextButton(
+                          onPressed:
+                              () => performHousingAction(housingId, 'reject'),
+                          child: const Text(
+                            'Reject',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         );
       },
     );
   }
 
-  // ========== UI & Lifecycle ==========
+  // DASHBOARD SUMMARY
+  Widget buildAdminDashboard() {
+    // Count unverified users
+    final unverifiedUsersCount =
+        users.where((u) => (u['is_verified'] ?? 0) != 1).length;
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: GridView(
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 300, // Max width of each card
+          childAspectRatio: 2.5, // Keep card shape consistent
+          crossAxisSpacing: 20,
+          mainAxisSpacing: 20,
+        ),
+        children: [
+          buildDashboardCard(
+            'Total Users',
+            users.length,
+            Icons.people,
+            Colors.blue,
+          ),
+          buildDashboardCard(
+            'Unverified Users',
+            unverifiedUsersCount,
+            Icons.person_off,
+            Colors.red,
+          ),
+          buildDashboardCard(
+            'Eateries',
+            eateries.length,
+            Icons.restaurant,
+            Colors.orange,
+          ),
+          buildDashboardCard(
+            'Housings',
+            housings.length,
+            Icons.hotel,
+            Colors.green,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildDashboardCard(
+    String title,
+    int count,
+    IconData icon,
+    Color color,
+  ) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Scale font sizes based on screen width
+    double titleFontSize = screenWidth < 350 ? 14 : 16;
+    double countFontSize = screenWidth < 350 ? 16 : 18;
+    double iconSize = screenWidth < 350 ? 28 : 35;
+
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(icon, size: iconSize, color: color),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF0A4423),
+                    ),
+                    overflow: TextOverflow.ellipsis, // prevent overflow
+                  ),
+                  Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: countFontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -281,18 +500,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
         decoration: BoxDecoration(
-          color: isActive ? Colors.blue.shade100 : Colors.transparent,
+          color:
+              isActive ? Color.fromARGB(110, 121, 19, 22) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isActive ? Colors.blue : Colors.black54),
+            Icon(icon, color: isActive ? Color(0xFF791317) : Colors.black54),
             const SizedBox(width: 10),
             Text(
               title,
               style: TextStyle(
                 fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                color: isActive ? Colors.blue.shade900 : Colors.black87,
+                color: isActive ? Color(0xFF791317) : Colors.black87,
               ),
             ),
           ],
@@ -304,10 +524,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget buildPageContent() {
     switch (selectedPage) {
       case 0:
-        return buildUserPage();
+        return buildAdminDashboard();
       case 1:
-        return buildEateryPage();
+        return buildUserPage();
       case 2:
+        return buildEateryPage();
+      case 3:
         return buildHousingPage();
       default:
         return const Center(child: Text('Invalid Page'));
@@ -321,46 +543,102 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         children: [
           Container(
             width: 230,
-            color: Colors.grey.shade200,
-            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(2, 2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
                 const Text(
                   'Admin Panel',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0A4423),
+                  ),
                 ),
+                Divider(color: Colors.grey.shade400),
                 const SizedBox(height: 30),
-                buildSidebarItem('Users Verification', Icons.people, 0),
-                buildSidebarItem('Eatery Verification', Icons.restaurant, 1),
-                buildSidebarItem('Housing Verification', Icons.hotel, 2),
+
+                // Sidebar items
+                buildSidebarItem('Admin Dashboard', Icons.dashboard, 0),
+                const SizedBox(height: 10),
+                buildSidebarItem('Users Verification', Icons.people, 1),
+                const SizedBox(height: 10),
+                buildSidebarItem('Eatery Verification', Icons.restaurant, 2),
+                const SizedBox(height: 10),
+                buildSidebarItem('Housing Verification', Icons.hotel, 3),
+
                 const Spacer(),
-                const Divider(),
-                TextButton.icon(
-                  onPressed: () => Navigator.pushNamed(context, '/profile'),
-                  icon: const Icon(Icons.home),
-                  label: const Text('Back to Profile'),
+                const Divider(thickness: 2, color: Colors.grey),
+                const SizedBox(height: 10),
+
+                SizedBox(
+                  width:
+                      double
+                          .infinity, // Makes the button fill the available width
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.pushNamed(context, '/profile'),
+                    icon: const Icon(Icons.home, color: Colors.white),
+                    label: const Text(
+                      'View Admin Profile',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A4423),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
+
           Expanded(
             child: Column(
               children: [
                 Container(
                   height: 60,
-                  color: Colors.blue.shade600,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
                   alignment: Alignment.centerLeft,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
                     selectedPage == 0
-                        ? 'User Verification'
+                        ? 'Admin Dashboard'
                         : selectedPage == 1
-                            ? 'Eatery Verification'
-                            : 'Housing Verification',
+                        ? 'User Management'
+                        : selectedPage == 2
+                        ? 'Eatery Verification'
+                        : 'Housing Verification',
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 Expanded(child: buildPageContent()),
