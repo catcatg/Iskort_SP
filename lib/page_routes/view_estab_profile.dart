@@ -228,6 +228,7 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                           ),
 
                           // Reviews tab
+                          // Reviews tab
                           Padding(
                             padding: const EdgeInsets.all(10),
                             child: Column(
@@ -269,6 +270,24 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                     ),
                                   ],
                                 ),
+                                const SizedBox(height: 10),
+
+                                // Add Review Button
+                                ElevatedButton.icon(
+                                  onPressed: _showAddReviewDialog,
+                                  icon: const Icon(Icons.add),
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0A4423),
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  label: const Text(
+                                    "Add a review",
+                                    style: TextStyle(
+                                      color: Color.fromARGB(255, 255, 255, 255),
+                                    ),
+                                  ),
+                                ),
+
                                 const SizedBox(height: 10),
                                 Expanded(
                                   child:
@@ -334,7 +353,7 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                                                     .local_florist,
                                                                 size: 16,
                                                                 color: Color(
-                                                                  0xFFFFD700,
+                                                                  0xFFFBAC24,
                                                                 ),
                                                               ),
                                                             ),
@@ -532,6 +551,108 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
         ),
         subtitle: Text(est['location']?.toString() ?? 'N/A'),
       ),
+    );
+  }
+
+  void _showAddReviewDialog() {
+    final _nameController = TextEditingController();
+    final _commentController = TextEditingController();
+    int _rating = 0;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            "Add a review",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0A4423),
+            ),
+          ),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: 'Your Name'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _commentController,
+                      decoration: const InputDecoration(labelText: 'Comment'),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          icon: Icon(
+                            index < _rating
+                                ? Icons.local_florist
+                                : Icons.local_florist_outlined,
+                            color:
+                                index < _rating
+                                    ? const Color(0xFFFBAC24)
+                                    : Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _rating = index + 1;
+                            });
+                          },
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF791317),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (_nameController.text.isEmpty ||
+                    _commentController.text.isEmpty ||
+                    _rating == 0) {
+                  return;
+                }
+
+                setState(() {
+                  if (business!['reviews'] == null) {
+                    business!['reviews'] = [];
+                  }
+                  business!['reviews'].add({
+                    'reviewer_name': _nameController.text,
+                    'comment': _commentController.text,
+                    'rating': _rating,
+                    'date': DateTime.now().toIso8601String(),
+                  });
+                });
+
+                Navigator.pop(context);
+              },
+
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF0A4423),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text("Submit"),
+            ),
+          ],
+        );
+      },
     );
   }
 }
