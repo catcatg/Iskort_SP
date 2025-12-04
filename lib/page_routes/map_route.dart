@@ -48,7 +48,9 @@ class LocationRecord {
 }
 
 class MapRoutePage extends StatefulWidget {
-  const MapRoutePage({super.key});
+  final String? initialLocation;
+
+  const MapRoutePage({super.key, this.initialLocation});
 
   @override
   State<MapRoutePage> createState() => _MapRoutePageState();
@@ -84,6 +86,12 @@ class _MapRoutePageState extends State<MapRoutePage> {
     super.initState();
     _initLocation();
     _loadLastDestination();
+
+    // If initialLocation is provided, auto fill search bar and fetch
+    if (widget.initialLocation != null && widget.initialLocation!.isNotEmpty) {
+      _searchController.text = widget.initialLocation!;
+      fetchCoordPoint(widget.initialLocation!);
+    }
   }
 
   @override
@@ -196,28 +204,55 @@ class _MapRoutePageState extends State<MapRoutePage> {
     bool moveCamera = true,
   }) async {
     try {
+      // Bounding box for entire Iloilo province
+      const double minLat = 10.5;
+      const double maxLat = 11.7;
+      const double minLon = 121.9;
+      const double maxLon = 123.0;
+
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=$location&format=json&limit=1',
+        'https://nominatim.openstreetmap.org/search'
+        '?q=$location'
+        '&format=json'
+        '&limit=1'
+        '&viewbox=$minLon,$minLat,$maxLon,$maxLat'
+        '&bounded=1',
       );
+
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
         if (data.isNotEmpty) {
           final lat = double.parse(data[0]['lat']);
           final lon = double.parse(data[0]['lon']);
+
+          // Extra safety check
+          if (lat < minLat || lat > maxLat || lon < minLon || lon > maxLon) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location is outside Iloilo province.'),
+              ),
+            );
+            return;
+          }
+
           if (!mounted) return;
           setState(() {
             _userDestination = LatLng(lat, lon);
             _searchSuggestions.clear();
           });
+
           if (moveCamera) _mapController.move(_userDestination!, 18);
+
           await _fetchRoute();
           _saveLastDestination(location);
           await _checkIfLocationIsSaved();
         } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Location not found.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location not found in Iloilo province.'),
+            ),
+          );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -345,15 +380,41 @@ class _MapRoutePageState extends State<MapRoutePage> {
       return;
     }
 
+    // Bounding box for entire Iloilo province
+    const double minLat = 10.5;
+    const double maxLat = 11.7;
+    const double minLon = 121.9;
+    const double maxLon = 123.0;
+
     final url = Uri.parse(
-      'https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=5&addressdetails=1',
+      'https://nominatim.openstreetmap.org/search'
+      '?q=$query'
+      '&format=json'
+      '&limit=5'
+      '&addressdetails=1'
+      '&viewbox=$minLon,$minLat,$maxLon,$maxLat'
+      '&bounded=1',
     );
+
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
+
       if (!mounted) return;
+
+      // Extra safety filter
+      final filtered =
+          (data as List).where((s) {
+            final lat = double.parse(s['lat']);
+            final lon = double.parse(s['lon']);
+            return lat >= minLat &&
+                lat <= maxLat &&
+                lon >= minLon &&
+                lon <= maxLon;
+          }).toList();
+
       setState(
-        () => _searchSuggestions = List<Map<String, dynamic>>.from(data),
+        () => _searchSuggestions = List<Map<String, dynamic>>.from(filtered),
       );
     }
   }
