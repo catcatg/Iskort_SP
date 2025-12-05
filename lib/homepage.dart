@@ -136,14 +136,14 @@ class _HomePageState extends State<HomePage> {
       decoration: BoxDecoration(
         color: const Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Color.fromARGB(255, 32, 29, 24)),
+        border: Border.all(color: Color(0xFF0A4423), width: 1.5),
       ),
       child: TextField(
         controller: _searchController,
         decoration: const InputDecoration(
           hintText: 'Search housing or eateries',
           border: InputBorder.none,
-          suffixIcon: Icon(Icons.search),
+          suffixIcon: Icon(Icons.search, color: Color(0xFF0A4423)),
           contentPadding: EdgeInsets.all(12),
         ),
         onSubmitted: (query) {
@@ -366,17 +366,27 @@ class _HomePageState extends State<HomePage> {
             // ------------------------------
             // RECOMMENDED SECTION (Housing + Eateries)
             // ------------------------------
-            Divider(color: Colors.grey.shade400),
+            Divider(color: Color(0xFF0A4423)),
             const SizedBox(height: 10),
-            const Text(
-              "Recommended for you",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0A4423),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A4423),
+                border: Border.all(color: Colors.transparent),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                "Recommended for you",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
               ),
             ),
-            const SizedBox(height: 10),
+
+            const SizedBox(height: 20),
 
             if (isLoading)
               const Center(child: CircularProgressIndicator())
@@ -451,7 +461,7 @@ class _HomePageState extends State<HomePage> {
               ),
 
               const SizedBox(height: 10),
-              Divider(color: Colors.grey.shade400),
+              Divider(color: Color(0xFF0A4423)),
               const SizedBox(height: 10),
 
               // --------------------- EATERIES ---------------------
