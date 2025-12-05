@@ -132,7 +132,16 @@ class _FoodPageState extends State<FoodPage> {
           Expanded(
             child:
                 isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                      child: SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 5,
+                          color: Color(0xFF0A4423),
+                        ),
+                      ),
+                    )
                     : _filteredFoods.isEmpty
                     ? const Center(child: Text("No eateries found"))
                     : GridView.builder(
