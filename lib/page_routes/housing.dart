@@ -126,48 +126,51 @@ class _HousingPageState extends State<HousingPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: "Search Housing",
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: const Color(0xFFF0E1E1),
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 0,
-                  horizontal: 16,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: const Color(0xFF0A4423), width: 1.5),
+              ),
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: "Search housing",
+                  suffixIcon: Icon(Icons.search, color: Color(0xFF0A4423)),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(1, 16, 1, 16),
-                      itemCount: filteredHousingData.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.75,
+              child:
+                  isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(1, 16, 1, 16),
+                        itemCount: filteredHousingData.length,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 12,
+                              crossAxisSpacing: 12,
+                              childAspectRatio: 0.75,
+                            ),
+                        itemBuilder: (context, index) {
+                          final house = filteredHousingData[index];
+                          return HousingCard(
+                            name: house['name'],
+                            location: house['location'],
+                            price: house['price'],
+                            pax: house['pax'],
+                            imagePath: house['image'],
+                          );
+                        },
                       ),
-                      itemBuilder: (context, index) {
-                        final house = filteredHousingData[index];
-                        return HousingCard(
-                          name: house['name'],
-                          location: house['location'],
-                          price: house['price'],
-                          pax: house['pax'],
-                          imagePath: house['image'],
-                        );
-                      },
-                    ),
             ),
           ],
         ),
@@ -223,10 +226,11 @@ class _HousingCardState extends State<HousingCard> {
                     widget.imagePath,
                     fit: BoxFit.cover,
                     width: double.infinity,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: Colors.grey.shade300,
-                      child: const Icon(Icons.broken_image, size: 40),
-                    ),
+                    errorBuilder:
+                        (context, error, stackTrace) => Container(
+                          color: Colors.grey.shade300,
+                          child: const Icon(Icons.broken_image, size: 40),
+                        ),
                   ),
                 ),
               ),
@@ -259,12 +263,13 @@ class _HousingCardState extends State<HousingCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  widget.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Row(
                   children: [
-                    const Icon(Icons.location_on,
-                        size: 14, color: Colors.grey),
+                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -285,14 +290,15 @@ class _HousingCardState extends State<HousingCard> {
                 ),
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.shade100,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(widget.pax,
-                      style: const TextStyle(fontSize: 12)),
+                  child: Text(widget.pax, style: const TextStyle(fontSize: 12)),
                 ),
               ],
             ),
