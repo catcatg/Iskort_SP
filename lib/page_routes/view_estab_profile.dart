@@ -125,7 +125,16 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
 
       body:
           loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(
+                child: SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 5,
+                    color: Color(0xFF0A4423),
+                  ),
+                ),
+              )
               : business == null
               ? const Center(child: Text("Establishment not found"))
               : SafeArea(
