@@ -40,14 +40,14 @@ class _SignupPageState extends State<SignupPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://iskort-public-web.onrender.com/api/admin/register'), // adjust for your backend
+        Uri.parse('https://iskort-public-web.onrender.com/api/admin/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'name': nameController.text,
           'email': emailController.text,
           'password': passwordController.text,
           'phone_num': phoneController.text,
-          'role': selectedRole, // still passed to backend
+          'role': selectedRole, 
           'notif_preference': notifPreference,
         }),
       );
@@ -62,12 +62,14 @@ class _SignupPageState extends State<SignupPage> {
         confirmPasswordController.clear();
         phoneController.clear();
         Navigator.pushReplacementNamed(context, '/login');
-      } else {
-        final body = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${body['message'] ?? 'Registration failed'}')),
-        );
-      }
+      }  else {
+          print('Status code: ${response.statusCode}');
+          print('Body: ${response.body}');
+          final body = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${body['message'] ?? body['error'] ?? 'Registration failed'}')),
+          );
+        }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not connect to the server')),
