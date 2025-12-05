@@ -72,6 +72,31 @@ const sendBusinessVerificationEmail = async (email, ownerName, businessName, typ
   }
 };
 
+// ===== REGISTER (All roles register under admin first) =====
+app.post('/api/admin/register', (req, res) => {
+  const { name, email, password, role, phone_num, notif_preference } = req.body;
+
+  db.query('SELECT * FROM admin WHERE email = ?', [email], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (results.length > 0)
+      return res.status(409).json({ success: false, message: 'Email already exists' });
+
+    db.query(
+      `INSERT INTO admin 
+       (name, email, password, role, is_verified, phone_num, notif_preference, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
+      [name, email, password, role, 0, phone_num, notif_preference || 'email'],
+      (err2) => {
+        if (err2) return res.status(500).json({ success: false, error: err2.message });
+        res.status(201).json({
+          success: true,
+          message: 'Registration successful. Waiting for admin verification.',
+        });
+      }
+    );
+  });
+});
+
 
 // ===== LOGIN (Auto Role Detection) =====
 app.post('/api/admin/login', (req, res) => {
@@ -157,7 +182,7 @@ const sendVerificationSMS = async (phoneNum, name) => {
         apikey: process.env.SEMAPHORE_API_KEY, // add this in your .env
         number: phoneNum,
         message: message,
-        //sendername: undefined, //placeholder since name application is pending
+        sendername: "Iskort", //placeholder since name application is pending
       }
     });
     console.log('Verification SMS sent to', phoneNum, res.data);
@@ -252,25 +277,23 @@ app.put('/api/admin/verify/:id', (req, res) => {
 
 // ===== TEST EMAIL =====
 app.get('/api/test-email', async (req, res) => {
-try {
-const msg = {
-to: process.env.EMAIL_FROM, // send to yourself for testing
-from: process.env.EMAIL_FROM,
-subject: 'Test Email from Iskort',
-text: 'Hello! This is a test email from your Iskort backend.',
-html: '<b>Hello! This is a test email from your Iskort backend.</b>',
-};
+  try {
+  const msg = {
+  to: process.env.EMAIL_FROM, // send to yourself for testing
+  from: process.env.EMAIL_FROM,
+  subject: 'Test Email from Iskort',
+  text: 'Hello! This is a test email from your Iskort backend.',
+  html: '<b>Hello! This is a test email from your Iskort backend.</b>',
+  };
 
+  await sgMail.send(msg);
+  console.log('Test email sent to', process.env.EMAIL_FROM);
+  res.json({ success: true, message: 'Test email sent' });
 
-await sgMail.send(msg);
-console.log('Test email sent to', process.env.EMAIL_FROM);
-res.json({ success: true, message: 'Test email sent' });
-
-
-} catch (err) {
-console.error('Test email error: ', err);
-res.status(500).json({ success: false, error: err.message });
-}
+  } catch (err) {
+  console.error('Test email error: ', err);
+  res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ===== REJECT ACCOUNT WITH EMAIL NOTIFICATION =====
@@ -312,16 +335,7 @@ if (results.length === 0) return res.status(404).json({ success: false, message:
 // ===== EATERY ROUTES (with JOIN) =====
 app.post('/api/eatery', (req, res) => {
   const {
-    owner_id,
-    name,
-    location,
-    min_price = null,
-    is_verified = 0,
-    verified_by_admin_id = null,
-    verified_time = null,
-    eatery_photo = '',
-    open_time,
-    end_time,
+    owner_id, name, location, min_price = null, is_verified = 0, verified_by_admin_id = null, verified_time = null, eatery_photo = '', open_time, end_time,
   } = req.body;
 
   const sql = `INSERT INTO eatery (owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time, eatery_photo, open_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
