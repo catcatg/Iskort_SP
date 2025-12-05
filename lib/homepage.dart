@@ -134,16 +134,16 @@ class _HomePageState extends State<HomePage> {
   Widget GeneralSearchBar() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF0E1E1),
+        color: const Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: Color.fromARGB(255, 32, 29, 24)),
       ),
       child: TextField(
         controller: _searchController,
         decoration: const InputDecoration(
-          hintText: 'Search',
+          hintText: 'Search housing or eateries',
           border: InputBorder.none,
-          prefixIcon: Icon(Icons.search),
+          suffixIcon: Icon(Icons.search),
           contentPadding: EdgeInsets.all(12),
         ),
         onSubmitted: (query) {
@@ -182,13 +182,19 @@ class _HomePageState extends State<HomePage> {
                   height: 90,
                   margin: const EdgeInsets.symmetric(horizontal: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFEFEF),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
-                        color: Colors.grey.withAlpha(24),
-                        blurRadius: 3,
-                        offset: const Offset(0, 2),
+                        color: Color(
+                          0x660A4423,
+                        ), // slightly transparent for softer shadow
+                        blurRadius: 4,
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
@@ -198,14 +204,14 @@ class _HomePageState extends State<HomePage> {
                       Icon(
                         card['icon'] as IconData? ?? Icons.help_outline,
                         size: 30,
-                        color: const Color(0xFF791317),
+                        color: Colors.white,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         card['name']?.toString() ?? 'Unknown',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A4423),
+                          color: Colors.white,
                           fontSize: 14,
                         ),
                       ),
@@ -355,20 +361,81 @@ class _HomePageState extends State<HomePage> {
             GeneralSearchBar(),
             const SizedBox(height: 30),
             _buildNavCardsRow(),
-            const SizedBox(height: 30),
+            const SizedBox(height: 15),
+
+            // ------------------------------
+            // RECOMMENDED SECTION (Housing + Eateries)
+            // ------------------------------
+            Divider(color: Colors.grey.shade400),
+            const SizedBox(height: 10),
             const Text(
               "Recommended for you",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0A4423),
+              ),
             ),
             const SizedBox(height: 10),
+
             if (isLoading)
               const Center(child: CircularProgressIndicator())
             else if (allEntries.isEmpty)
               const Text("No entries found")
-            else
+            else ...[
+              // --------------------- HOUSING ---------------------
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Housing",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0A4423),
+                    ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      backgroundColor: Colors.transparent,
+                    ),
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/housing');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        "View more",
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 10),
               Column(
                 children:
                     allEntries
+                        .where((e) => e['type'] == 'Housing')
+                        .take(5)
                         .map(
                           (entry) => ProductCard(
                             title: entry['name'] ?? '',
@@ -382,6 +449,79 @@ class _HomePageState extends State<HomePage> {
                         )
                         .toList(),
               ),
+
+              const SizedBox(height: 10),
+              Divider(color: Colors.grey.shade400),
+              const SizedBox(height: 10),
+
+              // --------------------- EATERIES ---------------------
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Eateries",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0A4423),
+                    ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      backgroundColor: Colors.transparent,
+                    ),
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/food');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        "View more",
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 10),
+
+              Column(
+                children:
+                    allEntries
+                        .where((e) => e['type'] == 'Eatery')
+                        .take(5)
+                        .map(
+                          (entry) => ProductCard(
+                            title: entry['name'] ?? '',
+                            subtitle: "Tap to view details",
+                            location: entry['location'] ?? '',
+                            imagePath:
+                                entry['photo'] ??
+                                "assets/images/placeholder.png",
+                            onTap: () => showEntryDetails(entry),
+                          ),
+                        )
+                        .toList(),
+              ),
+            ],
           ],
         ),
       ),
@@ -454,6 +594,12 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final housingResults =
+        filteredEntries.where((e) => e['type'] == 'Housing').toList();
+
+    final eateryResults =
+        filteredEntries.where((e) => e['type'] == 'Eatery').toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Results', style: TextStyle(color: Colors.white)),
@@ -472,46 +618,187 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               ? Center(
                 child: Text('No results found for "${widget.searchQuery}"'),
               )
-              : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              : ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Results for "${widget.searchQuery}"',
+                  Text(
+                    'Results for "${widget.searchQuery}"',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ---------------- HOUSING RESULTS ----------------
+                  if (housingResults.isNotEmpty) ...[
+                    Text(
+                      "Housing (${housingResults.length})",
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A4423),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: EdgeInsets.all(16),
-                      itemCount: filteredEntries.length,
-                      itemBuilder: (context, index) {
-                        final entry = filteredEntries[index];
-                        return ProductCard(
-                          title: entry['name'] ?? '',
-                          subtitle: "Tap to view details",
-                          location: entry['location'] ?? '',
-                          imagePath:
-                              entry['photo'] ?? "assets/images/placeholder.png",
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder:
-                                  (_) => Dialog(
-                                    child: Text("Details for ${entry['name']}"),
-                                  ),
-                            );
-                          },
-                        );
-                      },
+                    const SizedBox(height: 8),
+
+                    ...housingResults.map(
+                      (entry) => ProductCard(
+                        title: entry['name'] ?? '',
+                        subtitle: "Tap to view details",
+                        location: entry['location'] ?? '',
+                        imagePath:
+                            entry['photo'] ?? "assets/images/placeholder.png",
+                        onTap: () => showEntryDetails(entry),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // ---------------- EATERY RESULTS ----------------
+                  if (eateryResults.isNotEmpty) ...[
+                    Text(
+                      "Eateries (${eateryResults.length})",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A4423),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    ...eateryResults.map(
+                      (entry) => ProductCard(
+                        title: entry['name'] ?? '',
+                        subtitle: "Tap to view details",
+                        location: entry['location'] ?? '',
+                        imagePath:
+                            entry['photo'] ?? "assets/images/placeholder.png",
+                        onTap: () => showEntryDetails(entry),
+                      ),
+                    ),
+                  ],
                 ],
               ),
+    );
+  }
+
+  void showEntryDetails(Map entry) {
+    showDialog(
+      context: context,
+      builder:
+          (_) => Dialog(
+            insetPadding: const EdgeInsets.all(25),
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(30.0),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Image.network(
+                            entry['photo'] ?? "assets/images/placeholder.png",
+                            height: 200,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (_, __, ___) =>
+                                    const Icon(Icons.broken_image, size: 40),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text("Location: ${entry['location'] ?? ''}"),
+
+                        if (entry['type'] == 'Eatery') ...[
+                          Text(
+                            "Minimum Price: ₱${entry['min_price'] ?? 'N/A'}",
+                          ),
+                          Text("Open: ${entry['open_time'] ?? ''}"),
+                          Text("Close: ${entry['end_time'] ?? ''}"),
+                        ] else if (entry['type'] == 'Housing') ...[
+                          Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
+                          Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
+                        ],
+
+                        const SizedBox(height: 20),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => EstabProfileForCustomer(
+                                          ownerId:
+                                              entry['owner_id']?.toString() ??
+                                              '',
+                                        ),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A4423),
+                              ),
+                              child: const Text(
+                                "View Establishment Profile",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => MapRoutePage(
+                                          initialLocation:
+                                              entry['location']?.toString() ??
+                                              '',
+                                        ),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A4423),
+                              ),
+                              child: const Text(
+                                "View Route",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
     );
   }
 }
@@ -539,19 +826,69 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Card(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        child: ListTile(
-          leading: Image.network(
-            imagePath,
-            width: 60,
-            height: 60,
-            fit: BoxFit.cover,
-            errorBuilder:
-                (_, __, ___) => const Icon(Icons.broken_image, size: 30),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          title: Text(title),
-          subtitle: Text("$subtitle • $location"),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.92),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imagePath,
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.cover,
+                  errorBuilder:
+                      (_, __, ___) => const Icon(Icons.broken_image, size: 35),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0A4423),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "$subtitle • $location",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Color(0xFF7A1E1E)),
+            ],
+          ),
         ),
       ),
     );
