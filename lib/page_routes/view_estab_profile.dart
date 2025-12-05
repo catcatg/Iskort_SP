@@ -103,6 +103,26 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          "${business?['name'] ?? 'Owner'}'s Profile",
+          style: const TextStyle(color: Colors.white, fontSize: 18),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+      ),
+
       body:
           loading
               ? const Center(child: CircularProgressIndicator())
@@ -153,8 +173,8 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                           Text(
                             business?['name']?.toString() ?? 'Unknown',
                             style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w500,
                               color: Colors.white,
                             ),
                             textAlign: TextAlign.center,
@@ -181,15 +201,19 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                     // Tabs
                     TabBar(
                       controller: _tabController,
-                      labelColor: const Color(0xFF0A4423),
-                      unselectedLabelColor: Colors.black54,
-                      indicatorColor: const Color(0xFF0A4423),
+                      labelColor: Color(0xFF0A4423),
+                      unselectedLabelColor:
+                          Colors.black54, // Text color for unselected tabs
+                      indicatorColor: Color(0xFF0A4423),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicatorWeight: 5,
                       tabs: const [
                         Tab(text: "Products"),
                         Tab(text: "Reviews"),
                         Tab(text: "About"),
                       ],
                     ),
+
                     // TabBarView
                     Expanded(
                       child: TabBarView(
@@ -398,6 +422,8 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                       'No description yet.',
                                   style: const TextStyle(fontSize: 14),
                                 ),
+                                const SizedBox(height: 15),
+                                Divider(color: Colors.grey.shade400),
                                 const SizedBox(height: 15),
                                 Wrap(
                                   spacing: 8,
