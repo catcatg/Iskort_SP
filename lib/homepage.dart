@@ -389,7 +389,16 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 20),
 
             if (isLoading)
-              const Center(child: CircularProgressIndicator())
+              const Center(
+                child: SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 5,
+                    color: Color(0xFF0A4423),
+                  ),
+                ),
+              )
             else if (allEntries.isEmpty)
               const Text("No entries found")
             else ...[
@@ -400,7 +409,7 @@ class _HomePageState extends State<HomePage> {
                   const Text(
                     "Housing",
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF0A4423),
                     ),
@@ -471,7 +480,7 @@ class _HomePageState extends State<HomePage> {
                   const Text(
                     "Eateries",
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF0A4423),
                     ),
@@ -814,7 +823,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 }
 
 // --------------------------
-// PRODUCT CARD
+// PRODUCT CARD (UNIFORM HEIGHT)
 // --------------------------
 class ProductCard extends StatelessWidget {
   final String title;
@@ -834,9 +843,13 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const double cardHeight = 90; // uniform height for all cards
+    const double imageSize = 70; // fixed image size
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        height: cardHeight,
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
@@ -861,41 +874,59 @@ class ProductCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  imagePath,
-                  width: 70,
-                  height: 70,
-                  fit: BoxFit.cover,
-                  errorBuilder:
-                      (_, __, ___) => const Icon(Icons.broken_image, size: 35),
+              // Image
+              SizedBox(
+                width: imageSize,
+                height: imageSize,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imagePath,
+                    width: imageSize,
+                    height: imageSize,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (_, __, ___) =>
+                            const Icon(Icons.broken_image, size: 35),
+                  ),
                 ),
               ),
+
               const SizedBox(width: 12),
+
+              // Text Column
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0A4423),
+                child: SizedBox(
+                  height: imageSize,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0A4423),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "$subtitle • $location",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
+                      const SizedBox(height: 4),
+                      Text(
+                        "$subtitle • $location",
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
+
               const Icon(Icons.chevron_right, color: Color(0xFF7A1E1E)),
             ],
           ),
