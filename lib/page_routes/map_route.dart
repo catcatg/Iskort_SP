@@ -360,7 +360,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
         final pos = LatLng(current.latitude!, current.longitude!);
         if (!mounted) return;
         setState(() => _userLocation = pos);
-        _mapController.move(pos, 18);
+        _mapController.move(pos, 19);
         if (_userDestination != null) await _fetchRoute();
       } else {
         throw Exception("No coordinates");
@@ -437,7 +437,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
         titleTextStyle: const TextStyle(
           color: Colors.white,
           fontSize: 20,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w500,
         ),
         backgroundColor: const Color.fromARGB(255, 150, 29, 20),
         actions: [
@@ -509,125 +509,156 @@ class _MapRoutePageState extends State<MapRoutePage> {
               left: 20,
               right: 20,
               child: Card(
-                color: const Color.fromARGB(199, 5, 41, 5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Close card and clear search
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: IconButton(
-                          icon: const Icon(Icons.clear, color: Colors.white70),
-                          onPressed: _clearSearchAndCard,
-                        ),
-                      ),
-
-                      // Location name
-                      if (_searchController.text.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Text(
-                            _searchController.text,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.white,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF0A4423), // dark green
+                        Color(0xFF7A1E1E), // deep red
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Close button
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.clear,
+                              color: Colors.white70,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      else if (_destinationName != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Text(
-                            _destinationName!,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            textAlign: TextAlign.center,
+                            onPressed: _clearSearchAndCard,
                           ),
                         ),
 
-                      // Row with ETA and Distance boxes
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              margin: const EdgeInsets.only(right: 6),
-                              decoration: BoxDecoration(
-                                color: const Color.fromARGB(180, 255, 255, 255),
-                                borderRadius: BorderRadius.circular(8),
+                        // Location name
+                        if (_searchController.text.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              _searchController.text,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.normal,
+                                color: Colors.white,
                               ),
-                              child: Center(
-                                child: Text(
-                                  'ETA: ${_durationMin!.toStringAsFixed(0)} mins',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        else if (_destinationName != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              _destinationName!,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+
+                        // ETA and Distance
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color.fromARGB(
+                                    180,
+                                    255,
+                                    255,
+                                    255,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'ETA: ${_durationMin!.toStringAsFixed(0)} mins',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              margin: const EdgeInsets.only(left: 6),
-                              decoration: BoxDecoration(
-                                color: const Color.fromARGB(180, 255, 255, 255),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'Distance: ${_distanceKm!.toStringAsFixed(2)} km',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                margin: const EdgeInsets.only(left: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color.fromARGB(
+                                    180,
+                                    255,
+                                    255,
+                                    255,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Distance: ${_distanceKm!.toStringAsFixed(2)} km',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                          ],
+                        ),
 
-                      // Save location button
-                      ElevatedButton.icon(
-                        onPressed: _toggleSaveCurrentLocation,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        const SizedBox(height: 12),
+
+                        // Save location button
+                        ElevatedButton.icon(
+                          onPressed: _toggleSaveCurrentLocation,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFFBAC24),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          icon: Icon(
+                            isSaved ? Icons.bookmark : Icons.bookmark_border,
+                            color: const Color.fromARGB(255, 0, 0, 0),
+                          ),
+                          label: Text(
+                            isSaved ? "Saved" : "Save Location",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color.fromARGB(255, 0, 0, 0),
+                            ),
+                          ),
                         ),
-                        icon: Icon(
-                          isSaved ? Icons.bookmark : Icons.bookmark_border,
-                          color: Colors.white,
-                        ),
-                        label: Text(
-                          isSaved ? "Saved" : "Save Location",
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
 
           // Search bar and suggestions
+          // ====================== Search bar ======================
           Positioned(
             top: 20,
             left: 20,
@@ -642,16 +673,38 @@ class _MapRoutePageState extends State<MapRoutePage> {
                       _fetchSuggestions(value);
                     });
                   },
+                  onSubmitted: (value) {
+                    fetchCoordPoint(value);
+                  },
                   decoration: InputDecoration(
-                    hintText: "Search destination",
                     filled: true,
                     fillColor: Colors.white,
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.search),
-                      onPressed: () => fetchCoordPoint(_searchController.text),
-                    ),
+                    hintText: "Search destination",
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide(
+                        color: Color(0xFF0A4423),
+                        width: 1.5,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide(
+                        color: Color(0xFF0A4423),
+                        width: 1.5,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide(
+                        color: Color(0xFF0A4423),
+                        width: 2,
+                      ),
+                    ),
+                    suffixIcon: Icon(Icons.search, color: Color(0xFF0A4423)),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
                     ),
                   ),
                 ),
