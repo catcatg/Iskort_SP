@@ -723,8 +723,16 @@ app.put('/api/food/:food_id', (req, res) => {
   });
 });
 
-// ===== FACILITY ROUTES =====
+// Delete food
+app.delete('/api/food/:food_id', (req, res) => {
+  const { food_id } = req.params;
+  db.query('DELETE FROM food WHERE food_id = ?', [food_id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, message: 'Food deleted successfully' });
+  });
+});
 
+// ===== FACILITY ROUTES =====
 // Create facility
 app.post('/api/facility', (req, res) => {
   const {
@@ -784,6 +792,15 @@ app.put('/api/facility/:facility_id', (req, res) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Facility not found' });
     res.json({ success: true, message: 'Facility updated successfully' });
+  });
+});
+
+// Delete facility
+app.delete('/api/facility/:facility_id', (req, res) => {
+  const { facility_id } = req.params;
+  db.query('DELETE FROM facility WHERE facility_id = ?', [facility_id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, message: 'Facility deleted successfully' });
   });
 });
 

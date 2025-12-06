@@ -31,6 +31,9 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
   late TextEditingController openTimeController;
   late TextEditingController closeTimeController;
 
+  // Housing
+  late TextEditingController curfewController;
+
   List<Map<String, dynamic>> menuItems = [];
   List<Map<String, dynamic>> facilities = [];
 
@@ -48,6 +51,7 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
       closeTimeController = TextEditingController(text: biz['end_time'] ?? "");
       _loadMenuItems();
     } else {
+      curfewController = TextEditingController(text: biz['curfew'] ?? "");
       _loadFacilities();
     }
   }
@@ -87,6 +91,7 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
 
     if (res.statusCode == 200) {
       _loadMenuItems();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Food added successfully")));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to add menu item.")));
     }
@@ -111,6 +116,7 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
     final res = await http.delete(Uri.parse("https://iskort-public-web.onrender.com/api/food/$foodId"));
     if (res.statusCode == 200) {
       _loadMenuItems();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Food deleted")));
     }
   }
 
@@ -157,6 +163,9 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
 
     if (res.statusCode == 200) {
       _loadFacilities();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Facility added successfully")));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to add facility")));
     }
   }
 
@@ -183,100 +192,58 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
     final res = await http.delete(Uri.parse("https://iskort-public-web.onrender.com/api/facility/$facilityId"));
     if (res.statusCode == 200) {
       _loadFacilities();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Facility deleted")));
     }
   }
 
   // ===== UI DIALOGS =====
-  void _openAddFoodDialog() {
-    final pic = TextEditingController();
-    final name = TextEditingController();
-    final price = TextEditingController();
-    String? selectedTag;
-
-    final classes = ["Pork","Chicken","Beef","Vegetables","Seafood","Alcoholic Drinks","Coffee Drinks","Non-Coffee Drinks","Desserts","Snacks","Meal Set"];
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Add Menu Item"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _input(pic, hint: "Image URL"),
-              _input(name, hint: "Food Name"),
-              DropdownButtonFormField<String>(
-                value: selectedTag,
-                hint: const Text("Classification"),
-                items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (val) => selectedTag = val,
-              ),
-              _input(price, hint: "Price (₱)"),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-            ElevatedButton(
-              child: const Text("Add"),
-              onPressed: () async {
-                if (name.text.isEmpty || selectedTag == null) return;
-                await _saveFoodToServer(
-                  food_pic: pic.text.trim(),
-                  foodName: name.text.trim(),
-                  classification: selectedTag!,
-                  price: price.text.trim(),
-                );
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-    void _openEditFoodDialog(Map<String, dynamic> item) {
+  void _openEditFoodDialog(Map<String, dynamic> item) {
     final name = TextEditingController(text: item['name']);
     final price = TextEditingController(text: item['price'].toString());
     final pic = TextEditingController(text: item['food_pic']);
-    String classification = item['classification'];
+    final classes = ["Pork","Chicken","Beef","Vegetables","Seafood","Alcoholic Drinks",
+                     "Coffee Drinks","Non-Coffee Drinks","Desserts","Snacks","Meal Set"];
+    String? classification = classes.contains(item['classification']) ? item['classification'] : null;
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Edit Food Item"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _input(name, hint: "Food Name"),
-              _input(price, hint: "Price"),
-              _input(pic, hint: "Image URL"),
-              DropdownButtonFormField<String>(
-                value: classification,
-                items: ["Pork","Chicken","Beef","Vegetables","Seafood","Desserts","Snacks"]
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (val) => classification = val ?? classification,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Edit Food Item"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _input(name, hint: "Food Name"),
+                  _input(price, hint: "Price"),
+                  _input(pic, hint: "Image URL"),
+                  DropdownButtonFormField<String>(
+                    value: classification,
+                    items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                    onChanged: (val) => setState(() => classification = val),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                ElevatedButton(
+                  child: const Text("Save"),
+                  onPressed: () async {
+                    item['name'] = name.text.trim();
+                    item['price'] = price.text.trim();
+                                      item['food_pic'] = pic.text.trim();
+                  item['classification'] = classification ?? "Pork";
+                  await _updateFoodItem(item);
+                  Navigator.pop(context);
+                  _loadMenuItems();
+                },
               ),
             ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-            ElevatedButton(
-              child: const Text("Save"),
-              onPressed: () async {
-                item['name'] = name.text.trim();
-                item['price'] = price.text.trim();
-                item['food_pic'] = pic.text.trim();
-                item['classification'] = classification;
-                await _updateFoodItem(item);
-                Navigator.pop(context);
-                _loadMenuItems();
-              },
-            ),
-          ],
-        );
-      },
+          );
+        },
+      );
+    },
     );
   }
 
@@ -288,67 +255,129 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
     bool hasAc = item['has_ac'] == 1 || item['has_ac'] == true;
     bool hasCr = item['has_cr'] == 1 || item['has_cr'] == true;
     bool hasKitchen = item['has_kitchen'] == 1 || item['has_kitchen'] == true;
-    String type = item['type'];
+    String? type = ["Solo","Shared"].contains(item['type']) ? item['type'] : null;
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text("Edit Facility"),
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                _input(name, hint: "Facility Name"),
-                _input(price, hint: "Price"),
-                _input(pic, hint: "Image URL"),
-                DropdownButtonFormField<String>(
-                  value: type,
-                  items: ["Solo","Shared"]
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                  onChanged: (val) => type = val ?? type,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Edit Facility"),
+              content: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _input(name, hint: "Facility Name"),
+                    _input(price, hint: "Price"),
+                    _input(pic, hint: "Image URL"),
+                    DropdownButtonFormField<String>(
+                      value: type,
+                      items: ["Solo","Shared"]
+                          .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (val) => setState(() => type = val),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Airconditioned"),
+                      value: hasAc,
+                      onChanged: (val) => setState(() => hasAc = val ?? false),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Comfort Room"),
+                      value: hasCr,
+                      onChanged: (val) => setState(() => hasCr = val ?? false),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Kitchen"),
+                      value: hasKitchen,
+                      onChanged: (val) => setState(() => hasKitchen = val ?? false),
+                    ),
+                    _input(info, hint: "Additional Info"),
+                  ],
                 ),
-                CheckboxListTile(
-                  title: const Text("Airconditioned"),
-                  value: hasAc,
-                  onChanged: (val) => hasAc = val ?? false,
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                ElevatedButton(
+                  child: const Text("Save"),
+                  onPressed: () async {
+                    item['name'] = name.text.trim();
+                    item['price'] = price.text.trim();
+                    item['facility_pic'] = pic.text.trim();
+                    item['additional_info'] = info.text.trim();
+                    item['has_ac'] = hasAc;
+                    item['has_cr'] = hasCr;
+                    item['has_kitchen'] = hasKitchen;
+                    item['type'] = type ?? "Solo";
+                    await _updateFacilityItem(item);
+                    Navigator.pop(context);
+                    _loadFacilities();
+                  },
                 ),
-                CheckboxListTile(
-                  title: const Text("Comfort Room"),
-                  value: hasCr,
-                  onChanged: (val) => hasCr = val ?? false,
-                ),
-                CheckboxListTile(
-                  title: const Text("Kitchen"),
-                  value: hasKitchen,
-                  onChanged: (val) => hasKitchen = val ?? false,
-                ),
-                _input(info, hint: "Additional Info"),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-            ElevatedButton(
-              child: const Text("Save"),
-              onPressed: () async {
-                item['name'] = name.text.trim();
-                item['price'] = price.text.trim();
-                item['facility_pic'] = pic.text.trim();
-                item['additional_info'] = info.text.trim();
-                item['has_ac'] = hasAc;
-                item['has_cr'] = hasCr;
-                item['has_kitchen'] = hasKitchen;
-                item['type'] = type;
-                await _updateFacilityItem(item);
-                Navigator.pop(context);
-                _loadFacilities();
-              },
-            ),
-          ],
+            );
+          },
         );
       },
     );
   }
+  void _openAddFoodDialog() {
+  final pic = TextEditingController();
+  final name = TextEditingController();
+  final price = TextEditingController();
+  String? selectedTag;
+
+  final classes = [
+    "Pork","Chicken","Beef","Vegetables","Seafood",
+    "Alcoholic Drinks","Coffee Drinks","Non-Coffee Drinks",
+    "Desserts","Snacks","Meal Set"
+  ];
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text("Add Menu Item"),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _input(pic, hint: "Image URL"),
+              const SizedBox(height: 10),
+              _input(name, hint: "Food Name"),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: selectedTag,
+                hint: const Text("Classification"),
+                items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                onChanged: (val) => selectedTag = val,
+              ),
+              const SizedBox(height: 10),
+              _input(price, hint: "Price (₱)"),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            child: const Text("Add"),
+            onPressed: () async {
+              if (name.text.isEmpty || selectedTag == null) return;
+
+              await _saveFoodToServer(
+                food_pic: pic.text.trim(),
+                foodName: name.text.trim(),
+                classification: selectedTag!,
+                price: price.text.trim(),
+              );
+
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
 
   // ===== Cards with Edit + Delete =====
   Widget _menuCard(Map<String, dynamic> item) {
@@ -430,175 +459,172 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
       ),
     );
   }
-// ==== Build Method ===== //
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(title: Text(isEatery ? "Edit Eatery" : "Edit Housing")),
-    body: SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _label("Business Name"),
-          _input(nameController),
-          const SizedBox(height: 12),
-          _label("Location"),
-          _input(locationController),
 
-          // ===== Eatery Section =====
-          if (isEatery) ...[
-            const SizedBox(height: 20),
-            Divider(),
+  // ==== Build Method ===== //
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(isEatery ? "Edit Eatery" : "Edit Housing")),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _label("Business Name"),
+            _input(nameController),
             const SizedBox(height: 12),
-            _label("Operating Hours"),
-            Row(
-              children: [
-                Expanded(child: _input(openTimeController, hint: "Open Time")),
-                const SizedBox(width: 10),
-                Expanded(child: _input(closeTimeController, hint: "Close Time")),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Divider(),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Menu Items",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _openAddFoodDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text("Add Item"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A4423),
-                    foregroundColor: Colors.white,
+            _label("Location"),
+            _input(locationController),
+
+            if (isEatery) ...[
+              const SizedBox(height: 20),
+              Divider(),
+              const SizedBox(height: 12),
+              _label("Operating Hours"),
+              Row(
+                children: [
+                  Expanded(child: _input(openTimeController, hint: "Open Time")),
+                  const SizedBox(width: 10),
+                  Expanded(child: _input(closeTimeController, hint: "Close Time")),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Divider(),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Menu Items", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ElevatedButton.icon(
+                    onPressed: _openAddFoodDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text("Add Item"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A4423),
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (menuItems.isEmpty)
-              const Text("No menu items yet.", style: TextStyle(color: Colors.grey)),
-            ...menuItems.map(_menuCard).toList(),
-          ]
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (menuItems.isEmpty)
+                const Text("No menu items yet.", style: TextStyle(color: Colors.grey)),
+              ...menuItems.map(_menuCard).toList(),
+            ] else ...[
+              _label("Curfew Time"),
+              _input(curfewController, hint: "Curfew (e.g. 10:00 PM)"),
+              const SizedBox(height: 20),
+              Divider(),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Facilities", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final name = TextEditingController();
+                      final price = TextEditingController();
+                      final pic = TextEditingController();
+                      final info = TextEditingController();
+                      bool hasAc = false;
+                      bool hasCr = false;
+                      bool hasKitchen = false;
+                      String? type;
 
-          // ===== Housing Section =====
-          else ...[
-            const SizedBox(height: 20),
-            Divider(),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Facilities",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    final name = TextEditingController();
-                    final price = TextEditingController();
-                    final pic = TextEditingController();
-                    final info = TextEditingController();
-                    bool hasAc = false;
-                    bool hasCr = false;
-                    bool hasKitchen = false;
-                    String? type;
-
-                    showDialog(
-                      context: context,
-                      builder: (context) {
-                        return AlertDialog(
-                          title: const Text("Add Facility"),
-                          content: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                _input(name, hint: "Facility Name"),
-                                _input(price, hint: "Price"),
-                                _input(pic, hint: "Image URL"),
-                                DropdownButtonFormField<String>(
-                                  value: type,
-                                  hint: const Text("Type"),
-                                  items: ["Solo","Shared"]
-                                      .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                                  onChanged: (val) => type = val,
+                      showDialog(
+                        context: context,
+                        builder: (context) {
+                          return StatefulBuilder(
+                            builder: (context, setState) {
+                              return AlertDialog(
+                                title: const Text("Add Facility"),
+                                content: SingleChildScrollView(
+                                  child: Column(
+                                    children: [
+                                      _input(name, hint: "Facility Name"),
+                                      _input(price, hint: "Price"),
+                                      _input(pic, hint: "Image URL"),
+                                      DropdownButtonFormField<String>(
+                                        value: type,
+                                        hint: const Text("Type"),
+                                        items: ["Solo","Shared"]
+                                            .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                                        onChanged: (val) => setState(() => type = val),
+                                      ),
+                                      CheckboxListTile(
+                                        title: const Text("Airconditioned"),
+                                        value: hasAc,
+                                        onChanged: (val) => setState(() => hasAc = val ?? false),
+                                      ),
+                                                                            CheckboxListTile(
+                                        title: const Text("Comfort Room"),
+                                        value: hasCr,
+                                        onChanged: (val) => setState(() => hasCr = val ?? false),
+                                      ),
+                                      CheckboxListTile(
+                                        title: const Text("Kitchen"),
+                                        value: hasKitchen,
+                                        onChanged: (val) => setState(() => hasKitchen = val ?? false),
+                                      ),
+                                      _input(info, hint: "Additional Info"),
+                                    ],
+                                  ),
                                 ),
-                                CheckboxListTile(
-                                  title: const Text("Airconditioned"),
-                                  value: hasAc,
-                                  onChanged: (val) => hasAc = val ?? false,
-                                ),
-                                CheckboxListTile(
-                                  title: const Text("Comfort Room"),
-                                  value: hasCr,
-                                  onChanged: (val) => hasCr = val ?? false,
-                                ),
-                                CheckboxListTile(
-                                  title: const Text("Kitchen"),
-                                  value: hasKitchen,
-                                  onChanged: (val) => hasKitchen = val ?? false,
-                                ),
-                                _input(info, hint: "Additional Info"),
-                              ],
-                            ),
-                          ),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-                            ElevatedButton(
-                              child: const Text("Add"),
-                              onPressed: () async {
-                                await _saveFacilityToServer(
-                                  name: name.text.trim(),
-                                  facilityPic: pic.text.trim(),
-                                  price: price.text.trim(),
-                                  hasAc: hasAc,
-                                  hasCr: hasCr,
-                                  hasKitchen: hasKitchen,
-                                  type: type ?? "Solo",
-                                  additionalInfo: info.text.trim(),
-                                );
-                                Navigator.pop(context);
-                              },
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text("Add Facility"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A4423),
-                    foregroundColor: Colors.white,
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                                  ElevatedButton(
+                                    child: const Text("Add"),
+                                    onPressed: () async {
+                                      await _saveFacilityToServer(
+                                        name: name.text.trim(),
+                                        facilityPic: pic.text.trim(),
+                                        price: price.text.trim(),
+                                        hasAc: hasAc,
+                                        hasCr: hasCr,
+                                        hasKitchen: hasKitchen,
+                                        type: type ?? "Solo",
+                                        additionalInfo: info.text.trim(),
+                                      );
+                                      Navigator.pop(context);
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text("Add Facility"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A4423),
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (facilities.isEmpty)
+                const Text("No facilities yet.", style: TextStyle(color: Colors.grey)),
+              ...facilities.map(_facilityCard).toList(),
+            ],
+
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: _saveChanges,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A4423),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              child: const Text("Save Changes"),
             ),
-            const SizedBox(height: 12),
-            if (facilities.isEmpty)
-              const Text("No facilities yet.", style: TextStyle(color: Colors.grey)),
-            ...facilities.map(_facilityCard).toList(),
           ],
-
-          const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: _saveChanges,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0A4423),
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 48),
-            ),
-            child: const Text("Save Changes"),
-          ),
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   // ===== Save Changes =====
   void _saveChanges() async {
@@ -609,6 +635,8 @@ Widget build(BuildContext context) {
       if (isEatery) ...{
         'open_time': openTimeController.text.trim(),
         'end_time': closeTimeController.text.trim(),
+      } else ...{
+        'curfew': curfewController.text.trim(),
       }
     };
 
