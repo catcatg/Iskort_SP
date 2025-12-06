@@ -723,6 +723,70 @@ app.put('/api/food/:food_id', (req, res) => {
   });
 });
 
+// ===== FACILITY ROUTES =====
+
+// Create facility
+app.post('/api/facility', (req, res) => {
+  const {
+    name,
+    housing_id,
+    facility_pic,
+    price,
+    has_ac,
+    has_cr,
+    type,
+    has_kitchen,
+    additional_info
+  } = req.body;
+
+  const sql = `
+    INSERT INTO facility 
+    (name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  db.query(sql, [name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, facility_id: result.insertId });
+  });
+});
+
+// Get facilities by housing_id
+app.get('/api/facility/:housing_id', (req, res) => {
+  const { housing_id } = req.params;
+  const sql = `SELECT * FROM facility WHERE housing_id = ?`;
+  db.query(sql, [housing_id], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, facilities: results });
+  });
+});
+
+// Update facility
+app.put('/api/facility/:facility_id', (req, res) => {
+  const { facility_id } = req.params;
+  const {
+    name,
+    housing_id,
+    facility_pic,
+    price,
+    has_ac,
+    has_cr,
+    type,
+    has_kitchen,
+    additional_info
+  } = req.body;
+
+  const sql = `
+    UPDATE facility
+    SET name=?, housing_id=?, facility_pic=?, price=?, has_ac=?, has_cr=?, type=?, has_kitchen=?, additional_info=?
+    WHERE facility_id=?
+  `;
+  db.query(sql, [name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info, facility_id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Facility not found' });
+    res.json({ success: true, message: 'Facility updated successfully' });
+  });
+});
+
 // ===== OWNER ROUTES =====
 app.get('/api/owner', (req, res) => {
   const sql = `SELECT owner_id AS id, name, email, phone_num, notif_preference, created_at FROM owner`;
