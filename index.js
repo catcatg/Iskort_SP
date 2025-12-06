@@ -691,7 +691,7 @@ app.post('/api/food', (req, res) => {
   });
 });
 
-app.get('/api/foods/:eatery_id', (req, res) => {
+app.get('/api/food/:eatery_id', (req, res) => {
   const { eatery_id } = req.params;
   const sql = `SELECT * FROM food WHERE eatery_id = ?`; 
   db.query(sql, [eatery_id], (err, results) => {
