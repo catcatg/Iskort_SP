@@ -232,6 +232,7 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                           ListView(
                             padding: const EdgeInsets.all(8),
                             children: [
+                              // Eateries Section
                               const Text(
                                 "Eateries",
                                 style: TextStyle(
@@ -241,10 +242,24 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              ...ownerEateries.map(
-                                (e) => _establishmentCard(e, isEatery: true),
-                              ),
+                              if (ownerEateries.isEmpty)
+                                Text(
+                                  textAlign: TextAlign.center,
+                                  "${business?['name'] ?? 'User'} has no eatery product",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.grey,
+                                  ),
+                                )
+                              else
+                                ...ownerEateries.map(
+                                  (e) => _establishmentCard(e, isEatery: true),
+                                ),
+
                               const SizedBox(height: 16),
+
+                              // Housings Section
                               const Text(
                                 "Housings",
                                 style: TextStyle(
@@ -254,9 +269,20 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              ...ownerHousings.map(
-                                (h) => _establishmentCard(h, isEatery: false),
-                              ),
+                              if (ownerHousings.isEmpty)
+                                Text(
+                                  textAlign: TextAlign.center,
+                                  "${business?['name'] ?? 'User'} has no housing product",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.grey,
+                                  ),
+                                )
+                              else
+                                ...ownerHousings.map(
+                                  (h) => _establishmentCard(h, isEatery: false),
+                                ),
                             ],
                           ),
 
