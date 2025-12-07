@@ -726,11 +726,35 @@ app.put('/api/food/:food_id', (req, res) => {
 // Delete food
 app.delete('/api/food/:food_id', (req, res) => {
   const { food_id } = req.params;
-  db.query('DELETE FROM food WHERE food_id = ?', [food_id], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, message: 'Food deleted successfully' });
-  });
+
+  db.query(
+    'DELETE FROM food WHERE food_id = ?',
+    [food_id],
+    (err, result) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database error while deleting food.',
+          error: err.message
+        });
+      }
+
+      // Check if the row actually existed
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Food item not found. No deletion performed.'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Food deleted successfully.'
+      });
+    }
+  );
 });
+
 
 // ===== FACILITY ROUTES =====
 // Create facility
@@ -798,10 +822,33 @@ app.put('/api/facility/:facility_id', (req, res) => {
 // Delete facility
 app.delete('/api/facility/:facility_id', (req, res) => {
   const { facility_id } = req.params;
-  db.query('DELETE FROM facility WHERE facility_id = ?', [facility_id], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, message: 'Facility deleted successfully' });
-  });
+
+  db.query(
+    'DELETE FROM facility WHERE facility_id = ?',
+    [facility_id],
+    (err, result) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: 'Database error while deleting facility.',
+          error: err.message
+        });
+      }
+
+      // result.affectedRows tells if a row was deleted
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Facility not found. No deletion performed.'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Facility deleted successfully.'
+      });
+    }
+  );
 });
 
 // ===== OWNER ROUTES =====
