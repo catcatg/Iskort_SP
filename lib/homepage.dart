@@ -225,57 +225,140 @@ class _HomePageState extends State<HomePage> {
   }
 
   void showEntryDetails(Map entry) {
+    // Track favorite status for this specific entry
+    bool isLiked = false; // You can initialize from a saved list if needed
+
     showDialog(
       context: context,
       builder:
           (_) => Dialog(
             insetPadding: const EdgeInsets.all(25),
-            child: Stack(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(30.0),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 400),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: Image.network(
-                            entry['photo'] ?? "assets/images/placeholder.png",
-                            height: 200,
-                            fit: BoxFit.cover,
-                            errorBuilder:
-                                (_, __, ___) =>
-                                    const Icon(Icons.broken_image, size: 40),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text("Location: ${entry['location'] ?? ''}"),
-                        if (entry['type'] == 'Eatery') ...[
-                          Text(
-                            "Minimum Price: ₱${entry['min_price'] ?? 'N/A'}",
-                          ),
-                          Text("Open: ${entry['open_time'] ?? ''}"),
-                          Text("Close: ${entry['end_time'] ?? ''}"),
-                        ] else if (entry['type'] == 'Housing') ...[
-                          Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
-                          Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
-                        ],
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                void toggleFavorite() {
+                  setState(() => isLiked = !isLiked); // update icon color
+
+                  // Optional: save/remove from actual favorites list here
+                  // e.g., save to SharedPreferences or your app's favorites map
+
+                  ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isLiked
+                            ? 'Added to favorites!'
+                            : 'Removed from favorites!',
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+
+                return Stack(
+                  children: [
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Image
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                entry['photo'] ??
+                                    "assets/images/placeholder.png",
+                                height: 200,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder:
+                                    (_, __, ___) => Container(
+                                      height: 200,
+                                      color: Colors.grey.shade300,
+                                      child: const Icon(
+                                        Icons.broken_image,
+                                        size: 40,
+                                      ),
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+
+                            // Title + Favorite icon
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: toggleFavorite,
+                                  child: CircleAvatar(
+                                    backgroundColor: Colors.white,
+                                    radius: 16,
+                                    child: Icon(
+                                      isLiked
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: isLiked ? Colors.red : Colors.grey,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 8),
+                            // Location
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    entry['location'] ?? '',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Entry-specific details
+                            if (entry['type'] == 'Eatery') ...[
+                              Text(
+                                "Minimum Price: ₱${entry['min_price'] ?? 'N/A'}",
+                              ),
+                              Text("Open: ${entry['open_time'] ?? ''}"),
+                              Text("Close: ${entry['end_time'] ?? ''}"),
+                            ] else if (entry['type'] == 'Housing') ...[
+                              Text(
+                                "Monthly Price: ₱${entry['price'] ?? 'N/A'}",
+                              ),
+                              Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
+                            ],
+
+                            const SizedBox(height: 20),
+
+                            // Buttons
                             ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A4423),
+                                minimumSize: const Size(double.infinity, 45),
+                              ),
                               onPressed: () {
                                 Navigator.pop(context);
                                 Navigator.push(
@@ -290,22 +373,24 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 );
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0A4423),
-                              ),
                               child: const Text(
                                 "View Establishment Profile",
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),
+                            const SizedBox(height: 10),
                             ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A4423),
+                                minimumSize: const Size(double.infinity, 45),
+                              ),
                               onPressed: () {
                                 Navigator.pop(context);
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder:
-                                        (context) => MapRoutePage(
+                                        (_) => MapRoutePage(
                                           initialLocation:
                                               entry['location']?.toString() ??
                                               '',
@@ -313,28 +398,26 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 );
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0A4423),
-                              ),
                               child: const Text(
                                 "View Route",
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),
+                            const SizedBox(height: 10),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-              ],
+                    Positioned(
+                      right: 0,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, size: 26),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
     );
@@ -703,60 +786,140 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   }
 
   void showEntryDetails(Map entry) {
+    // Track favorite status for this specific entry
+    bool isLiked = false; // You can initialize from a saved list if needed
+
     showDialog(
       context: context,
       builder:
           (_) => Dialog(
             insetPadding: const EdgeInsets.all(25),
-            child: Stack(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(30.0),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 400),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: Image.network(
-                            entry['photo'] ?? "assets/images/placeholder.png",
-                            height: 200,
-                            fit: BoxFit.cover,
-                            errorBuilder:
-                                (_, __, ___) =>
-                                    const Icon(Icons.broken_image, size: 40),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text("Location: ${entry['location'] ?? ''}"),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                void toggleFavorite() {
+                  setState(() => isLiked = !isLiked); // update icon color
 
-                        if (entry['type'] == 'Eatery') ...[
-                          Text(
-                            "Minimum Price: ₱${entry['min_price'] ?? 'N/A'}",
-                          ),
-                          Text("Open: ${entry['open_time'] ?? ''}"),
-                          Text("Close: ${entry['end_time'] ?? ''}"),
-                        ] else if (entry['type'] == 'Housing') ...[
-                          Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
-                          Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
-                        ],
+                  // Optional: save/remove from actual favorites list here
+                  // e.g., save to SharedPreferences or your app's favorites map
 
-                        const SizedBox(height: 20),
+                  ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isLiked
+                            ? 'Added to favorites!'
+                            : 'Removed from favorites!',
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
 
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                return Stack(
+                  children: [
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Image
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                entry['photo'] ??
+                                    "assets/images/placeholder.png",
+                                height: 200,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder:
+                                    (_, __, ___) => Container(
+                                      height: 200,
+                                      color: Colors.grey.shade300,
+                                      child: const Icon(
+                                        Icons.broken_image,
+                                        size: 40,
+                                      ),
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+
+                            // Title + Favorite icon
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: toggleFavorite,
+                                  child: CircleAvatar(
+                                    backgroundColor: Colors.white,
+                                    radius: 16,
+                                    child: Icon(
+                                      isLiked
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: isLiked ? Colors.red : Colors.grey,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 8),
+                            // Location
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    entry['location'] ?? '',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Entry-specific details
+                            if (entry['type'] == 'Eatery') ...[
+                              Text(
+                                "Minimum Price: ₱${entry['min_price'] ?? 'N/A'}",
+                              ),
+                              Text("Open: ${entry['open_time'] ?? ''}"),
+                              Text("Close: ${entry['end_time'] ?? ''}"),
+                            ] else if (entry['type'] == 'Housing') ...[
+                              Text(
+                                "Monthly Price: ₱${entry['price'] ?? 'N/A'}",
+                              ),
+                              Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
+                            ],
+
+                            const SizedBox(height: 20),
+
+                            // Buttons
                             ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A4423),
+                                minimumSize: const Size(double.infinity, 45),
+                              ),
                               onPressed: () {
                                 Navigator.pop(context);
                                 Navigator.push(
@@ -771,15 +934,17 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                                   ),
                                 );
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0A4423),
-                              ),
                               child: const Text(
                                 "View Establishment Profile",
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),
+                            const SizedBox(height: 10),
                             ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A4423),
+                                minimumSize: const Size(double.infinity, 45),
+                              ),
                               onPressed: () {
                                 Navigator.pop(context);
                                 Navigator.push(
@@ -794,28 +959,26 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                                   ),
                                 );
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0A4423),
-                              ),
                               child: const Text(
                                 "View Route",
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),
+                            const SizedBox(height: 10),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-              ],
+                    Positioned(
+                      right: 0,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, size: 26),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
     );
