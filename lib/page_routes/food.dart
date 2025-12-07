@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'view_estab_profile.dart';
+import 'map_route.dart';
 
 class FoodPage extends StatefulWidget {
   const FoodPage({super.key});
@@ -20,23 +22,12 @@ class _FoodPageState extends State<FoodPage> {
   @override
   void initState() {
     super.initState();
-    filteredFoods = allFoods;
     _searchController.addListener(_onSearchChanged);
     fetchVerifiedEateries();
   }
 
-  // Normalize API eatery into UI format
-  Map<String, dynamic> normalizeEatery(Map eatery) {
-    return {
-      "name": eatery['name'] ?? '',
-      "location": eatery['location'] ?? '',
-      "price": eatery['min_price'] ?? 0,
-      "priceRange": "₱${eatery['min_price'] ?? 'N/A'}",
-      "image": eatery['eatery_photo'] ?? 'assets/images/placeholder.png',
-    };
-  }
-
   Future<void> fetchVerifiedEateries() async {
+    setState(() => isLoading = true);
     try {
       final resp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
@@ -44,11 +35,22 @@ class _FoodPageState extends State<FoodPage> {
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-
         final verifiedEateries =
             (data['eateries'] ?? [])
                 .where((e) => e['is_verified'] == 1)
-                .map<Map<String, dynamic>>((e) => normalizeEatery(e))
+                .map<Map<String, dynamic>>(
+                  (e) => {
+                    "name": e['name'] ?? '',
+                    "location": e['location'] ?? '',
+                    "price": e['min_price'] ?? 0,
+                    "priceRange": "₱${e['min_price'] ?? 'N/A'}",
+                    "image":
+                        e['eatery_photo'] ?? 'assets/images/placeholder.png',
+                    "owner_id": e['owner_id']?.toString() ?? "",
+                    "type": "Eatery", // unify with HomePage structure
+                    "tags": e['tags'] ?? [],
+                  },
+                )
                 .toList();
 
         setState(() {
@@ -70,16 +72,21 @@ class _FoodPageState extends State<FoodPage> {
     final query = _searchController.text.toLowerCase();
 
     setState(() {
-      if (query.isEmpty) {
-        filteredFoods = List.from(allFoods);
-      } else {
-        filteredFoods =
-            allFoods.where((food) {
-              final name = food["name"].toString().toLowerCase();
-              final location = food["location"].toString().toLowerCase();
-              return name.contains(query) || location.contains(query);
-            }).toList();
-      }
+      filteredFoods =
+          allFoods.where((food) {
+            final name = food["name"].toString().toLowerCase();
+            final location = food["location"].toString().toLowerCase();
+            final tagsList =
+                (food['tags'] is List)
+                    ? (food['tags'] as List)
+                        .map((t) => t.toString().toLowerCase())
+                        .toList()
+                    : [];
+            return name.contains(query) ||
+                location.contains(query) ||
+                tagsList.any((t) => t.contains(query));
+          }).toList();
+
       _applySort(lastSortOption);
     });
   }
@@ -120,6 +127,138 @@ class _FoodPageState extends State<FoodPage> {
     }
   }
 
+  void _showFoodDialog(Map food) {
+    showDialog(
+      context: context,
+      builder:
+          (_) => Dialog(
+            insetPadding: const EdgeInsets.all(25),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            food['image'],
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (_, __, ___) => Container(
+                                  height: 200,
+                                  color: Colors.grey.shade300,
+                                  child: const Icon(
+                                    Icons.broken_image,
+                                    size: 40,
+                                  ),
+                                ),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        Text(
+                          food['name'],
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                food['location'],
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          food['priceRange'],
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0A4423),
+                            minimumSize: const Size(double.infinity, 45),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => EstabProfileForCustomer(
+                                      ownerId: food['owner_id'],
+                                    ),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            "View Establishment Profile",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0A4423),
+                            minimumSize: const Size(double.infinity, 45),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => MapRoutePage(
+                                      initialLocation: food['location'],
+                                    ),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            "View Route",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, size: 26),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -141,14 +280,14 @@ class _FoodPageState extends State<FoodPage> {
       ),
       body: Column(
         children: [
-          // Search
+          // Search Bar
           Padding(
             padding: const EdgeInsets.all(12),
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Color(0xFF0A4423), width: 1.5),
+                border: Border.all(color: const Color(0xFF0A4423), width: 1.5),
               ),
               child: TextField(
                 controller: _searchController,
@@ -165,7 +304,7 @@ class _FoodPageState extends State<FoodPage> {
             ),
           ),
 
-          // Sort menu
+          // Sort Menu
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Align(
@@ -174,7 +313,7 @@ class _FoodPageState extends State<FoodPage> {
                 onTap: () async {
                   final selected = await showMenu<String>(
                     context: context,
-                    position: RelativeRect.fromLTRB(100, 100, 0, 0),
+                    position: const RelativeRect.fromLTRB(100, 100, 0, 0),
                     items: const [
                       PopupMenuItem(
                         value: 'price_asc',
@@ -202,7 +341,7 @@ class _FoodPageState extends State<FoodPage> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Color(0xFF0A4423),
+                    color: const Color(0xFF0A4423),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -242,127 +381,96 @@ class _FoodPageState extends State<FoodPage> {
                           ),
                       itemBuilder: (_, i) {
                         final food = filteredFoods[i];
-                        return FoodCard(
-                          name: food["name"],
-                          location: food["location"],
-                          priceRange: food["priceRange"],
-                          imagePath: food["image"],
+                        return GestureDetector(
+                          onTap: () => _showFoodDialog(food),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black12, blurRadius: 6),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Stack(
+                                  children: [
+                                    Container(
+                                      height: 180,
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(10),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.network(
+                                          food['image'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (_, __, ___) => Container(
+                                                color: Colors.grey.shade300,
+                                                child: const Icon(
+                                                  Icons.broken_image,
+                                                  size: 40,
+                                                ),
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    8,
+                                    4,
+                                    8,
+                                    4,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        food['name'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.location_on,
+                                            size: 14,
+                                            color: Colors.grey,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              food['location'],
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        food['priceRange'],
+                                        style: const TextStyle(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         );
                       },
                     ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class FoodCard extends StatefulWidget {
-  final String name;
-  final String location;
-  final String priceRange;
-  final String imagePath;
-
-  const FoodCard({
-    super.key,
-    required this.name,
-    required this.location,
-    required this.priceRange,
-    required this.imagePath,
-  });
-
-  @override
-  State<FoodCard> createState() => _FoodCardState();
-}
-
-class _FoodCardState extends State<FoodCard> {
-  bool isLiked = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.white,
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // IMAGE
-          Stack(
-            children: [
-              Container(
-                height: 180,
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    widget.imagePath,
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (_, __, ___) => Container(
-                          color: Colors.grey.shade300,
-                          child: const Icon(Icons.broken_image, size: 40),
-                        ),
-                  ),
-                ),
-              ),
-
-              // HEART
-              Positioned(
-                top: 14,
-                right: 13,
-                child: GestureDetector(
-                  onTap: () => setState(() => isLiked = !isLiked),
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    radius: 16,
-                    child: Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? Colors.red : Colors.grey,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // INFO
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        widget.location,
-                        style: const TextStyle(fontSize: 12),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.priceRange,
-                  style: const TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
