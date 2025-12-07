@@ -11,27 +11,11 @@ class HousingPage extends StatefulWidget {
 
 class _HousingPageState extends State<HousingPage> {
   final TextEditingController _searchController = TextEditingController();
-
-  // Hardcoded sample data
-  final List<Map<String, dynamic>> housingData = [
-    {
-      'name': 'Nonato’s Boarding',
-      'location': 'Paguntalan, Sapa',
-      'price': 459,
-      'pax': '2pax',
-      'image': 'assets/images/housing.jpg',
-    },
-    {
-      'name': 'British Boarding House',
-      'location': 'Paguntalan, Sapa',
-      'price': 894,
-      'pax': '6pax',
-      'image': 'assets/images/housing.jpg',
-    },
-  ];
-
+  final List<Map<String, dynamic>> housingData = [];
   late List<Map<String, dynamic>> filteredHousingData;
   bool isLoading = true;
+
+  String lastSortOption = 'price_asc';
 
   @override
   void initState() {
@@ -41,13 +25,12 @@ class _HousingPageState extends State<HousingPage> {
     fetchVerifiedHousing();
   }
 
-  // Normalize API housing into same format as hardcoded
   Map<String, dynamic> normalizeHousing(Map house) {
     return {
       'name': house['name'] ?? '',
       'location': house['location'] ?? '',
       'price': house['price'] ?? 0,
-      'pax': house['pax'] ?? 'N/A', // fallback if API doesn’t provide pax
+      'pax': house['pax'] ?? 'N/A',
       'image': house['housing_photo'] ?? 'assets/images/housing.jpg',
     };
   }
@@ -67,7 +50,8 @@ class _HousingPageState extends State<HousingPage> {
 
         setState(() {
           housingData.addAll(verifiedHousing);
-          filteredHousingData = housingData;
+          filteredHousingData = List.from(housingData);
+          _applySort(lastSortOption);
           isLoading = false;
         });
       } else {
@@ -83,7 +67,7 @@ class _HousingPageState extends State<HousingPage> {
     final query = _searchController.text.toLowerCase();
     setState(() {
       if (query.isEmpty) {
-        filteredHousingData = housingData;
+        filteredHousingData = List.from(housingData);
       } else {
         filteredHousingData =
             housingData.where((house) {
@@ -91,6 +75,27 @@ class _HousingPageState extends State<HousingPage> {
               final location = house['location'].toString().toLowerCase();
               return name.contains(query) || location.contains(query);
             }).toList();
+      }
+      _applySort(lastSortOption);
+    });
+  }
+
+  void _applySort(String sortOption) {
+    lastSortOption = sortOption;
+    setState(() {
+      switch (sortOption) {
+        case 'price_asc':
+          filteredHousingData.sort((a, b) => a['price'].compareTo(b['price']));
+          break;
+        case 'price_desc':
+          filteredHousingData.sort((a, b) => b['price'].compareTo(a['price']));
+          break;
+        case 'name_asc':
+          filteredHousingData.sort((a, b) => a['name'].compareTo(b['name']));
+          break;
+        case 'name_desc':
+          filteredHousingData.sort((a, b) => b['name'].compareTo(a['name']));
+          break;
       }
     });
   }
@@ -126,6 +131,7 @@ class _HousingPageState extends State<HousingPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Search Bar
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -145,7 +151,71 @@ class _HousingPageState extends State<HousingPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
+
+            // Sorting menu under search bar
+            Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () async {
+                  final selected = await showMenu<String>(
+                    context: context,
+                    position: const RelativeRect.fromLTRB(100, 100, 0, 0),
+                    items: [
+                      const PopupMenuItem(
+                        value: 'price_asc',
+                        child: Text('Price: Low → High'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'price_desc',
+                        child: Text('Price: High → Low'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'name_asc',
+                        child: Text('Name: A → Z'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'name_desc',
+                        child: Text('Name: Z → A'),
+                      ),
+                    ],
+                  );
+                  if (selected != null) _applySort(selected);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF0A4423),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFF0A4423)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.sort,
+                        color: Color.fromARGB(255, 255, 255, 255),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _getSortLabel(lastSortOption),
+                        style: const TextStyle(
+                          color: Color.fromARGB(255, 255, 255, 255),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
+
+            // Housing Grid
             Expanded(
               child:
                   isLoading
@@ -315,5 +385,20 @@ class _HousingCardState extends State<HousingCard> {
         ],
       ),
     );
+  }
+}
+
+String _getSortLabel(String sortOption) {
+  switch (sortOption) {
+    case 'price_asc':
+      return 'Price: Low → High';
+    case 'price_desc':
+      return 'Price: High → Low';
+    case 'name_asc':
+      return 'Name: A → Z';
+    case 'name_desc':
+      return 'Name: Z → A';
+    default:
+      return 'Sort';
   }
 }
