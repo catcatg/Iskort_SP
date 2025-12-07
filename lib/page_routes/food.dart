@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:iskort/widgets/reusables.dart';
 
 class FoodPage extends StatefulWidget {
   const FoodPage({super.key});
@@ -13,29 +12,27 @@ class FoodPage extends StatefulWidget {
 class _FoodPageState extends State<FoodPage> {
   final TextEditingController _searchController = TextEditingController();
 
-  List<Map<String, dynamic>> _allFoods = [];
-  List<Map<String, dynamic>> _filteredFoods = [];
+  List<Map<String, dynamic>> allFoods = [];
+  List<Map<String, dynamic>> filteredFoods = [];
   bool isLoading = true;
+  String lastSortOption = 'price_asc';
 
   @override
   void initState() {
     super.initState();
+    filteredFoods = allFoods;
+    _searchController.addListener(_onSearchChanged);
     fetchVerifiedEateries();
-    _searchController.addListener(() {
-      _searchFood(_searchController.text);
-    });
   }
 
   // Normalize API eatery into UI format
   Map<String, dynamic> normalizeEatery(Map eatery) {
     return {
       "name": eatery['name'] ?? '',
-      "restaurant": eatery['name'] ?? '',
       "location": eatery['location'] ?? '',
+      "price": eatery['min_price'] ?? 0,
       "priceRange": "₱${eatery['min_price'] ?? 'N/A'}",
       "image": eatery['eatery_photo'] ?? 'assets/images/placeholder.png',
-      "open_time": eatery['open_time'] ?? '',
-      "end_time": eatery['end_time'] ?? '',
     };
   }
 
@@ -44,8 +41,10 @@ class _FoodPageState extends State<FoodPage> {
       final resp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
       );
+
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
+
         final verifiedEateries =
             (data['eateries'] ?? [])
                 .where((e) => e['is_verified'] == 1)
@@ -53,8 +52,9 @@ class _FoodPageState extends State<FoodPage> {
                 .toList();
 
         setState(() {
-          _allFoods = verifiedEateries;
-          _filteredFoods = verifiedEateries;
+          allFoods = verifiedEateries;
+          filteredFoods = List.from(allFoods);
+          _applySort(lastSortOption);
           isLoading = false;
         });
       } else {
@@ -66,31 +66,65 @@ class _FoodPageState extends State<FoodPage> {
     }
   }
 
-  void _searchFood(String query) {
-    final results =
-        _allFoods.where((food) {
-          final name = food["name"].toString().toLowerCase();
-          final restaurant = food["restaurant"].toString().toLowerCase();
-          return name.contains(query.toLowerCase()) ||
-              restaurant.contains(query.toLowerCase());
-        }).toList();
+  void _onSearchChanged() {
+    final query = _searchController.text.toLowerCase();
 
     setState(() {
-      _filteredFoods = results;
+      if (query.isEmpty) {
+        filteredFoods = List.from(allFoods);
+      } else {
+        filteredFoods =
+            allFoods.where((food) {
+              final name = food["name"].toString().toLowerCase();
+              final location = food["location"].toString().toLowerCase();
+              return name.contains(query) || location.contains(query);
+            }).toList();
+      }
+      _applySort(lastSortOption);
     });
+  }
+
+  void _applySort(String sortOption) {
+    lastSortOption = sortOption;
+
+    setState(() {
+      switch (sortOption) {
+        case 'price_asc':
+          filteredFoods.sort((a, b) => a['price'].compareTo(b['price']));
+          break;
+        case 'price_desc':
+          filteredFoods.sort((a, b) => b['price'].compareTo(a['price']));
+          break;
+        case 'name_asc':
+          filteredFoods.sort((a, b) => a['name'].compareTo(b['name']));
+          break;
+        case 'name_desc':
+          filteredFoods.sort((a, b) => b['name'].compareTo(a['name']));
+          break;
+      }
+    });
+  }
+
+  String _getSortLabel(String option) {
+    switch (option) {
+      case 'price_asc':
+        return 'Price: Low → High';
+      case 'price_desc':
+        return 'Price: High → Low';
+      case 'name_asc':
+        return 'Name: A → Z';
+      case 'name_desc':
+        return 'Name: Z → A';
+      default:
+        return 'Sort';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Food"),
-        titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-        ),
+        title: const Text("Food", style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -107,18 +141,19 @@ class _FoodPageState extends State<FoodPage> {
       ),
       body: Column(
         children: [
+          // Search
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.all(12),
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: const Color(0xFF0A4423), width: 1.5),
+                border: Border.all(color: Color(0xFF0A4423), width: 1.5),
               ),
               child: TextField(
                 controller: _searchController,
                 decoration: const InputDecoration(
-                  hintText: 'Search food or restaurant',
+                  hintText: 'Search food',
                   border: InputBorder.none,
                   suffixIcon: Icon(Icons.search, color: Color(0xFF0A4423)),
                   contentPadding: EdgeInsets.symmetric(
@@ -129,118 +164,208 @@ class _FoodPageState extends State<FoodPage> {
               ),
             ),
           ),
+
+          // Sort menu
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: GestureDetector(
+                onTap: () async {
+                  final selected = await showMenu<String>(
+                    context: context,
+                    position: RelativeRect.fromLTRB(100, 100, 0, 0),
+                    items: const [
+                      PopupMenuItem(
+                        value: 'price_asc',
+                        child: Text('Price: Low → High'),
+                      ),
+                      PopupMenuItem(
+                        value: 'price_desc',
+                        child: Text('Price: High → Low'),
+                      ),
+                      PopupMenuItem(
+                        value: 'name_asc',
+                        child: Text('Name: A → Z'),
+                      ),
+                      PopupMenuItem(
+                        value: 'name_desc',
+                        child: Text('Name: Z → A'),
+                      ),
+                    ],
+                  );
+                  if (selected != null) _applySort(selected);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Color(0xFF0A4423),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.sort, color: Colors.white, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        _getSortLabel(lastSortOption),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Grid
           Expanded(
             child:
                 isLoading
                     ? const Center(
-                      child: SizedBox(
-                        width: 50,
-                        height: 50,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 5,
-                          color: Color(0xFF0A4423),
-                        ),
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF0A4423),
                       ),
                     )
-                    : _filteredFoods.isEmpty
-                    ? const Center(child: Text("No eateries found"))
                     : GridView.builder(
                       padding: const EdgeInsets.all(12),
+                      itemCount: filteredFoods.length,
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            childAspectRatio: 0.70,
+                            childAspectRatio: 0.75,
                           ),
-                      itemCount: _filteredFoods.length,
-                      itemBuilder: (context, index) {
-                        final food = _filteredFoods[index];
-                        return GestureDetector(
-                          onTap: () => _showEateryDetails(food),
-                          child: Card(
-                            child: Column(
-                              children: [
-                                Image.network(
-                                  food['image'],
-                                  height: 120,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder:
-                                      (_, __, ___) => const Icon(
-                                        Icons.broken_image,
-                                        size: 40,
-                                      ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        food['name'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Text(food['location']),
-                                      Text(food['priceRange']),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                      itemBuilder: (_, i) {
+                        final food = filteredFoods[i];
+                        return FoodCard(
+                          name: food["name"],
+                          location: food["location"],
+                          priceRange: food["priceRange"],
+                          imagePath: food["image"],
                         );
                       },
                     ),
           ),
         ],
       ),
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: 1,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushNamed(context, '/homepage');
-          } else if (index == 2) {
-            Navigator.pushNamed(context, '/profile');
-          }
-        },
-      ),
     );
   }
+}
 
-  void _showEateryDetails(Map<String, dynamic> eatery) {
-    showDialog(
-      context: context,
-      builder:
-          (_) => AlertDialog(
-            title: Text(eatery['name']),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Image.network(
-                  eatery['image'],
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
+class FoodCard extends StatefulWidget {
+  final String name;
+  final String location;
+  final String priceRange;
+  final String imagePath;
+
+  const FoodCard({
+    super.key,
+    required this.name,
+    required this.location,
+    required this.priceRange,
+    required this.imagePath,
+  });
+
+  @override
+  State<FoodCard> createState() => _FoodCardState();
+}
+
+class _FoodCardState extends State<FoodCard> {
+  bool isLiked = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // IMAGE
+          Stack(
+            children: [
+              Container(
+                height: 180,
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    widget.imagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (_, __, ___) => Container(
+                          color: Colors.grey.shade300,
+                          child: const Icon(Icons.broken_image, size: 40),
+                        ),
+                  ),
                 ),
-                const SizedBox(height: 12),
-                Text("Location: ${eatery['location']}"),
-                Text("Minimum Price: ${eatery['priceRange']}"),
-                Text("Open: ${eatery['open_time']}"),
-                Text("Close: ${eatery['end_time']}"),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Close"),
+              ),
+
+              // HEART
+              Positioned(
+                top: 14,
+                right: 13,
+                child: GestureDetector(
+                  onTap: () => setState(() => isLiked = !isLiked),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    radius: 16,
+                    child: Icon(
+                      isLiked ? Icons.favorite : Icons.favorite_border,
+                      color: isLiked ? Colors.red : Colors.grey,
+                      size: 18,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
+
+          // INFO
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.location,
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.priceRange,
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
