@@ -30,7 +30,7 @@ Widget input(TextEditingController controller, {String? hint}) {
 // ===== Global Dialogs =====
 void openAddFoodDialog(BuildContext context, Future<void> Function({
   required String food_pic,
-  required String foodName,
+  required String name,
   required String classification,
   required String price,
 }) saveFoodToServer) {
@@ -77,7 +77,7 @@ void openAddFoodDialog(BuildContext context, Future<void> Function({
               if (name.text.isEmpty || selectedTag == null) return;
               await saveFoodToServer(
                 food_pic: pic.text.trim(),
-                foodName: name.text.trim(),
+                name: name.text.trim(),
                 classification: selectedTag!,
                 price: price.text.trim(),
               );
@@ -440,13 +440,13 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
 
   Future<void> saveFoodToServer({
     required String food_pic,
-    required String foodName,
+    required String name,
     required String classification,
     required String price,
   }) async {
     final eateryId = extractId(widget.business['eatery_id'] ?? widget.business['id']);
     final body = {
-      "name": foodName,
+      "name": name,
       "eatery_id": eateryId,
       "classification": classification,
       "price": price,
