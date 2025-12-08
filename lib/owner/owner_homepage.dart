@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:iskort/page_routes/edit_establishments.dart';
 
+enum SortMode { classificationName, classificationPrice, globalPrice }
+
 class OwnerHomePage extends StatefulWidget {
   final Map<String, dynamic> currentUser;
 
@@ -21,6 +23,18 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   List<dynamic> ownerEateries = [];
   List<dynamic> ownerHousings = [];
   List<dynamic> products = [];
+  List<String> get classifications {
+    final tags = <String>{};
+    for (var item in products) {
+      if (item['classification'] != null && item['classification'].toString().isNotEmpty) {
+        tags.add(item['classification'].toString());
+      }
+    }
+    return tags.toList()..sort(); // return sorted list
+  }
+
+  // variable for sorting
+  SortMode sortMode = SortMode.classificationName; // default
 
   // Reviews sorting state
   String reviewSortOrder = 'Newest';
@@ -89,6 +103,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
 
       setState(() {
         products = fetchedProducts;
+        sortProducts();
         loading = false;
       });
     } catch (e) {
@@ -165,6 +180,104 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       );
     }
   }
+
+  List<Widget> _buildCategorizedProductList() {
+    // Group products by classification (Eatery) and type (Housing)
+    Map<String, List<dynamic>> grouped = {};
+
+    for (var item in products) {
+      String key;
+
+      if (item['businessType'] == 'Eatery') {
+        key = item['classification'] ?? 'Uncategorized';
+      } else {
+        key = item['type'] ?? 'Facilities';
+      }
+
+      grouped.putIfAbsent(key, () => []);
+      grouped[key]!.add(item);
+    }
+
+    // Sort category groups alphabetically (for consistent headers)
+    final sortedKeys = grouped.keys.toList()..sort();
+
+    List<Widget> widgets = [];
+
+    for (String key in sortedKeys) {
+      final groupItems = grouped[key]!;
+
+      // CATEGORY HEADER
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          child: Text(
+            key,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0A4423),
+            ),
+          ),
+        ),
+      );
+
+      // CATEGORY ITEMS
+      for (var item in groupItems) {
+        final isEateryProduct = item['businessType'] == 'Eatery';
+
+        widgets.add(
+          GestureDetector(
+            onTap: () => _showProductDetails(item),
+            child: isEateryProduct
+                ? menuCard(
+                    item,
+                    context: context,
+                    updateFoodItem: _updateFoodItem,
+                    deleteFoodItem: _deleteFoodItem,
+                    reload: _reloadProducts,
+                  )
+                : facilityCard(
+                    item,
+                    context: context,
+                    updateFacilityItem: _updateFacilityItem,
+                    deleteFacilityItem: _deleteFacilityItem,
+                    reload: _reloadProducts,
+                  ),
+          ),
+        );
+      }
+    }
+
+    return widgets;
+  }
+
+  void sortProducts() {
+    if (sortMode == SortMode.globalPrice) {
+      // LOWEST → HIGHEST
+      products.sort((a, b) =>
+        double.parse(a['price'].toString())
+          .compareTo(double.parse(b['price'].toString())));
+    } else {
+      products.sort((a, b) {
+        // First sort by classification (only for Eatery items)
+        final classA = a['classification'] ?? '';
+        final classB = b['classification'] ?? '';
+        final classCompare = classA.compareTo(classB);
+        if (classCompare != 0) return classCompare;
+
+        // Then sort within classification
+        if (sortMode == SortMode.classificationPrice) {
+          // LOWEST → HIGHEST price
+          return double.parse(a['price'].toString())
+              .compareTo(double.parse(b['price'].toString()));
+        } else {
+          // Sort alphabetically by name
+          return (a['name'] ?? '').compareTo(b['name'] ?? '');
+        }
+      });
+    }
+  }
+
 
   // Popup for product details
   void _showProductDetails(Map<String, dynamic> item) {
@@ -436,36 +549,48 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                   ),
                                 ),
                               const SizedBox(height: 10),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      "Sort Products",
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                    ),
+                                    DropdownButton<SortMode>(
+                                      value: sortMode,
+                                      items: [
+                                        DropdownMenuItem(
+                                          value: SortMode.classificationName,
+                                          child: const Text("By Category (A-Z)"),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: SortMode.classificationPrice,
+                                          child: const Text("By Category (Price)"),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: SortMode.globalPrice,
+                                          child: const Text("All by Price"),
+                                        ),
+                                      ],
+                                      onChanged: (mode) {
+                                        if (mode == null) return;
+                                        setState(() {
+                                          sortMode = mode;
+                                          sortProducts();
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
                               Expanded(
                                 child: products.isEmpty
                                     ? const Center(child: Text("No products yet"))
                                     : ListView(
-                                        children: products.map((item) {
-                                          final isEateryProduct =
-                                              item['businessType'] == 'Eatery';
-                                          return GestureDetector(
-                                            onTap: () => _showProductDetails(item),
-                                            child: isEateryProduct
-                                                ? menuCard(
-                                                    item,
-                                                    context: context,
-                                                    updateFoodItem: _updateFoodItem,
-                                                    deleteFoodItem: _deleteFoodItem,
-                                                    reload: _reloadProducts,
-                                                  )
-                                                : facilityCard(
-                                                    item,
-                                                    context: context,
-                                                    updateFacilityItem:
-                                                        _updateFacilityItem,
-                                                    deleteFacilityItem:
-                                                        _deleteFacilityItem,
-                                                    reload: _reloadProducts,
-                                                  ),
-                                          );
-                                        }).toList(),
+                                        children: _buildCategorizedProductList(),
                                       ),
                               ),
+
                             ],
                           ),
                         ),
@@ -702,30 +827,27 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 5),
-                              Wrap(
-                                spacing: 8,
-                                children: (businessTags.isNotEmpty
-                                        ? businessTags
-                                        : ["No tags yet"])
-                                    .map(
-                                      (tag) => Chip(
-                                        label: Text(
-                                          tag,
-                                          style: const TextStyle(
-                                            color: Color(0xFF0A4423),
-                                          ),
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          side: const BorderSide(
-                                            color: Color(0xFF0A4423),
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
+                              const SizedBox(height: 10),
+                                Text("Tags:",
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: classifications.isEmpty
+                                      ? [const Text("No tags yet")]
+                                      : classifications.map((c) => Chip(
+                                            label: Text(c),
+                                            backgroundColor: const Color(0xFFE0F2F1),
+                                          )).toList(),
+                                ),
+                                Text("Status: ${getBusinessStatus(business ?? {})}",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: getBusinessStatus(business ?? {}) == "Open"
+                                        ? Colors.green
+                                        : Colors.red,
+                                  )),
                             ],
                           ),
                         ),
@@ -736,6 +858,36 @@ class _OwnerHomePageState extends State<OwnerHomePage>
               ),
             ),
     );
+  }
+
+  String get priceRange {
+      if (products.isEmpty) return "N/A";
+      final prices = products
+          .map((p) => double.tryParse(p['price'].toString()) ?? 0)
+          .toList();
+      final min = prices.reduce((a, b) => a < b ? a : b);
+      final max = prices.reduce((a, b) => a > b ? a : b);
+      return "₱$min - ₱$max";
+    }
+
+    String getBusinessStatus(Map<String, dynamic> biz) {
+    final open = biz['open_time'];
+    final close = biz['end_time'];
+    if (open == null || close == null) return "N/A";
+
+    final now = TimeOfDay.now();
+    final openParts = open.split(":");
+    final closeParts = close.split(":");
+
+    final openTime = TimeOfDay(hour: int.parse(openParts[0]), minute: int.parse(openParts[1]));
+    final closeTime = TimeOfDay(hour: int.parse(closeParts[0]), minute: int.parse(closeParts[1]));
+
+    bool isOpen = (now.hour > openTime.hour ||
+                  (now.hour == openTime.hour && now.minute >= openTime.minute)) &&
+                  (now.hour < closeTime.hour ||
+                  (now.hour == closeTime.hour && now.minute <= closeTime.minute));
+
+    return isOpen ? "Open" : "Closed";
   }
 
   // Stub methods for About tab actions

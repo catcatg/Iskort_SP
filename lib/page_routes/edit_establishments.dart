@@ -27,6 +27,26 @@ Widget input(TextEditingController controller, {String? hint}) {
   );
 }
 
+String getBusinessStatus(Map<String, dynamic> biz) {
+  final open = biz['open_time'];
+  final close = biz['end_time'];
+  if (open == null || close == null) return "N/A";
+
+  final now = TimeOfDay.now();
+  final openParts = open.split(":");
+  final closeParts = close.split(":");
+
+  final openTime = TimeOfDay(hour: int.parse(openParts[0]), minute: int.parse(openParts[1]));
+  final closeTime = TimeOfDay(hour: int.parse(closeParts[0]), minute: int.parse(closeParts[1]));
+
+  bool isOpen = (now.hour > openTime.hour ||
+                (now.hour == openTime.hour && now.minute >= openTime.minute)) &&
+                (now.hour < closeTime.hour ||
+                (now.hour == closeTime.hour && now.minute <= closeTime.minute));
+
+  return isOpen ? "Open" : "Closed";
+}
+
 // ===== Global Dialogs =====
 void openAddFoodDialog(BuildContext context, Future<void> Function({
   required String food_pic,
@@ -404,6 +424,9 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
   // Housing
   late TextEditingController curfewController;
 
+  // About
+  late TextEditingController aboutController;
+
   List<Map<String, dynamic>> menuItems = [];
   List<Map<String, dynamic>> facilities = [];
 
@@ -415,6 +438,7 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
 
     nameController = TextEditingController(text: biz['name'] ?? "");
     locationController = TextEditingController(text: biz['location'] ?? "");
+    aboutController = TextEditingController(text: biz['about_desc'] ?? "");
 
     if (isEatery) {
       openTimeController = TextEditingController(text: biz['open_time'] ?? "");
@@ -480,6 +504,11 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
         "food_pic": item['food_pic'],
       }),
     );
+  }
+
+  // Manual toggle for housings
+  String getBusinessStatus(Map<String, dynamic> biz) {
+    return biz['status'] ?? "Open for tenants";
   }
 
   Future<void> deleteFoodItem(int foodId) async {
@@ -678,10 +707,14 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
       if (isEatery) ...{
         'open_time': openTimeController.text.trim(),
         'end_time': closeTimeController.text.trim(),
+        'about_desc': aboutController.text.trim(),
+        'status': getBusinessStatus(widget.business),
       } else ...{
         'curfew': curfewController.text.trim(),
+        'about_desc': aboutController.text.trim(),
+        'status': getBusinessStatus(widget.business),
       }
-    };
+  };
 
     final endpoint = isEatery
         ? "https://iskort-public-web.onrender.com/api/eatery/$id"

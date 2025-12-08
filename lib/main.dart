@@ -7,7 +7,7 @@ import 'package:iskort/homepage.dart';
 import 'package:iskort/page_routes/food.dart';
 import 'package:iskort/page_routes/housing.dart';
 import 'package:iskort/page_routes/map_route.dart';
-import 'package:iskort/page_routes/user_reviews.dart';
+//import 'package:iskort/page_routes/user_reviews.dart'; // i deleted this since it returns an error. i saved the copy tho for later
 //import 'package:iskort/page_routes/saved_locations.dart';
 import 'package:iskort/page_routes/profile_settings.dart';
 import 'package:iskort/profile.dart';
@@ -53,7 +53,7 @@ class MyApp extends StatelessWidget {
         '/housing': (context) => const HousingPage(),
         '/route': (context) => const MapRoutePage(),
         '/setup-details': (context) => const SetupDetailsPage(),
-        '/user-reviews': (context) => const YourReviews(),
+        //'/user-reviews': (context) => const YourReviews(),
         '/profile_settings': (context) => const ProfileSettingsPage(),
         '/setup-eatery-page': (context) {
           final args =

@@ -335,21 +335,24 @@ if (results.length === 0) return res.status(404).json({ success: false, message:
 // ===== EATERY ROUTES (with JOIN) =====
 app.post('/api/eatery', (req, res) => {
   const {
-    owner_id, name, location, min_price = null, is_verified = 0, verified_by_admin_id = null, verified_time = null, eatery_photo = '', open_time, end_time,
+    owner_id, name, location, min_price = null, is_verified = 0,
+    verified_by_admin_id = null, verified_time = null, eatery_photo = '',
+    open_time, end_time,
+    about_desc = '',   // NEW
+    status = 'Open for tenants' // NEW default
   } = req.body;
 
-  const sql = `INSERT INTO eatery (owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time, eatery_photo, open_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  db.query(
-    sql,
-    [owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time, eatery_photo, open_time, end_time],
-    (err, result) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
-      res.json({ success: true, eatery_id: result.insertId });
-    }
-  );
+  const sql = `INSERT INTO eatery 
+    (owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time, eatery_photo, open_time, end_time, about_desc, status) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  db.query(sql, [owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time, eatery_photo, open_time, end_time, about_desc, status], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, eatery_id: result.insertId });
+  });
 });
 
-// 🔹 UPDATED GET EATERIES WITH OWNER INFO
+// GET EATERIES WITH OWNER INFO
 app.get('/api/eatery', (req, res) => {
   const sql = `
     SELECT e.*, o.name AS owner_name, o.email AS owner_email, o.phone_num AS owner_phone
@@ -365,10 +368,10 @@ app.get('/api/eatery', (req, res) => {
 // Update eatery
 app.put('/api/eatery/:id', (req, res) => {
   const { id } = req.params;
-  const { name, location, open_time, end_time } = req.body;
+  const { name, location, open_time, end_time, about_desc, status } = req.body;
 
-  const sql = `UPDATE eatery SET name=?, location=?, open_time=?, end_time=? WHERE eatery_id=?`;
-  db.query(sql, [name, location, open_time, end_time, id], (err, result) => {
+  const sql = `UPDATE eatery SET name=?, location=?, open_time=?, end_time=?, about_desc=?, status=? WHERE eatery_id=?`;
+  db.query(sql, [name, location, open_time, end_time, about_desc, status, id], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Eatery not found' });
     res.json({ success: true, message: 'Eatery updated successfully' });
@@ -511,19 +514,17 @@ app.delete('/api/admin/reject/eatery/:id', (req, res) => {
 // ===== HOUSING ROUTES (with JOIN) =====
 app.post('/api/housing', (req, res) => {
   const {
-    owner_id,
-    name,
-    location,
-    price = null,
-    curfew = null,
-    housing_photo = '',
-    is_verified = 0,
-    verified_by_admin_id = null,
-    verified_time = null,
+    owner_id, name, location, price = null, curfew = null, housing_photo = '',
+    is_verified = 0, verified_by_admin_id = null, verified_time = null,
+    about_desc = '',   // NEW
+    status = 'Open for tenants' // NEW default
   } = req.body;
 
-  const sql = `INSERT INTO housing (owner_id, name, location, price, curfew, housing_photo, is_verified, verified_by_admin_id, verified_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  db.query(sql, [owner_id, name, location, price, curfew, housing_photo, is_verified, verified_by_admin_id, verified_time], (err, result) => {
+  const sql = `INSERT INTO housing 
+    (owner_id, name, location, price, curfew, housing_photo, is_verified, verified_by_admin_id, verified_time, about_desc, status) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  db.query(sql, [owner_id, name, location, price, curfew, housing_photo, is_verified, verified_by_admin_id, verified_time, about_desc, status], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, housing_id: result.insertId });
   });
@@ -545,10 +546,10 @@ app.get('/api/housing', (req, res) => {
 // Update housing
 app.put('/api/housing/:id', (req, res) => {
   const { id } = req.params;
-  const { name, location, price, curfew } = req.body;
+  const { name, location, price, curfew, about_desc, status } = req.body;
 
-  const sql = `UPDATE housing SET name=?, location=?, price=?, curfew=? WHERE housing_id=?`;
-  db.query(sql, [name, location, price, curfew, id], (err, result) => {
+  const sql = `UPDATE housing SET name=?, location=?, price=?, curfew=?, about_desc=?, status=? WHERE housing_id=?`;
+  db.query(sql, [name, location, price, curfew, about_desc, status, id], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Housing not found' });
     res.json({ success: true, message: 'Housing updated successfully' });
