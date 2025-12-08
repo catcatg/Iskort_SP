@@ -7,7 +7,7 @@ import 'package:iskort/homepage.dart';
 import 'package:iskort/page_routes/food.dart';
 import 'package:iskort/page_routes/housing.dart';
 import 'package:iskort/page_routes/map_route.dart';
-import 'package:iskort/page_routes/notifications.dart';
+import 'package:iskort/page_routes/user_reviews.dart';
 //import 'package:iskort/page_routes/saved_locations.dart';
 import 'package:iskort/page_routes/profile_settings.dart';
 import 'package:iskort/profile.dart';
@@ -53,14 +53,19 @@ class MyApp extends StatelessWidget {
         '/housing': (context) => const HousingPage(),
         '/route': (context) => const MapRoutePage(),
         '/setup-details': (context) => const SetupDetailsPage(),
-        '/notifications': (context) => const NotificationsPage(),
+        '/user-reviews': (context) => const YourReviews(),
         '/profile_settings': (context) => const ProfileSettingsPage(),
         '/setup-eatery-page': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>? ??
+              {};
           return SetupEateryPage(currentUser: args);
         },
         '/edit-establishments': (context) {
-          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          final args =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
           return EditEstablishmentsPage(business: args);
         },
       },
