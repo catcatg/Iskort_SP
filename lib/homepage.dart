@@ -276,6 +276,8 @@ class _HomePageState extends State<HomePage> {
                                 fit: BoxFit.cover,
                                 errorBuilder:
                                     (_, __, ___) => Container(
+                                      width: double.infinity,
+                                      alignment: Alignment.center,
                                       height: 200,
                                       color: Colors.grey.shade300,
                                       child: const Icon(
@@ -324,7 +326,7 @@ class _HomePageState extends State<HomePage> {
                                 const Icon(
                                   Icons.location_on,
                                   size: 16,
-                                  color: Colors.grey,
+                                  color: Color(0xFF7A1E1E),
                                 ),
                                 const SizedBox(width: 4),
                                 Expanded(
@@ -432,13 +434,28 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (user.isNotEmpty)
-              Text(
-                "Hello, ${user['name'] ?? 'Isko!'}!",
-                style: const TextStyle(
-                  color: Color(0xFF0A4423),
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Hello, ${user['name'] ?? 'Isko!'}!",
+                    style: const TextStyle(
+                      color: Color(0xFF0A4423),
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 3,
+                    decoration: const BoxDecoration(
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF0A4423), Color(0xFF1E8A58)],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             const SizedBox(height: 25),
             GeneralSearchBar(),
@@ -1076,14 +1093,39 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        "$subtitle • $location",
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 16,
+                            color: Color(0xFF7A1E1E),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              " $location ",
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: const Color.fromARGB(255, 0, 0, 0),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 15),
+                          // Expanded(
+                          //   child: Text(
+                          //     "•$subtitle",
+                          //     maxLines: 2,
+                          //     overflow: TextOverflow.ellipsis,
+                          //     style: TextStyle(
+                          //       fontSize: 13,
+                          //       color: Colors.grey.shade700,
+                          //     ),
+                          //   ),
+                          // ),
+                        ],
                       ),
                     ],
                   ),

@@ -415,6 +415,8 @@ class _HousingPageState extends State<HousingPage> {
                                           fit: BoxFit.cover,
                                           errorBuilder:
                                               (_, __, ___) => Container(
+                                                width: double.infinity,
+                                                alignment: Alignment.center,
                                                 color: Colors.grey.shade300,
                                                 child: const Icon(
                                                   Icons.broken_image,
@@ -447,8 +449,8 @@ class _HousingPageState extends State<HousingPage> {
                                         children: [
                                           const Icon(
                                             Icons.location_on,
-                                            size: 14,
-                                            color: Colors.grey,
+                                            size: 16,
+                                            color: Color(0xFF7A1E1E),
                                           ),
                                           const SizedBox(width: 4),
                                           Expanded(
