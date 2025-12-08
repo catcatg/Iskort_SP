@@ -27,10 +27,11 @@ Widget input(TextEditingController controller, {String? hint}) {
   );
 }
 
-String getBusinessStatus(Map<String, dynamic> biz) {
+// Eatery: compute Open/Closed from open_time and end_time
+String computeEateryOpenStatus(Map<String, dynamic> biz) {
   final open = biz['open_time'];
   final close = biz['end_time'];
-  if (open == null || close == null) return "N/A";
+  if (open == null || close == null || open.isEmpty || close.isEmpty) return "N/A";
 
   final now = TimeOfDay.now();
   final openParts = open.split(":");
@@ -39,366 +40,369 @@ String getBusinessStatus(Map<String, dynamic> biz) {
   final openTime = TimeOfDay(hour: int.parse(openParts[0]), minute: int.parse(openParts[1]));
   final closeTime = TimeOfDay(hour: int.parse(closeParts[0]), minute: int.parse(closeParts[1]));
 
-  bool isOpen = (now.hour > openTime.hour ||
-                (now.hour == openTime.hour && now.minute >= openTime.minute)) &&
-                (now.hour < closeTime.hour ||
-                (now.hour == closeTime.hour && now.minute <= closeTime.minute));
+  final afterOpen = (now.hour > openTime.hour) || (now.hour == openTime.hour && now.minute >= openTime.minute);
+  final beforeClose = (now.hour < closeTime.hour) || (now.hour == closeTime.hour && now.minute <= closeTime.minute);
 
-  return isOpen ? "Open" : "Closed";
+  return (afterOpen && beforeClose) ? "Open" : "Closed";
 }
 
-// ===== Global Dialogs =====
-void openAddFoodDialog(BuildContext context, Future<void> Function({
-  required String food_pic,
-  required String name,
-  required String classification,
-  required String price,
-}) saveFoodToServer) {
-  final pic = TextEditingController();
-  final name = TextEditingController();
-  final price = TextEditingController();
-  String? selectedTag;
-
-  final classes = [
-    "Pork","Chicken","Beef","Vegetables","Seafood",
-    "Alcoholic Drinks","Coffee Drinks","Non-Coffee Drinks",
-    "Desserts","Snacks","Meal Set"
-  ];
-
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text("Add Menu Item"),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              input(pic, hint: "Image URL"),
-              const SizedBox(height: 10),
-              input(name, hint: "Food Name"),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: selectedTag,
-                hint: const Text("Classification"),
-                items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (val) => selectedTag = val,
-              ),
-              const SizedBox(height: 10),
-              input(price, hint: "Price (₱)"),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            child: const Text("Add"),
-            onPressed: () async {
-              if (name.text.isEmpty || selectedTag == null) return;
-              await saveFoodToServer(
-                food_pic: pic.text.trim(),
-                name: name.text.trim(),
-                classification: selectedTag!,
-                price: price.text.trim(),
-              );
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      );
-    },
-  );
+// Housing: manual status string
+String getHousingStatus(Map<String, dynamic> biz) {
+  return (biz['status']?.toString().isNotEmpty == true) ? biz['status'] : "Open for tenants";
 }
 
-void openAddFacilityDialog(BuildContext context, Future<void> Function({
-  required String name,
-  required String facilityPic,
-  required String price,
-  required bool hasAc,
-  required bool hasCr,
-  required bool hasKitchen,
-  required String type,
-  required String additionalInfo,
-}) saveFacilityToServer) {
-  final name = TextEditingController();
-  final price = TextEditingController();
-  final pic = TextEditingController();
-  final info = TextEditingController();
-  bool hasAc = false;
-  bool hasCr = false;
-  bool hasKitchen = false;
-  String? type;
+  // ===== Global Dialogs =====
+  void openAddFoodDialog(BuildContext context, Future<void> Function({
+    required String food_pic,
+    required String name,
+    required String classification,
+    required String price,
+  }) saveFoodToServer) {
+    final pic = TextEditingController();
+    final name = TextEditingController();
+    final price = TextEditingController();
+    String? selectedTag;
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text("Add Facility"),
-            content: SingleChildScrollView(
-              child: Column(
-                children: [
-                  input(name, hint: "Facility Name"),
-                  input(price, hint: "Price"),
-                  input(pic, hint: "Image URL"),
-                  DropdownButtonFormField<String>(
-                    value: type,
-                    hint: const Text("Type"),
-                    items: ["Solo","Shared"]
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                    onChanged: (val) => setState(() => type = val),
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Airconditioned"),
-                    value: hasAc,
-                    onChanged: (val) => setState(() => hasAc = val ?? false),
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Comfort Room"),
-                    value: hasCr,
-                    onChanged: (val) => setState(() => hasCr = val ?? false),
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Kitchen"),
-                    value: hasKitchen,
-                    onChanged: (val) => setState(() => hasKitchen = val ?? false),
-                  ),
-                  input(info, hint: "Additional Info"),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-              ElevatedButton(
-                child: const Text("Add"),
-                onPressed: () async {
-                  await saveFacilityToServer(
-                    name: name.text.trim(),
-                    facilityPic: pic.text.trim(),
-                    price: price.text.trim(),
-                    hasAc: hasAc,
-                    hasCr: hasCr,
-                    hasKitchen: hasKitchen,
-                    type: type ?? "Solo",
-                    additionalInfo: info.text.trim(),
-                  );
-                  Navigator.pop(context);
-                },
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
+    final classes = [
+      "Pork","Chicken","Beef","Vegetables","Seafood",
+      "Alcoholic Drinks","Coffee Drinks","Non-Coffee Drinks",
+      "Desserts","Snacks","Meal Set"
+    ];
 
-void openEditFoodDialog(
-    BuildContext context,
-    Map<String, dynamic> item,
-    Future<void> Function(Map<String, dynamic>) updateFoodItem,
-    Future<void> Function() reload) {
-  final name = TextEditingController(text: item['name']);
-  final price = TextEditingController(text: item['price'].toString());
-  final pic = TextEditingController(text: item['food_pic']);
-  final classes = [
-    "Pork","Chicken","Beef","Vegetables","Seafood","Alcoholic Drinks",
-    "Coffee Drinks","Non-Coffee Drinks","Desserts","Snacks","Meal Set"
-  ];
-  String? classification = classes.contains(item['classification']) ? item['classification'] : null;
-
-  showDialog(
-    context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text("Edit Food Item"),
-            content: Column(
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Add Menu Item"),
+          content: SingleChildScrollView(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                input(name, hint: "Food Name"),
-                input(price, hint: "Price"),
                 input(pic, hint: "Image URL"),
+                const SizedBox(height: 10),
+                input(name, hint: "Food Name"),
+                const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: classification,
+                  value: selectedTag,
+                  hint: const Text("Classification"),
                   items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                  onChanged: (val) => setState(() => classification = val),
+                  onChanged: (val) => selectedTag = val,
                 ),
+                const SizedBox(height: 10),
+                input(price, hint: "Price (₱)"),
               ],
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-              ElevatedButton(
-                child: const Text("Save"),
-                onPressed: () async {
-                  item['name'] = name.text.trim();
-                  item['price'] = price.text.trim();
-                  item['food_pic'] = pic.text.trim();
-                  item['classification'] = classification ?? "Pork";
-                  await updateFoodItem(item);
-                  Navigator.pop(context);
-                  await reload();
-                },
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              child: const Text("Add"),
+              onPressed: () async {
+                if (name.text.isEmpty || selectedTag == null) return;
+                await saveFoodToServer(
+                  food_pic: pic.text.trim(),
+                  name: name.text.trim(),
+                  classification: selectedTag!,
+                  price: price.text.trim(),
+                );
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void openAddFacilityDialog(BuildContext context, Future<void> Function({
+    required String name,
+    required String facilityPic,
+    required String price,
+    required bool hasAc,
+    required bool hasCr,
+    required bool hasKitchen,
+    required String type,
+    required String additionalInfo,
+  }) saveFacilityToServer) {
+    final name = TextEditingController();
+    final price = TextEditingController();
+    final pic = TextEditingController();
+    final info = TextEditingController();
+    bool hasAc = false;
+    bool hasCr = false;
+    bool hasKitchen = false;
+    String? type;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Add Facility"),
+              content: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    input(name, hint: "Facility Name"),
+                    input(price, hint: "Price"),
+                    input(pic, hint: "Image URL"),
+                    DropdownButtonFormField<String>(
+                      value: type,
+                      hint: const Text("Type"),
+                      items: ["Solo","Shared"]
+                          .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                          .toList(),
+                      onChanged: (val) => setState(() => type = val),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Airconditioned"),
+                      value: hasAc,
+                      onChanged: (val) => setState(() => hasAc = val ?? false),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Comfort Room"),
+                      value: hasCr,
+                      onChanged: (val) => setState(() => hasCr = val ?? false),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Kitchen"),
+                      value: hasKitchen,
+                      onChanged: (val) => setState(() => hasKitchen = val ?? false),
+                    ),
+                    input(info, hint: "Additional Info"),
+                  ],
+                ),
               ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                ElevatedButton(
+                  child: const Text("Add"),
+                  onPressed: () async {
+                    await saveFacilityToServer(
+                      name: name.text.trim(),
+                      facilityPic: pic.text.trim(),
+                      price: price.text.trim(),
+                      hasAc: hasAc,
+                      hasCr: hasCr,
+                      hasKitchen: hasKitchen,
+                      type: type ?? "Solo",
+                      additionalInfo: info.text.trim(),
+                    );
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
-void openEditFacilityDialog(
-    BuildContext context,
-    Map<String, dynamic> item,
-    Future<void> Function(Map<String, dynamic>) updateFacilityItem,
-    Future<void> Function() reload) {
-  final name = TextEditingController(text: item['name']);
-  final price = TextEditingController(text: item['price'].toString());
-  final pic = TextEditingController(text: item['facility_pic']);
-  final info = TextEditingController(text: item['additional_info']);
-  bool hasAc = item['has_ac'] == 1 || item['has_ac'] == true;
-  bool hasCr = item['has_cr'] == 1 || item['has_cr'] == true;
-  bool hasKitchen = item['has_kitchen'] == 1 || item['has_kitchen'] == true;
-  String? type = ["Solo","Shared"].contains(item['type']) ? item['type'] : null;
+  void openEditFoodDialog(
+      BuildContext context,
+      Map<String, dynamic> item,
+      Future<void> Function(Map<String, dynamic>) updateFoodItem,
+      Future<void> Function() reload) {
+    final name = TextEditingController(text: item['name']);
+    final price = TextEditingController(text: item['price'].toString());
+    final pic = TextEditingController(text: item['food_pic']);
+    final classes = [
+      "Pork","Chicken","Beef","Vegetables","Seafood","Alcoholic Drinks",
+      "Coffee Drinks","Non-Coffee Drinks","Desserts","Snacks","Meal Set"
+    ];
+    String? classification = classes.contains(item['classification']) ? item['classification'] : null;
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text("Edit Facility"),
-            content: SingleChildScrollView(
-              child: Column(
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Edit Food Item"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  input(name, hint: "Facility Name"),
+                  input(name, hint: "Food Name"),
                   input(price, hint: "Price"),
                   input(pic, hint: "Image URL"),
                   DropdownButtonFormField<String>(
-                    value: type,
-                    items: ["Solo","Shared"]
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (val) => setState(() => type = val),
+                    value: classification,
+                    items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                    onChanged: (val) => setState(() => classification = val),
                   ),
-                  CheckboxListTile(
-                    title: const Text("Airconditioned"),
-                    value: hasAc,
-                    onChanged: (val) => setState(() => hasAc = val ?? false),
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Comfort Room"),
-                    value: hasCr,
-                    onChanged: (val) => setState(() => hasCr = val ?? false),
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Kitchen"),
-                    value: hasKitchen,
-                    onChanged: (val) => setState(() => hasKitchen = val ?? false),
-                  ),
-                  input(info, hint: "Additional Info"),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-              ElevatedButton(
-                child: const Text("Save"),
-                onPressed: () async {
-                  item['name'] = name.text.trim();
-                  item['price'] = price.text.trim();
-                  item['facility_pic'] = pic.text.trim();
-                  item['additional_info'] = info.text.trim();
-                  item['has_ac'] = hasAc;
-                  item['has_cr'] = hasCr;
-                  item['has_kitchen'] = hasKitchen;
-                  item['type'] = type ?? "Solo";
-                  await updateFacilityItem(item);
-                  Navigator.pop(context);
-                  await reload();
-                },
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                ElevatedButton(
+                  child: const Text("Save"),
+                  onPressed: () async {
+                    item['name'] = name.text.trim();
+                    item['price'] = price.text.trim();
+                    item['food_pic'] = pic.text.trim();
+                    item['classification'] = classification ?? "Pork";
+                    await updateFoodItem(item);
+                    Navigator.pop(context);
+                    await reload();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void openEditFacilityDialog(
+      BuildContext context,
+      Map<String, dynamic> item,
+      Future<void> Function(Map<String, dynamic>) updateFacilityItem,
+      Future<void> Function() reload) {
+    final name = TextEditingController(text: item['name']);
+    final price = TextEditingController(text: item['price'].toString());
+    final pic = TextEditingController(text: item['facility_pic']);
+    final info = TextEditingController(text: item['additional_info']);
+    bool hasAc = item['has_ac'] == 1 || item['has_ac'] == true;
+    bool hasCr = item['has_cr'] == 1 || item['has_cr'] == true;
+    bool hasKitchen = item['has_kitchen'] == 1 || item['has_kitchen'] == true;
+    String? type = ["Solo","Shared"].contains(item['type']) ? item['type'] : null;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Edit Facility"),
+              content: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    input(name, hint: "Facility Name"),
+                    input(price, hint: "Price"),
+                    input(pic, hint: "Image URL"),
+                    DropdownButtonFormField<String>(
+                      value: type,
+                      items: ["Solo","Shared"]
+                          .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (val) => setState(() => type = val),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Airconditioned"),
+                      value: hasAc,
+                      onChanged: (val) => setState(() => hasAc = val ?? false),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Comfort Room"),
+                      value: hasCr,
+                      onChanged: (val) => setState(() => hasCr = val ?? false),
+                    ),
+                    CheckboxListTile(
+                      title: const Text("Kitchen"),
+                      value: hasKitchen,
+                      onChanged: (val) => setState(() => hasKitchen = val ?? false),
+                    ),
+                    input(info, hint: "Additional Info"),
+                  ],
+                ),
               ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+                ElevatedButton(
+                  child: const Text("Save"),
+                  onPressed: () async {
+                    item['name'] = name.text.trim();
+                    item['price'] = price.text.trim();
+                    item['facility_pic'] = pic.text.trim();
+                    item['additional_info'] = info.text.trim();
+                    item['has_ac'] = hasAc;
+                    item['has_cr'] = hasCr;
+                    item['has_kitchen'] = hasKitchen;
+                    item['type'] = type ?? "Solo";
+                    await updateFacilityItem(item);
+                    Navigator.pop(context);
+                    await reload();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
-// ===== Global Cards =====
-Widget menuCard(
-  Map<String, dynamic> item, {
-  required BuildContext context,
-  required Future<void> Function(Map<String, dynamic>) updateFoodItem,
-  required Future<void> Function(int) deleteFoodItem,
-  required Future<void> Function() reload,
-}){
-  return Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: ListTile(
-      leading: Image.network(item['food_pic'] ?? "",
-          width: 50, height: 50, fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(Icons.fastfood)),
-      title: Text(item['name']),
-      subtitle: Text("${item['classification']} • ₱${item['price']}"),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.green),
-            onPressed: () => openEditFoodDialog(context, item, updateFoodItem, reload),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () async {
-              await deleteFoodItem(item['food_id']);
-              await reload();
-            },
-          ),
-        ],
+  // ===== Global Cards =====
+  Widget menuCard(
+    Map<String, dynamic> item, {
+    required BuildContext context,
+    required Future<void> Function(Map<String, dynamic>) updateFoodItem,
+    required Future<void> Function(int) deleteFoodItem,
+    required Future<void> Function() reload,
+  }){
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Image.network(item['food_pic'] ?? "",
+            width: 50, height: 50, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(Icons.fastfood)),
+        title: Text(item['name']),
+        subtitle: Text("${item['classification']} • ₱${item['price']}"),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.green),
+              onPressed: () => openEditFoodDialog(context, item, updateFoodItem, reload),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () async {
+                await deleteFoodItem(item['food_id']);
+                await reload();
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-Widget facilityCard(
-  Map<String, dynamic> item, {
-  required BuildContext context,
-  required Future<void> Function(Map<String, dynamic>) updateFacilityItem,
-  required Future<void> Function(int) deleteFacilityItem,
-  required Future<void> Function() reload,
-}) {
-  return Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: ListTile(
-      leading: Image.network(item['facility_pic'] ?? "",
-          width: 50, height: 50, fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(Icons.home)),
-      title: Text(item['name']),
-      subtitle: Text("${item['type']} • ₱${item['price']}"),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.blue),
-            onPressed: () => openEditFacilityDialog(context, item, updateFacilityItem, reload),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () async {
-              await deleteFacilityItem(item['facility_id']);
-              await reload();
-            },
-          ),
-        ],
+  Widget facilityCard(
+    Map<String, dynamic> item, {
+    required BuildContext context,
+    required Future<void> Function(Map<String, dynamic>) updateFacilityItem,
+    required Future<void> Function(int) deleteFacilityItem,
+    required Future<void> Function() reload,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Image.network(item['facility_pic'] ?? "",
+            width: 50, height: 50, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(Icons.home)),
+        title: Text(item['name']),
+        subtitle: Text("${item['type']} • ₱${item['price']}"),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blue),
+              onPressed: () => openEditFacilityDialog(context, item, updateFacilityItem, reload),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () async {
+                await deleteFacilityItem(item['facility_id']);
+                await reload();
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
 // ===== Main Page =====
 class EditEstablishmentsPage extends StatefulWidget {
@@ -427,6 +431,9 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
   // About
   late TextEditingController aboutController;
 
+  // Status (manual for housing)
+  String selectedStatus = "Open for tenants";
+
   List<Map<String, dynamic>> menuItems = [];
   List<Map<String, dynamic>> facilities = [];
 
@@ -439,6 +446,7 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
     nameController = TextEditingController(text: biz['name'] ?? "");
     locationController = TextEditingController(text: biz['location'] ?? "");
     aboutController = TextEditingController(text: biz['about_desc'] ?? "");
+    selectedStatus = biz['status'] ?? "Open for tenants";
 
     if (isEatery) {
       openTimeController = TextEditingController(text: biz['open_time'] ?? "");
@@ -447,6 +455,31 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
     } else {
       curfewController = TextEditingController(text: biz['curfew'] ?? "");
       loadFacilities();
+    }
+
+    fetchBusinessDetails(); // NEW: fetch owner info
+  }
+
+  // ===== Fetch Business Details =====
+  Future<void> fetchBusinessDetails() async {
+    final id = extractId(widget.business['eatery_id'] ?? widget.business['housing_id'] ?? widget.business['id']);
+    final endpoint = isEatery
+        ? "https://iskort-public-web.onrender.com/api/eatery"
+        : "https://iskort-public-web.onrender.com/api/housing";
+
+    final res = await http.get(Uri.parse(endpoint));
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      final list = isEatery ? data['eateries'] : data['housings'];
+      final match = list.firstWhere(
+        (b) => extractId(b[isEatery ? 'eatery_id' : 'housing_id']) == id,
+        orElse: () => {},
+      );
+      if (match.isNotEmpty) {
+        setState(() {
+          widget.business.addAll(match); // merge owner_name, owner_email, owner_phone, etc.
+        });
+      }
     }
   }
 
@@ -611,6 +644,16 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
             label("Location"),
             input(locationController),
 
+            // Business details display
+            const SizedBox(height: 20),
+            Divider(),
+            const SizedBox(height: 12),
+            label("Business Details"),
+            Text("Owner: ${widget.business['owner_name'] ?? ''}"),
+            Text("Contact: ${widget.business['owner_phone'] ?? ''}"),
+            Text("Email: ${widget.business['owner_email'] ?? ''}"),
+            Text("Location: ${widget.business['location'] ?? ''}"),
+
             if (isEatery) ...[
               const SizedBox(height: 20),
               Divider(),
@@ -626,21 +669,7 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
               const SizedBox(height: 20),
               Divider(),
               const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Menu Items", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  ElevatedButton.icon(
-                    onPressed: () => openAddFoodDialog(context, saveFoodToServer),
-                    icon: const Icon(Icons.add),
-                    label: const Text("Add Item"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0A4423),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
+              label("Menu Items"),
               const SizedBox(height: 12),
               if (menuItems.isEmpty)
                 const Text("No menu items yet.", style: TextStyle(color: Colors.grey)),
@@ -656,22 +685,8 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
               const SizedBox(height: 20),
               Divider(),
               const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Facilities", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  ElevatedButton.icon(
-                    onPressed: () => openAddFacilityDialog(context, saveFacilityToServer),
-                    icon: const Icon(Icons.add),
-                    label: const Text("Add Facility"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0A4423),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-                           const SizedBox(height: 12),
+              label("Facilities"),
+              const SizedBox(height: 12),
               if (facilities.isEmpty)
                 const Text("No facilities yet.", style: TextStyle(color: Colors.grey)),
               ...facilities.map((item) => facilityCard(item,
@@ -681,6 +696,41 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
                 reload: loadFacilities,
               )),
             ],
+
+            const SizedBox(height: 20),
+            Divider(),
+            const SizedBox(height: 12),
+
+            // About field
+            label("About / Bio"),
+            TextField(
+              controller: aboutController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: "Describe your business",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Status toggle
+            label("Status"),
+            if (isEatery)
+              Text(
+                "Auto: ${computeEateryOpenStatus(widget.business)}",
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              )
+            else
+              DropdownButtonFormField<String>(
+                value: selectedStatus,
+                                items: const [
+                  DropdownMenuItem(value: "Open for tenants", child: Text("Open for tenants")),
+                  DropdownMenuItem(value: "No longer accepting", child: Text("No longer accepting")),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => selectedStatus = val);
+                },
+              ),
 
             const SizedBox(height: 30),
             ElevatedButton(
@@ -700,7 +750,8 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
 
   // ===== Save Changes =====
   void _saveChanges() async {
-    final id = extractId(widget.business['eatery_id'] ?? widget.business['id']);
+    final id = extractId(widget.business['eatery_id'] ?? widget.business['housing_id'] ?? widget.business['id']);
+
     final body = {
       'name': nameController.text.trim(),
       'location': locationController.text.trim(),
@@ -708,13 +759,16 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
         'open_time': openTimeController.text.trim(),
         'end_time': closeTimeController.text.trim(),
         'about_desc': aboutController.text.trim(),
-        'status': getBusinessStatus(widget.business),
+        'status': computeEateryOpenStatus({
+          'open_time': openTimeController.text.trim(),
+          'end_time': closeTimeController.text.trim(),
+        }),
       } else ...{
         'curfew': curfewController.text.trim(),
         'about_desc': aboutController.text.trim(),
-        'status': getBusinessStatus(widget.business),
+        'status': selectedStatus,
       }
-  };
+    };
 
     final endpoint = isEatery
         ? "https://iskort-public-web.onrender.com/api/eatery/$id"
@@ -731,12 +785,12 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
         for (var item in menuItems) {
           await updateFoodItem(item);
         }
-        loadMenuItems();
+        await loadMenuItems();
       } else {
         for (var item in facilities) {
           await updateFacilityItem(item);
         }
-        loadFacilities();
+        await loadFacilities();
       }
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Changes saved!")));
     } else {

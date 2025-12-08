@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:iskort/page_routes/edit_establishments.dart';
 import 'package:intl/intl.dart';
 
-
 enum SortMode { classificationName, classificationPrice, globalPrice }
 
 class OwnerHomePage extends StatefulWidget {
@@ -19,12 +18,15 @@ class OwnerHomePage extends StatefulWidget {
 class _OwnerHomePageState extends State<OwnerHomePage>
     with TickerProviderStateMixin {
   late TabController _tabController;
+
   Map<String, dynamic>? business;
   bool loading = true;
+
   List<String> businessTags = [];
   List<dynamic> ownerEateries = [];
   List<dynamic> ownerHousings = [];
   List<dynamic> products = [];
+
   List<String> get classifications {
     final tags = <String>{};
     for (var item in products) {
@@ -32,10 +34,10 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         tags.add(item['classification'].toString());
       }
     }
-    return tags.toList()..sort(); // return sorted list
+    return tags.toList()..sort();
   }
 
-  // variable for sorting
+  // Product sort state
   SortMode sortMode = SortMode.classificationName; // default
 
   // Reviews sorting state
@@ -44,8 +46,8 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   @override
   void initState() {
     super.initState();
-    fetchBusiness();
     _tabController = TabController(length: 3, vsync: this);
+    fetchBusiness();
   }
 
   @override
@@ -76,8 +78,20 @@ class _OwnerHomePageState extends State<OwnerHomePage>
           .where((h) => h['owner_id'] == ownerId)
           .toList();
 
-      // Fetch products for each business
+      // Assign the business to display on the About tab:
+      // Prefer the first eatery; if none, use the first housing
+      Map<String, dynamic>? selected;
+      if (ownerEateries.isNotEmpty) {
+        selected = Map<String, dynamic>.from(ownerEateries.first);
+        selected['type'] = 'eatery';
+      } else if (ownerHousings.isNotEmpty) {
+        selected = Map<String, dynamic>.from(ownerHousings.first);
+        selected['type'] = 'housing';
+      }
+
+      // Fetch products for each business the owner has
       List<dynamic> fetchedProducts = [];
+
       for (var eatery in ownerEateries) {
         final foodResp = await http.get(
           Uri.parse("https://iskort-public-web.onrender.com/api/food/${eatery['eatery_id']}"),
@@ -90,6 +104,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
           }
         }
       }
+
       for (var house in ownerHousings) {
         final facResp = await http.get(
           Uri.parse("https://iskort-public-web.onrender.com/api/facility/${house['housing_id']}"),
@@ -104,12 +119,13 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       }
 
       setState(() {
+        business = selected;
         products = fetchedProducts;
         sortProducts();
         loading = false;
       });
     } catch (e) {
-      print("Error fetching owner establishments: $e");
+      // Handle errors gracefully
       setState(() => loading = false);
     }
   }
@@ -200,7 +216,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       grouped[key]!.add(item);
     }
 
-    // Sort category groups alphabetically (for consistent headers)
+    // Sort category groups alphabetically (consistent headers)
     final sortedKeys = grouped.keys.toList()..sort();
 
     List<Widget> widgets = [];
@@ -279,7 +295,6 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       });
     }
   }
-
 
   // Popup for product details
   void _showProductDetails(Map<String, dynamic> item) {
@@ -366,7 +381,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         required bool hasKitchen,
         required String type,
         required String additionalInfo,
-            }) async {
+      }) async {
         final body = {
           "name": name,
           "housing_id": housingId.toString(),
@@ -560,18 +575,18 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                     ),
                                     DropdownButton<SortMode>(
                                       value: sortMode,
-                                      items: [
+                                      items: const [
                                         DropdownMenuItem(
                                           value: SortMode.classificationName,
-                                          child: const Text("By Category (A-Z)"),
+                                          child: Text("By Category (A-Z)"),
                                         ),
                                         DropdownMenuItem(
                                           value: SortMode.classificationPrice,
-                                          child: const Text("By Category (Price)"),
+                                          child: Text("By Category (Price)"),
                                         ),
                                         DropdownMenuItem(
                                           value: SortMode.globalPrice,
-                                          child: const Text("All by Price"),
+                                          child: Text("All by Price"),
                                         ),
                                       ],
                                       onChanged: (mode) {
@@ -592,7 +607,6 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                         children: _buildCategorizedProductList(),
                                       ),
                               ),
-
                             ],
                           ),
                         ),
@@ -641,7 +655,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                 ],
                               ),
                               const SizedBox(height: 10),
-                              // Ratings summary container
+                              // Ratings summary container (placeholder)
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
@@ -716,59 +730,59 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                               review['reviewer_name'] ??
                                                   'Anonymous';
                                           final date = review['date'] ?? '';
-                                                                                        return Card(
-                                                margin: const EdgeInsets.symmetric(
-                                                  vertical: 6,
-                                                ),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(10),
-                                                ),
-                                                elevation: 2,
-                                                child: Padding(
-                                                  padding: const EdgeInsets.all(10),
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                          return Card(
+                                            margin: const EdgeInsets.symmetric(
+                                              vertical: 6,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            elevation: 2,
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(10),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
                                                     children: [
+                                                      Text(
+                                                        reviewer,
+                                                        style: const TextStyle(
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      const Spacer(),
                                                       Row(
-                                                        children: [
-                                                          Text(
-                                                            reviewer,
-                                                            style: const TextStyle(
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
+                                                        children: List.generate(
+                                                          rating,
+                                                          (_) => const Icon(
+                                                            Icons.local_florist,
+                                                            size: 16,
+                                                            color: Color(0xFFFFD700),
                                                           ),
-                                                          const Spacer(),
-                                                          Row(
-                                                            children: List.generate(
-                                                              rating,
-                                                              (_) => const Icon(
-                                                                Icons.local_florist,
-                                                                size: 16,
-                                                                color: Color(0xFFFFD700),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        comment,
-                                                        style: const TextStyle(fontSize: 14),
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        date,
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors.grey[600],
                                                         ),
                                                       ),
                                                     ],
                                                   ),
-                                                ),
-                                              );
-                                            },
-                                          ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    comment,
+                                                    style: const TextStyle(fontSize: 14),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    date,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
                               ),
                             ],
                           ),
@@ -780,27 +794,64 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("Name: ${business?['name'] ?? ''}", style: const TextStyle(fontSize: 16)),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      "Name: ${business?['name'] ?? ''}",
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  ),
+                                  if (business != null)
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        // Navigate to full edit screen; refresh when back
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => EditEstablishmentsPage(
+                                              business: business!,
+                                            ),
+                                          ),
+                                        );
+                                        await fetchBusiness();
+                                      },
+                                      icon: const Icon(Icons.edit, size: 16, color: Colors.white),
+                                      label: const Text("Edit establishment", style: TextStyle(color: Colors.white)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0A4423),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text("Owner: ${business?['owner_name'] ?? ''}", style: const TextStyle(fontSize: 16)),
+                              Text("Contact: ${business?['owner_phone'] ?? ''}", style: const TextStyle(fontSize: 16)),
+                              Text("Email: ${business?['owner_email'] ?? ''}", style: const TextStyle(fontSize: 16)),
                               Text("Location: ${business?['location'] ?? ''}", style: const TextStyle(fontSize: 16)),
                               Text("Price Range: $priceRange", style: const TextStyle(fontSize: 16)),
 
                               if (business?['open_time'] != null && business?['end_time'] != null)
-                                Text("Hours: ${business?['open_time']} - ${business?['end_time']}",
-                                    style: const TextStyle(fontSize: 16)),
+                                Text(
+                                  "Hours: ${business?['open_time']} - ${business?['end_time']}",
+                                  style: const TextStyle(fontSize: 16),
+                                ),
 
                               if (business?['curfew'] != null)
                                 Text("Curfew: ${business?['curfew']}", style: const TextStyle(fontSize: 16)),
 
+                              const SizedBox(height: 6),
                               Text(
-                                "Status: ${business?['status'] ?? 'N/A'}",
+                                // Auto Open/Closed for eateries; manual status string for housing
+                                "Status: ${_statusText(business)}",
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: (business?['status'] == "Open for tenants")
-                                      ? Colors.green
-                                      : Colors.red,
+                                  color: _statusColor(business),
                                 ),
                               ),
+
                               const SizedBox(height: 10),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -814,6 +865,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                   IconButton(
                                     icon: const Icon(Icons.edit, color: Color(0xFF0A4423)),
                                     onPressed: () {
+                                      if (business == null) return;
                                       final controller = TextEditingController(text: business?['about_desc'] ?? '');
                                       showDialog(
                                         context: context,
@@ -857,6 +909,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                   ),
                                 ],
                               ),
+
                               const SizedBox(height: 10),
                               Text("Tags:", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                               Wrap(
@@ -892,7 +945,28 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     return "₱${formatter.format(min)} - ₱${formatter.format(max)}";
   }
 
+  // Auto status for eateries; manual status string for housing
+  String _statusText(Map<String, dynamic>? biz) {
+    if (biz == null) return "N/A";
+    final isEatery = biz['type'] == 'eatery' || biz.containsKey('open_time');
+    if (isEatery) {
+      return getBusinessStatus(biz);
+    } else {
+      return (biz['status']?.toString().isNotEmpty == true) ? biz['status'] : "Open for tenants";
+    }
+  }
 
+  Color _statusColor(Map<String, dynamic>? biz) {
+    final status = _statusText(biz);
+    if (status == "Open" || status == "Open for tenants") {
+      return Colors.green;
+    } else if (status == "Closed" || status == "No longer accepting" || status == "Fully occupied") {
+      return Colors.red;
+    }
+    return Colors.grey[700]!;
+  }
+
+  // Eatery open/closed computation
   String getBusinessStatus(Map<String, dynamic> biz) {
     final open = biz['open_time'];
     final close = biz['end_time'];
@@ -913,12 +987,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     return isOpen ? "Open" : "Closed";
   }
 
-  // Stub methods for About tab actions
-  void _editBioDialog() {
-    // TODO: implement bio editing dialog
-  }
-
-  void _openTagEditor() {
-    // TODO: implement tag editor dialog
-  }
+  // Stub methods for About tab actions (reserved for future)
+  void _editBioDialog() {}
+  void _openTagEditor() {}
 }
