@@ -217,12 +217,12 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       final eateryId = ownerEateries.first['eatery_id'];
       openAddFoodDialog(context, ({
         required String food_pic,
-        required String foodName,
+        required String name,
         required String classification,
         required String price,
       }) async {
         final body = {
-          "name": foodName,
+          "name": name,
           "eatery_id": eateryId.toString(),
           "classification": classification,
           "price": price,
