@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:iskort/page_routes/edit_establishments.dart';
+import 'package:intl/intl.dart';
+
 
 enum SortMode { classificationName, classificationPrice, globalPrice }
 
@@ -778,76 +780,95 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Bio and edit
+                              Text("Name: ${business?['name'] ?? ''}", style: const TextStyle(fontSize: 16)),
+                              Text("Location: ${business?['location'] ?? ''}", style: const TextStyle(fontSize: 16)),
+                              Text("Price Range: $priceRange", style: const TextStyle(fontSize: 16)),
+
+                              if (business?['open_time'] != null && business?['end_time'] != null)
+                                Text("Hours: ${business?['open_time']} - ${business?['end_time']}",
+                                    style: const TextStyle(fontSize: 16)),
+
+                              if (business?['curfew'] != null)
+                                Text("Curfew: ${business?['curfew']}", style: const TextStyle(fontSize: 16)),
+
+                              Text(
+                                "Status: ${business?['status'] ?? 'N/A'}",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: (business?['status'] == "Open for tenants")
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                    child: Center(
-                                      child: Text(
-                                        business?['bio'] ??
-                                            'Write something about your business',
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
+                                    child: Text(
+                                      business?['about_desc'] ?? 'Write something about your business',
+                                      style: const TextStyle(fontSize: 14),
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(
-                                      Icons.edit,
-                                      color: Color(0xFF0A4423),
-                                    ),
-                                    onPressed: _editBioDialog,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 15),
-                              Divider(color: Colors.grey.shade400),
-                              // Tags
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    "Your Product Tags",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: Color(0xFF0A4423),
-                                    ),
-                                  ),
-                                  TextButton.icon(
-                                    onPressed: _openTagEditor,
-                                    icon: const Icon(
-                                      Icons.edit,
-                                      color: Color(0xFF0A4423),
-                                    ),
-                                    label: const Text(
-                                      "Modify / Add Tags",
-                                      style: TextStyle(color: Color(0xFF0A4423)),
-                                    ),
+                                    icon: const Icon(Icons.edit, color: Color(0xFF0A4423)),
+                                    onPressed: () {
+                                      final controller = TextEditingController(text: business?['about_desc'] ?? '');
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          title: const Text("Edit About"),
+                                          content: TextField(
+                                            controller: controller,
+                                            maxLines: 4,
+                                            decoration: const InputDecoration(
+                                              border: OutlineInputBorder(),
+                                              hintText: "Describe your business",
+                                            ),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text("Cancel"),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () async {
+                                                final id = business?['eatery_id'] ?? business?['housing_id'];
+                                                final endpoint = business?['eatery_id'] != null
+                                                    ? "https://iskort-public-web.onrender.com/api/eatery/$id"
+                                                    : "https://iskort-public-web.onrender.com/api/housing/$id";
+
+                                                final body = {"about_desc": controller.text.trim()};
+                                                await http.put(
+                                                  Uri.parse(endpoint),
+                                                  headers: {"Content-Type": "application/json"},
+                                                  body: jsonEncode(body),
+                                                );
+                                                Navigator.pop(context);
+                                                await fetchBusiness(); // reload with updated about_desc
+                                              },
+                                              child: const Text("Save"),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 10),
-                                Text("Tags:",
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 4,
-                                  children: classifications.isEmpty
-                                      ? [const Text("No tags yet")]
-                                      : classifications.map((c) => Chip(
-                                            label: Text(c),
-                                            backgroundColor: const Color(0xFFE0F2F1),
-                                          )).toList(),
-                                ),
-                                Text("Status: ${getBusinessStatus(business ?? {})}",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: getBusinessStatus(business ?? {}) == "Open"
-                                        ? Colors.green
-                                        : Colors.red,
-                                  )),
+                              Text("Tags:", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: classifications.isEmpty
+                                    ? [const Text("No tags yet")]
+                                    : classifications.map((c) => Chip(
+                                          label: Text(c),
+                                          backgroundColor: const Color(0xFFE0F2F1),
+                                        )).toList(),
+                              ),
                             ],
                           ),
                         ),
@@ -861,16 +882,18 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   }
 
   String get priceRange {
-      if (products.isEmpty) return "N/A";
-      final prices = products
-          .map((p) => double.tryParse(p['price'].toString()) ?? 0)
-          .toList();
-      final min = prices.reduce((a, b) => a < b ? a : b);
-      final max = prices.reduce((a, b) => a > b ? a : b);
-      return "₱$min - ₱$max";
-    }
+    if (products.isEmpty) return "N/A";
+    final prices = products
+        .map((p) => double.tryParse(p['price'].toString()) ?? 0)
+        .toList();
+    final min = prices.reduce((a, b) => a < b ? a : b);
+    final max = prices.reduce((a, b) => a > b ? a : b);
+    final formatter = NumberFormat("#,###");
+    return "₱${formatter.format(min)} - ₱${formatter.format(max)}";
+  }
 
-    String getBusinessStatus(Map<String, dynamic> biz) {
+
+  String getBusinessStatus(Map<String, dynamic> biz) {
     final open = biz['open_time'];
     final close = biz['end_time'];
     if (open == null || close == null) return "N/A";
