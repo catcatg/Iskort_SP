@@ -164,7 +164,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildNavCardsRow() {
     final navCards = [
       {'name': 'Housing', 'route': '/housing', 'icon': Icons.home},
-      {'name': 'Food', 'route': '/food', 'icon': Icons.restaurant_menu},
+      {'name': 'Eateries', 'route': '/food', 'icon': Icons.restaurant_menu},
     ];
 
     return Row(
@@ -722,6 +722,13 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Results', style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        iconTheme: const IconThemeData(
+          color: Colors.white, // makes the back button white
+        ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -732,6 +739,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           ),
         ),
       ),
+
       body:
           filteredEntries.isEmpty
               ? Center(
