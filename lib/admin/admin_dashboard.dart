@@ -699,123 +699,97 @@ class EateryPage extends StatelessWidget {
   ) {
     showDialog(
       context: context,
-      builder:
-          (_) => Dialog(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // TOP RIGHT CLOSE BUTTON
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, size: 24),
-                    ),
-                  ),
+      builder: (_) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.close, size: 24),
+                ),
+              ),
+              Text(
+                '$name Credentials',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 15),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: documents.entries.map((doc) {
+                      final url = doc.value;
+                      final label = formatLabel(doc.key);
 
-                  // TITLE
-                  Text(
-                    '$name Credentials',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  // CONTENT SCROLL AREA
-                  Flexible(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children:
-                            documents.entries.map((doc) {
-                              final base64 = doc.value;
-                              final label = formatLabel(doc.key);
-
-                              return Column(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
+                      return Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 1,
+                                  child: Text(
+                                    label,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // LABEL
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
-                                            label,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  flex: 1,
+                                  child: url.isEmpty
+                                      ? const Text(
+                                          "User has not uploaded this requirement yet.",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        )
+                                      : GestureDetector(
+                                          onTap: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (_) => Dialog(
+                                                child: InteractiveViewer(
+                                                  child: Image.network(url),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Image.network(
+                                              url,
+                                              width: 120,
+                                              height: 120,
+                                              fit: BoxFit.cover,
                                             ),
                                           ),
                                         ),
-
-                                        const SizedBox(width: 10),
-
-                                        // IMAGE OR MESSAGE
-                                        Expanded(
-                                          flex: 1,
-                                          child:
-                                              base64.isEmpty
-                                                  ? const Text(
-                                                    "User has not uploaded this requirement yet.",
-                                                    style: TextStyle(
-                                                      color: Colors.grey,
-                                                      fontStyle:
-                                                          FontStyle.italic,
-                                                    ),
-                                                  )
-                                                  : GestureDetector(
-                                                    onTap: () {
-                                                      final bytes =
-                                                          base64Decode(base64);
-                                                      showDialog(
-                                                        context: context,
-                                                        builder:
-                                                            (_) => Dialog(
-                                                              child: InteractiveViewer(
-                                                                child:
-                                                                    Image.memory(
-                                                                      bytes,
-                                                                    ),
-                                                              ),
-                                                            ),
-                                                      );
-                                                    },
-                                                    child: ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                      child: Image.memory(
-                                                        base64Decode(base64),
-                                                        width: 120,
-                                                        height: 120,
-                                                        fit: BoxFit.cover,
-                                                      ),
-                                                    ),
-                                                  ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  const Divider(thickness: 1),
-                                ],
-                              );
-                            }).toList(),
-                      ),
-                    ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(thickness: 1),
+                        ],
+                      );
+                    }).toList(),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -1019,129 +993,101 @@ class HousingApplication extends StatelessWidget {
   ) {
     showDialog(
       context: context,
-      builder:
-          (_) => Dialog(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // TOP RIGHT CLOSE BUTTON
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, size: 24),
-                    ),
-                  ),
+      builder: (_) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.close, size: 24),
+                ),
+              ),
+              Text(
+                '$name Credentials',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 15),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: documents.entries.map((doc) {
+                      final url = doc.value;
+                      final label = doc.key
+                          .replaceAll("_base64", "")
+                          .split('_')
+                          .map((w) => w[0].toUpperCase() + w.substring(1))
+                          .join(' ');
 
-                  // TITLE
-                  Text(
-                    '$name Credentials',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  // CONTENT SCROLL AREA
-                  Flexible(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children:
-                            [
-                              // Only show the required documents
-                              'valid_id_base64_housing',
-                              'proof_of_ownership_base64',
-                            ].map((key) {
-                              final base64 = documents[key] ?? '';
-                              final label =
-                                  key == 'valid_id_base64_housing'
-                                      ? 'Valid ID / Housing'
-                                      : 'Proof of Ownership';
-
-                              return Column(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
+                      return Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 1,
+                                  child: Text(
+                                    label,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // LABEL
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
-                                            label,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  flex: 1,
+                                  child: url.isEmpty
+                                      ? const Text(
+                                          "User has not uploaded this requirement yet.",
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        )
+                                      : GestureDetector(
+                                          onTap: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (_) => Dialog(
+                                                child: InteractiveViewer(
+                                                  child: Image.network(url),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Image.network(
+                                              url,
+                                              width: 120,
+                                              height: 120,
+                                              fit: BoxFit.cover,
                                             ),
                                           ),
                                         ),
-
-                                        const SizedBox(width: 10),
-
-                                        // IMAGE OR MESSAGE
-                                        Expanded(
-                                          flex: 1,
-                                          child:
-                                              base64.isEmpty
-                                                  ? const Text(
-                                                    "User has not uploaded this requirement yet.",
-                                                    style: TextStyle(
-                                                      color: Colors.grey,
-                                                      fontStyle:
-                                                          FontStyle.italic,
-                                                    ),
-                                                  )
-                                                  : GestureDetector(
-                                                    onTap: () {
-                                                      final bytes =
-                                                          base64Decode(base64);
-                                                      showDialog(
-                                                        context: context,
-                                                        builder:
-                                                            (_) => Dialog(
-                                                              child: InteractiveViewer(
-                                                                child:
-                                                                    Image.memory(
-                                                                      bytes,
-                                                                    ),
-                                                              ),
-                                                            ),
-                                                      );
-                                                    },
-                                                    child: ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                      child: Image.memory(
-                                                        base64Decode(base64),
-                                                        width: 120,
-                                                        height: 120,
-                                                        fit: BoxFit.cover,
-                                                      ),
-                                                    ),
-                                                  ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Divider(thickness: 1),
-                                ],
-                              );
-                            }).toList(),
-                      ),
-                    ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(thickness: 1),
+                        ],
+                      );
+                    }).toList(),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
+        ),
+      ),
     );
   }
 

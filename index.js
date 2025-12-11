@@ -353,9 +353,11 @@ app.post('/api/eatery', (req, res) => {
      open_time, end_time, about_desc, status) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  db.query(sql, [owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time,
+  db.query(sql, [
+    owner_id, name, location, min_price, is_verified, verified_by_admin_id, verified_time,
     eatery_photo, valid_id_base64, business_permit_base64, dti_certificate_base64, health_permit_base64,
-    open_time, end_time, about_desc, status], (err, result) => {
+    open_time, end_time, about_desc, status
+  ], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, eatery_id: result.insertId });
   });
@@ -538,9 +540,11 @@ app.post('/api/housing', (req, res) => {
      is_verified, verified_by_admin_id, verified_time, about_desc, status) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  db.query(sql, [owner_id, name, location, price, curfew,
+  db.query(sql, [
+    owner_id, name, location, price, curfew,
     housing_photo, valid_id_base64, proof_of_ownership_base64,
-    is_verified, verified_by_admin_id, verified_time, about_desc, status], (err, result) => {
+    is_verified, verified_by_admin_id, verified_time, about_desc, status
+  ], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, housing_id: result.insertId });
   });

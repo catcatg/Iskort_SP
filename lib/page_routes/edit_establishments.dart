@@ -1,6 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+
+// Cloudinary config
+const String _cloudName = "iskort-system";
+const String _uploadPreset = "iskort_upload";
+
+Future<String?> uploadToCloudinary(XFile pickedFile, {String resourceType = 'image'}) async {
+  final url = Uri.parse("https://api.cloudinary.com/v1_1/$_cloudName/$resourceType/upload");
+  final bytes = await pickedFile.readAsBytes();
+
+  final request = http.MultipartRequest("POST", url)
+    ..fields['upload_preset'] = _uploadPreset
+    ..files.add(http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: pickedFile.name,
+    ));
+
+  final response = await request.send();
+  final resStr = await response.stream.bytesToString();
+  final data = jsonDecode(resStr);
+
+  return response.statusCode == 200 ? data['secure_url'] : null;
+}
 
 /// Safely extract an ID from int, string, or MongoDB ObjectId map
 String extractId(dynamic rawId) {
@@ -58,9 +82,9 @@ String getHousingStatus(Map<String, dynamic> biz) {
     required String classification,
     required String price,
   }) saveFoodToServer) {
-    final pic = TextEditingController();
-    final name = TextEditingController();
-    final price = TextEditingController();
+    final picController = TextEditingController();
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
     String? selectedTag;
 
     final classes = [
@@ -78,9 +102,32 @@ String getHousingStatus(Map<String, dynamic> biz) {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                input(pic, hint: "Image URL"),
+                TextFormField(
+                  controller: picController,
+                  decoration: const InputDecoration(
+                    labelText: "Food Image URL",
+                    hintText: "Auto-filled after upload",
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    final picker = ImagePicker();
+                    final picked = await picker.pickImage(source: ImageSource.gallery);
+                    if (picked != null) {
+                      final url = await uploadToCloudinary(picked);
+                      if (url != null) {
+                        picController.text = url;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Image uploaded successfully")),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("Upload Food Image"),
+                ),
                 const SizedBox(height: 10),
-                input(name, hint: "Food Name"),
+                TextField(controller: nameController, decoration: const InputDecoration(hintText: "Food Name")),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
                   value: selectedTag,
@@ -89,7 +136,7 @@ String getHousingStatus(Map<String, dynamic> biz) {
                   onChanged: (val) => selectedTag = val,
                 ),
                 const SizedBox(height: 10),
-                input(price, hint: "Price (₱)"),
+                TextField(controller: priceController, decoration: const InputDecoration(hintText: "Price (₱)")),
               ],
             ),
           ),
@@ -98,12 +145,12 @@ String getHousingStatus(Map<String, dynamic> biz) {
             ElevatedButton(
               child: const Text("Add"),
               onPressed: () async {
-                if (name.text.isEmpty || selectedTag == null) return;
+                if (nameController.text.isEmpty || selectedTag == null) return;
                 await saveFoodToServer(
-                  food_pic: pic.text.trim(),
-                  name: name.text.trim(),
+                  food_pic: picController.text.trim(),
+                  name: nameController.text.trim(),
                   classification: selectedTag!,
-                  price: price.text.trim(),
+                  price: priceController.text.trim(),
                 );
                 Navigator.pop(context);
               },
@@ -225,7 +272,30 @@ String getHousingStatus(Map<String, dynamic> biz) {
                 children: [
                   input(name, hint: "Food Name"),
                   input(price, hint: "Price"),
-                  input(pic, hint: "Image URL"),
+                  TextFormField(
+                    controller: pic,
+                    decoration: const InputDecoration(
+                      labelText: "Food Image URL",
+                      hintText: "Auto-filled after upload",
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final picker = ImagePicker();
+                      final picked = await picker.pickImage(source: ImageSource.gallery);
+                      if (picked != null) {
+                        final url = await uploadToCloudinary(picked);
+                        if (url != null) {
+                          pic.text = url;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Food image uploaded successfully")),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text("Upload Food Image"),
+                  ),
                   DropdownButtonFormField<String>(
                     value: classification,
                     items: classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
@@ -281,7 +351,30 @@ String getHousingStatus(Map<String, dynamic> biz) {
                   children: [
                     input(name, hint: "Facility Name"),
                     input(price, hint: "Price"),
-                    input(pic, hint: "Image URL"),
+                    TextFormField(
+                      controller: pic,
+                      decoration: const InputDecoration(
+                        labelText: "Facility Image URL",
+                        hintText: "Auto-filled after upload",
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final picker = ImagePicker();
+                        final picked = await picker.pickImage(source: ImageSource.gallery);
+                        if (picked != null) {
+                          final url = await uploadToCloudinary(picked);
+                          if (url != null) {
+                            pic.text = url;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Facility image uploaded successfully")),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text("Upload Facility Image"),
+                    ),
                     DropdownButtonFormField<String>(
                       value: type,
                       items: ["Solo","Shared"]

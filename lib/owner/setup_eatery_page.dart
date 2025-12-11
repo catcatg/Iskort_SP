@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+//import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -83,15 +83,25 @@ class _SetupEateryPage extends State<SetupEateryPage> {
   }
 
   // Upload file to Cloudinary and return secure_url
-  Future<String?> uploadToCloudinary(File file, {String resourceType = 'image'}) async {
+  Future<String?> uploadToCloudinary(XFile pickedFile, {String resourceType = 'image'}) async {
     final url = Uri.parse("https://api.cloudinary.com/v1_1/$_cloudName/$resourceType/upload");
+
+    // Read bytes directly from XFile (works in web + mobile)
+    final bytes = await pickedFile.readAsBytes();
+
     final request = http.MultipartRequest("POST", url)
       ..fields['upload_preset'] = _uploadPreset
-      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+      ..files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: pickedFile.name, // safe for web
+      ));
 
     final response = await request.send();
+    final resStr = await response.stream.bytesToString();
+    print("Cloudinary raw response: $resStr");
+
     if (response.statusCode == 200) {
-      final resStr = await response.stream.bytesToString();
       final data = jsonDecode(resStr);
       return data['secure_url'];
     } else {
@@ -102,24 +112,14 @@ class _SetupEateryPage extends State<SetupEateryPage> {
     }
   }
 
-  // Reusable helper: pick file (image or doc) and upload, then set controller
+  // pick file (image or doc) and upload, then set controller
   Future<void> pickAndUpload(TextEditingController controller, String label,
       {bool allowDocs = false}) async {
-    final ImagePicker picker = ImagePicker();
-
-    XFile? picked;
-    if (allowDocs) {
-      // For documents, prefer picking any file. If your app targets mobile,
-      // you can still use ImagePicker for photos and add a file_picker package for PDFs/docs later.
-      // For now, we allow picking images for permits; switch to file_picker if needed.
-      picked = await picker.pickImage(source: ImageSource.gallery);
-    } else {
-      picked = await picker.pickImage(source: ImageSource.gallery);
-    }
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
 
     if (picked != null) {
-      final File file = File(picked.path);
-      final String? url = await uploadToCloudinary(file, resourceType: 'image');
+      final url = await uploadToCloudinary(picked, resourceType: 'image');
       if (url != null) {
         setState(() {
           controller.text = url;
