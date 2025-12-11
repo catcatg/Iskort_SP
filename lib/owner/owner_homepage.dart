@@ -987,7 +987,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     return isOpen ? "Open" : "Closed";
   }
 
-  // Stub methods for About tab actions (reserved for future)
+  // Stub methods for About tab actions
   void _editBioDialog() {}
   void _openTagEditor() {}
 }
