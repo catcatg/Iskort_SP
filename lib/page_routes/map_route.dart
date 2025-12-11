@@ -67,6 +67,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
   LatLng? _userDestination;
   LatLng? _userLocation;
   List<LatLng> _routePoints = [];
+  bool _hasArrived = false;
 
   // Saved locations
   List<LocationRecord> savedLocations = [];
@@ -85,7 +86,8 @@ class _MapRoutePageState extends State<MapRoutePage> {
   void initState() {
     super.initState();
     _initLocation();
-    _loadLastDestination();
+    //_loadLastDestination();
+    _searchController.clear();
 
     // If initialLocation is provided, auto fill search bar and fetch
     if (widget.initialLocation != null && widget.initialLocation!.isNotEmpty) {
@@ -122,11 +124,13 @@ class _MapRoutePageState extends State<MapRoutePage> {
 
     if (selectedRecord != null && selectedRecord is LocationRecord) {
       setState(() {
+        _searchController.clear();
         _userDestination = selectedRecord.coordinates;
         _distanceKm = selectedRecord.distanceKm;
         _durationMin = selectedRecord.durationMin;
         _destinationName = selectedRecord.name;
         isSaved = true;
+        _hasArrived = false;
       });
 
       _mapController.move(_userDestination!, 18);
@@ -168,14 +172,14 @@ class _MapRoutePageState extends State<MapRoutePage> {
     });
   }
 
-  Future<void> _loadLastDestination() async {
-    final prefs = await SharedPreferences.getInstance();
-    final last = prefs.getString('last_destination');
-    if (last != null && mounted) {
-      _searchController.text = last;
-      await fetchCoordPoint(last, moveCamera: false);
-    }
-  }
+  // Future<void> _loadLastDestination() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   final last = prefs.getString('last_destination');
+  //   if (last != null && mounted) {
+  //     _searchController.text = last;
+  //     await fetchCoordPoint(last, moveCamera: false);
+  //   }
+  // }
 
   Future<void> _saveLastDestination(String location) async {
     final prefs = await SharedPreferences.getInstance();
@@ -195,6 +199,8 @@ class _MapRoutePageState extends State<MapRoutePage> {
           );
           isLoading = false;
         });
+
+        _checkArrival(); // Check if arrived
       }
     });
   }
@@ -219,7 +225,10 @@ class _MapRoutePageState extends State<MapRoutePage> {
         '&bounded=1',
       );
 
-      final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {"User-Agent": "IskortMap/1.0 (iskortmap@gmail.com)"},
+      );
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
         if (data.isNotEmpty) {
@@ -240,6 +249,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
           setState(() {
             _userDestination = LatLng(lat, lon);
             _searchSuggestions.clear();
+            _hasArrived = false;
           });
 
           if (moveCamera) _mapController.move(_userDestination!, 18);
@@ -291,9 +301,12 @@ class _MapRoutePageState extends State<MapRoutePage> {
     if (_userLocation == null || _userDestination == null) return;
 
     final url = Uri.parse(
-      'http://router.project-osrm.org/route/v1/driving/${_userLocation!.longitude},${_userLocation!.latitude};${_userDestination!.longitude},${_userDestination!.latitude}?overview=full&geometries=polyline',
+      'https://router.project-osrm.org/route/v1/driving/${_userLocation!.longitude},${_userLocation!.latitude};${_userDestination!.longitude},${_userDestination!.latitude}?overview=full&geometries=polyline',
     );
-    final response = await http.get(url);
+    final response = await http.get(
+      url,
+      headers: {"User-Agent": "IskortMap/1.0 (iskortmap@gmail.com)"},
+    );
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final geometry = data['routes'][0]['geometry'];
@@ -335,7 +348,79 @@ class _MapRoutePageState extends State<MapRoutePage> {
       _searchSuggestions.clear();
       _destinationName = null;
       isSaved = false;
+      _hasArrived = false;
     });
+  }
+
+  void _checkArrival() {
+    if (_userLocation == null || _userDestination == null) return;
+
+    final distance = Distance();
+    final meterDistance = distance(_userLocation!, _userDestination!);
+
+    if (meterDistance <= 20 && !_hasArrived) {
+      // 20 meters threshold
+      if (!mounted) return;
+      setState(() {
+        _hasArrived = true;
+        _routePoints.clear();
+        _distanceKm = null;
+        _durationMin = null;
+        _userDestination = null;
+      });
+
+      // Show arrival dialog
+      showDialog(
+        context: context,
+        builder: (context) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF0A4423), // dark green
+                    Color(0xFF7A1E1E), // deep red
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Icon(Icons.location_on, color: Colors.white, size: 60),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "You have arrived at your destination!",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 
   Future<bool> _checkPermissions() async {
@@ -396,7 +481,10 @@ class _MapRoutePageState extends State<MapRoutePage> {
       '&bounded=1',
     );
 
-    final response = await http.get(url);
+    final response = await http.get(
+      url,
+      headers: {"User-Agent": "IskortMap/1.0 (iskortmap@gmail.com)"},
+    );
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
 
@@ -670,11 +758,13 @@ class _MapRoutePageState extends State<MapRoutePage> {
                   onChanged: (value) {
                     _debounce?.cancel();
                     _debounce = Timer(const Duration(milliseconds: 500), () {
-                      _fetchSuggestions(value);
+                      _fetchSuggestions(value); // your autocomplete suggestions
                     });
                   },
                   onSubmitted: (value) {
-                    fetchCoordPoint(value);
+                    fetchCoordPoint(
+                      value,
+                    ); // fetch route when user presses enter
                   },
                   decoration: InputDecoration(
                     filled: true,
@@ -701,13 +791,22 @@ class _MapRoutePageState extends State<MapRoutePage> {
                         width: 2,
                       ),
                     ),
-                    suffixIcon: Icon(Icons.search, color: Color(0xFF0A4423)),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.search, color: Color(0xFF0A4423)),
+                      onPressed: () {
+                        final query = _searchController.text;
+                        if (query.isNotEmpty) {
+                          fetchCoordPoint(query);
+                        }
+                      },
+                    ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 14,
                     ),
                   ),
                 ),
+
                 if (_searchSuggestions.isNotEmpty)
                   Container(
                     color: Colors.white,
