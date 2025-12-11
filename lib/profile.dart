@@ -109,10 +109,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             fontSize: 14,
                           ),
                         ),
-                        Text(
-                          'Role: $role',
-                          style: const TextStyle(fontSize: 14),
-                        ),
+
                         const SizedBox(height: 20),
 
                         _buildMenuItem(Icons.bookmark, "Saved Locations", () {
@@ -137,9 +134,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
                         _buildMenuItem(
                           Icons.notifications,
-                          "Activity Notifications",
+                          "Your Activity",
                           () {
-                            Navigator.pushNamed(context, '/notifications');
+                            Navigator.pushNamed(context, '/user-reviews');
                           },
                         ),
 
