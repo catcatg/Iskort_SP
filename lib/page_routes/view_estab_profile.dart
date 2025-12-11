@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EstabProfileForCustomer extends StatefulWidget {
   final String ownerId;
@@ -20,6 +21,8 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
   List<String> businessTags = [];
   List<dynamic> ownerEateries = [];
   List<dynamic> ownerHousings = [];
+  List<dynamic> eateryFoods = [];
+  List<dynamic> housingFacilities = [];
 
   // Reviews sorting state
   String reviewSortOrder = 'Newest';
@@ -27,14 +30,96 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
   @override
   void initState() {
     super.initState();
-    fetchBusiness();
     _tabController = TabController(length: 3, vsync: this);
+
+    fetchBusiness().then((_) async {
+      await fetchOwnerAbout();
+      await fetchProducts();
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> fetchProducts() async {
+    try {
+      List<dynamic> allFoods = [];
+      List<dynamic> allFacilities = [];
+
+      // Fetch foods for each eatery
+      for (var eatery in ownerEateries) {
+        final resp = await http.get(
+          Uri.parse(
+            "https://iskort-public-web.onrender.com/api/food/${eatery['eatery_id']}",
+          ),
+        );
+        final data = jsonDecode(resp.body);
+        final foods = data['foods'] ?? [];
+
+        for (var food in foods) {
+          food['businessName'] = eatery['name'];
+        }
+
+        allFoods.addAll(foods);
+      }
+
+      // Fetch facilities for each housing
+      for (var housing in ownerHousings) {
+        final resp = await http.get(
+          Uri.parse(
+            "https://iskort-public-web.onrender.com/api/facility/${housing['housing_id']}",
+          ),
+        );
+        final data = jsonDecode(resp.body);
+        final facilities = data['facilities'] ?? [];
+
+        for (var fac in facilities) {
+          fac['businessName'] = housing['name'];
+        }
+
+        allFacilities.addAll(facilities);
+      }
+
+      setState(() {
+        eateryFoods = allFoods;
+        housingFacilities = allFacilities;
+      });
+    } catch (e) {
+      print("Error fetching products: $e");
+    }
+  }
+
+  Future<void> fetchOwnerAbout() async {
+    try {
+      final resp = await http.get(
+        Uri.parse(
+          "https://iskort-public-web.onrender.com/api/owner/${widget.ownerId}",
+        ),
+      );
+
+      final data = jsonDecode(resp.body);
+
+      if (data != null && data['owner'] != null) {
+        final owner = data['owner'];
+        setState(() {
+          business ??= {}; // Ensure business map exists
+          business!['bio'] = owner['about_desc'] ?? owner['bio'] ?? '';
+          business!['tags'] = owner['tags'] ?? [];
+          business!['location'] = owner['location'] ?? 'N/A';
+          business!['phone_num'] =
+              owner['phone_num'] ?? owner['owner_phone'] ?? 'N/A';
+          business!['email'] = owner['email'] ?? owner['owner_email'] ?? 'N/A';
+          business!['open_time'] = owner['open_time'] ?? '--';
+          business!['end_time'] = owner['end_time'] ?? '--';
+          business!['is_open'] = owner['is_open'] ?? false;
+        });
+      }
+    } catch (e) {
+      print("Error fetching owner about: $e");
+    }
   }
 
   Future<void> fetchBusiness() async {
@@ -51,24 +136,35 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
       final eateryData = jsonDecode(eateryResp.body);
       final housingData = jsonDecode(housingResp.body);
 
+      ownerEateries =
+          (eateryData['eateries'] ?? [])
+              .where((e) => e['owner_id']?.toString() == ownerId)
+              .toList();
+      ownerHousings =
+          (housingData['housings'] ?? [])
+              .where((h) => h['owner_id']?.toString() == ownerId)
+              .toList();
+
+      business =
+          ownerEateries.isNotEmpty
+              ? ownerEateries.first
+              : ownerHousings.isNotEmpty
+              ? ownerHousings.first
+              : null;
+
+      // Load saved reviews from shared_preferences
+      if (business != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final savedReviews = prefs.getStringList('reviews_${business!['id']}');
+        if (savedReviews != null) {
+          business!['reviews'] =
+              savedReviews.map((r) => jsonDecode(r)).toList();
+        } else {
+          business!['reviews'] = business!['reviews'] ?? [];
+        }
+      }
+
       setState(() {
-        ownerEateries =
-            (eateryData['eateries'] ?? [])
-                .where((e) => e['owner_id']?.toString() == ownerId)
-                .toList();
-
-        ownerHousings =
-            (housingData['housings'] ?? [])
-                .where((h) => h['owner_id']?.toString() == ownerId)
-                .toList();
-
-        business =
-            ownerEateries.isNotEmpty
-                ? ownerEateries.first
-                : ownerHousings.isNotEmpty
-                ? ownerHousings.first
-                : null;
-
         loading = false;
       });
     } catch (e) {
@@ -232,9 +328,9 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                           ListView(
                             padding: const EdgeInsets.all(8),
                             children: [
-                              // Eateries Section
+                              // ---------- EATERY PRODUCTS ----------
                               const Text(
-                                "Eateries",
+                                "Eatery Products",
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
@@ -242,26 +338,27 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              if (ownerEateries.isEmpty)
-                                Text(
+
+                              if (eateryFoods.isEmpty)
+                                const Text(
+                                  "No eatery products available.",
                                   textAlign: TextAlign.center,
-                                  "${business?['name'] ?? 'User'} has no eatery product",
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontStyle: FontStyle.italic,
                                     color: Colors.grey,
                                   ),
                                 )
                               else
-                                ...ownerEateries.map(
-                                  (e) => _establishmentCard(e, isEatery: true),
+                                ...eateryFoods.map(
+                                  (food) => _productCard(food, isEatery: true),
                                 ),
 
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
 
-                              // Housings Section
+                              // ---------- HOUSING FACILITIES ----------
                               const Text(
-                                "Housings",
+                                "Housing Facilities",
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
@@ -269,19 +366,20 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              if (ownerHousings.isEmpty)
-                                Text(
+
+                              if (housingFacilities.isEmpty)
+                                const Text(
+                                  "No housing facilities available.",
                                   textAlign: TextAlign.center,
-                                  "${business?['name'] ?? 'User'} has no housing product",
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontStyle: FontStyle.italic,
                                     color: Colors.grey,
                                   ),
                                 )
                               else
-                                ...ownerHousings.map(
-                                  (h) => _establishmentCard(h, isEatery: false),
+                                ...housingFacilities.map(
+                                  (fac) => _productCard(fac, isEatery: false),
                                 ),
                             ],
                           ),
@@ -463,8 +561,10 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                 Wrap(
                                   spacing: 8,
                                   children:
-                                      (businessTags.isNotEmpty
-                                              ? businessTags
+                                      ((business?['tags'] ?? []).isNotEmpty
+                                              ? List<String>.from(
+                                                business!['tags'],
+                                              )
                                               : ['No tags yet'])
                                           .map(
                                             (tag) => Chip(
@@ -532,7 +632,7 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      "Business hours: ${business?['open_time']?.toString() ?? '--'} - ${business?['end_time']?.toString() ?? '--'}",
+                                      "Business hours: ${business?['open_time']} - ${business?['end_time']}",
                                     ),
                                     const Spacer(),
                                     Container(
@@ -582,41 +682,9 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
     );
   }
 
-  Widget _establishmentCard(
-    Map<String, dynamic> est, {
-    required bool isEatery,
-  }) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(15),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.network(
-            est['eatery_photo']?.toString() ?? est['photo']?.toString() ?? "",
-            width: 70,
-            height: 70,
-            fit: BoxFit.cover,
-            errorBuilder:
-                (_, __, ___) =>
-                    const Icon(Icons.store, size: 40, color: Color(0xFF791317)),
-          ),
-        ),
-        title: Text(
-          est['name']?.toString() ?? 'Unknown',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0A4423),
-          ),
-        ),
-        subtitle: Text(est['location']?.toString() ?? 'N/A'),
-      ),
-    );
-  }
-
-  void _showAddReviewDialog() {
-    final _nameController = TextEditingController();
+  void _showAddReviewDialog({String? currentUserName}) {
+    // Pre-fill with user's name if available
+    final _nameController = TextEditingController(text: currentUserName ?? '');
     final _commentController = TextEditingController();
     int _rating = 0;
 
@@ -683,28 +751,40 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
               child: const Text("Cancel"),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (_nameController.text.isEmpty ||
                     _commentController.text.isEmpty ||
                     _rating == 0) {
                   return;
                 }
 
+                final newReview = {
+                  'shopName': business?['name'] ?? 'Unknown',
+                  'reviewer_name': _nameController.text,
+                  'comment': _commentController.text,
+                  'rating': _rating,
+                  'date': DateTime.now().toIso8601String(),
+                };
+
                 setState(() {
-                  if (business!['reviews'] == null) {
-                    business!['reviews'] = [];
-                  }
-                  business!['reviews'].add({
-                    'reviewer_name': _nameController.text,
-                    'comment': _commentController.text,
-                    'rating': _rating,
-                    'date': DateTime.now().toIso8601String(),
-                  });
+                  if (business!['reviews'] == null) business!['reviews'] = [];
+                  business!['reviews'].add(newReview);
+                  UserReviewsStorage.instance.addReview(newReview);
                 });
+
+                // Save reviews to shared_preferences
+                final prefs = await SharedPreferences.getInstance();
+                final reviewList =
+                    business!['reviews']!
+                        .map<String>((r) => jsonEncode(r))
+                        .toList();
+                await prefs.setStringList(
+                  'reviews_${business!['id']}',
+                  reviewList,
+                );
 
                 Navigator.pop(context);
               },
-
               style: TextButton.styleFrom(
                 backgroundColor: const Color(0xFF0A4423),
                 foregroundColor: Colors.white,
@@ -716,4 +796,71 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
       },
     );
   }
+}
+
+// LOCAL STORAGE FOR USER REVIEWS
+class UserReviewsStorage {
+  UserReviewsStorage._privateConstructor();
+  static final UserReviewsStorage instance =
+      UserReviewsStorage._privateConstructor();
+  final List<Map<String, dynamic>> _reviews = [];
+
+  List<Map<String, dynamic>> get reviews => _reviews;
+
+  void addReview(Map<String, dynamic> review) {
+    _reviews.add(review);
+  }
+}
+
+Widget _productCard(Map<String, dynamic> product, {required bool isEatery}) {
+  return Card(
+    elevation: 3,
+    margin: const EdgeInsets.symmetric(vertical: 8),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    child: ListTile(
+      contentPadding: const EdgeInsets.all(15),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          product['food_pic']?.toString() ??
+              product['facility_pic']?.toString() ??
+              "",
+          width: 70,
+          height: 70,
+          fit: BoxFit.cover,
+          errorBuilder:
+              (_, __, ___) =>
+                  const Icon(Icons.image, size: 40, color: Colors.grey),
+        ),
+      ),
+      title: Text(
+        product['name']?.toString() ?? 'Unknown Product',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF0A4423),
+        ),
+      ),
+      subtitle: RichText(
+        text: TextSpan(
+          style: const TextStyle(
+            color: Colors.black, // default color
+            fontSize: 14,
+          ),
+          children: [
+            TextSpan(
+              text: "${product['businessName']}\n",
+              style: const TextStyle(fontWeight: FontWeight.w500, height: 1.4),
+            ),
+            TextSpan(
+              text: "₱${product['price'] ?? product['rate']}",
+
+              style: const TextStyle(
+                color: Colors.green, // price colored green
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
