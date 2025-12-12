@@ -55,6 +55,7 @@ class MyApp extends StatelessWidget {
         '/setup-details': (context) => const SetupDetailsPage(),
         //'/user-reviews': (context) => const YourReviews(),
         '/profile_settings': (context) => const ProfileSettingsPage(),
+        '/forgot-password': (_) => const ForgotPasswordPage(),
         '/setup-eatery-page': (context) {
           final args =
               ModalRoute.of(context)?.settings.arguments
