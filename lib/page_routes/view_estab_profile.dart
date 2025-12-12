@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Mirrors owner layout but read-only for customers
 enum SortMode { classificationName, classificationPrice, globalPrice }
@@ -769,7 +770,7 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
               child: const Text("Cancel"),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (_nameController.text.isEmpty ||
                     _commentController.text.isEmpty ||
                     _rating == 0) {

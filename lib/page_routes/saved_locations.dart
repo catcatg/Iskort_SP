@@ -59,42 +59,94 @@ class _SavedLocationsState extends State<SavedLocations> {
                 itemCount: savedLocations.length,
                 itemBuilder: (context, index) {
                   final record = savedLocations[index];
-                  return ListTile(
-                    leading: const Icon(Icons.location_pin, color: Colors.red),
-                    title: Text(record.name),
-                    subtitle: Text(
-                      'Distance: ${record.distanceKm.toStringAsFixed(2)} km, '
-                      'ETA: ${record.durationMin.toStringAsFixed(0)} mins',
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 12,
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.white),
-                      onPressed: () async {
-                        final prefs = await SharedPreferences.getInstance();
-                        final savedList =
-                            prefs.getStringList('saved_locations') ?? [];
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 16,
+                      ),
+                      leading: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.location_pin,
+                          color: Color(0xFF791317),
+                        ),
+                      ),
+                      title: Text(
+                        record.name ?? 'Unknown',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Color(0xFF0A4423),
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Distance: ${record.distanceKm?.toStringAsFixed(2) ?? '0.00'} km, '
+                        'ETA: ${record.durationMin?.toStringAsFixed(0) ?? '0'} mins',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Color(0xFF791317),
+                        ),
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          final savedList =
+                              prefs.getStringList('saved_locations') ?? [];
 
-                        savedList.removeWhere((item) {
-                          final data = jsonDecode(item);
-                          return data['lat'] == record.coordinates.latitude &&
-                              data['lng'] == record.coordinates.longitude &&
-                              data['timestamp'] ==
-                                  record.timestamp.toIso8601String();
-                        });
+                          final updatedList =
+                              savedList.where((item) {
+                                final data = jsonDecode(item);
+                                return !(data['lat'] ==
+                                        record.coordinates.latitude &&
+                                    data['lng'] ==
+                                        record.coordinates.longitude &&
+                                    data['timestamp'] ==
+                                        record.timestamp.toIso8601String());
+                              }).toList();
 
-                        await prefs.setStringList('saved_locations', savedList);
+                          await prefs.setStringList(
+                            'saved_locations',
+                            updatedList,
+                          );
 
-                        setState(() {
-                          savedLocations.removeAt(index);
-                        });
+                          setState(() {
+                            savedLocations.removeAt(index);
+                          });
+                        },
+                      ),
+                      onTap: () {
+                        if (widget.onSelect != null) {
+                          widget.onSelect!(record);
+                        } else {
+                          Navigator.pop(context, record);
+                        }
                       },
                     ),
-                    onTap: () {
-                      if (widget.onSelect != null) {
-                        widget.onSelect!(record);
-                      } else {
-                        Navigator.pop(context, record);
-                      }
-                    },
                   );
                 },
               ),
