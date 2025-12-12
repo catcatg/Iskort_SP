@@ -25,7 +25,7 @@ class _FoodPageState extends State<FoodPage> {
     fetchVerifiedFoods();
   }
 
-    Future<void> fetchVerifiedFoods() async {
+  Future<void> fetchVerifiedFoods() async {
     setState(() => isLoading = true);
     try {
       final resp = await http.get(
@@ -34,8 +34,9 @@ class _FoodPageState extends State<FoodPage> {
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        final verifiedEateries =
-            (data['eateries'] ?? []).where((e) => e['is_verified'] == 1);
+        final verifiedEateries = (data['eateries'] ?? []).where(
+          (e) => e['is_verified'] == 1,
+        );
 
         List<Map<String, dynamic>> foods = [];
         Set<String> tagsSet = {};
@@ -44,7 +45,9 @@ class _FoodPageState extends State<FoodPage> {
           final eateryId = eatery['eatery_id'];
           final eateryName = eatery['name'] ?? '';
           final foodResp = await http.get(
-            Uri.parse('https://iskort-public-web.onrender.com/api/food/$eateryId'),
+            Uri.parse(
+              'https://iskort-public-web.onrender.com/api/food/$eateryId',
+            ),
           );
           if (foodResp.statusCode == 200) {
             final foodData = jsonDecode(foodResp.body);
@@ -81,19 +84,21 @@ class _FoodPageState extends State<FoodPage> {
     }
   }
 
-    void applyFilters() {
+  void applyFilters() {
     setState(() {
-      filteredFoods = allFoods.where((food) {
-        final matchesTag = selectedTags.isEmpty ||
-            selectedTags.contains(food['classification']);
-        final matchesBudget =
-            maxBudget == null || food['price'] <= maxBudget!;
-        return matchesTag && matchesBudget;
-      }).toList();
+      filteredFoods =
+          allFoods.where((food) {
+            final matchesTag =
+                selectedTags.isEmpty ||
+                selectedTags.contains(food['classification']);
+            final matchesBudget =
+                maxBudget == null || food['price'] <= maxBudget!;
+            return matchesTag && matchesBudget;
+          }).toList();
     });
   }
 
-    @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -120,40 +125,72 @@ class _FoodPageState extends State<FoodPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Tags with row spacing
                 Wrap(
                   spacing: 8,
-                  children: availableTags.map((tag) => FilterChip(
-                        label: Text(tag),
-                        selected: selectedTags.contains(tag),
-                        onSelected: (selected) {
-                          setState(() {
-                            if (selected) {
-                              selectedTags.add(tag);
-                            } else {
-                              selectedTags.remove(tag);
-                            }
-                            applyFilters();
-                          });
-                        },
-                      )).toList(),
+                  runSpacing: 8, // vertical spacing between rows
+                  children:
+                      availableTags.map((tag) {
+                        // Define isSelected inside the map closure
+                        final isSelected = selectedTags.contains(tag);
+                        return FilterChip(
+                          label: Text(
+                            tag,
+                            style: TextStyle(
+                              color:
+                                  isSelected
+                                      ? Colors.white
+                                      : Colors.black, // white when selected
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor: Color.fromARGB(255, 22, 152, 79),
+                          checkmarkColor: Colors.white, // checkmark color
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                selectedTags.add(tag);
+                              } else {
+                                selectedTags.remove(tag);
+                              }
+                              applyFilters();
+                            });
+                          },
+                        );
+                      }).toList(),
                 ),
+
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Text("Max Budget: "),
-                    Expanded(
-                      child: Slider(
-                        value: maxBudget ?? 100,
-                        min: 20,
-                        max: 500,
-                        divisions: 48,
-                        label: maxBudget?.toStringAsFixed(0) ?? "Any",
-                        onChanged: (val) {
-                          setState(() {
-                            maxBudget = val;
-                            applyFilters();
-                          });
-                        },
+                    const Text("Max Budget: P "),
+                    Container(
+                      width: 120,
+                      child: Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(
+                            fontSize: 14,
+                          ), // <-- font size set to 12
+                          decoration: const InputDecoration(
+                            hintText: "Enter amount",
+                            hintStyle: TextStyle(
+                              fontSize: 14,
+                            ), // optional: hint text matches font size
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 8,
+                            ),
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              maxBudget = double.tryParse(val);
+                              applyFilters();
+                            });
+                          },
+                        ),
                       ),
                     ),
                   ],
@@ -161,98 +198,139 @@ class _FoodPageState extends State<FoodPage> {
               ],
             ),
           ),
-                    Expanded(
-            child: isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF0A4423)),
-                  )
-                : GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: filteredFoods.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.8, // slightly taller cells
-                    ),
-                    itemBuilder: (_, i) {
-                      final food = filteredFoods[i];
-                      return Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: Colors.white,
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black12, blurRadius: 6),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Image
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: AspectRatio(
-                                aspectRatio: 1.2,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    food['image'],
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(Icons.broken_image,
-                                          size: 40),
+
+          Expanded(
+            child:
+                isLoading
+                    ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF0A4423),
+                      ),
+                    )
+                    : GridView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: filteredFoods.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.8, // slightly taller cells
+                          ),
+                      itemBuilder: (_, i) {
+                        final food = filteredFoods[i];
+                        return Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white,
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black12, blurRadius: 6),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Image
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: AspectRatio(
+                                  aspectRatio: 1.2,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      food['image'],
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (_, __, ___) => Container(
+                                            color: Colors.grey.shade300,
+                                            child: const Icon(
+                                              Icons.broken_image,
+                                              size: 40,
+                                            ),
+                                          ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                            Flexible(
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      food['name'],
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
+                              Flexible(
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    8,
+                                    4,
+                                    8,
+                                    8,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              food['name'],
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            width: 8,
+                                          ), // space between name and price pill
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  Colors
+                                                      .green[800], // darker green pill
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              "₱${food['price'].toStringAsFixed(0)}",
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      food['eateryName'],
-                                      style: const TextStyle(fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      food['classification'],
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
+
+                                      Text(
+                                        food['eateryName'],
+                                        style: const TextStyle(fontSize: 12),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
-                                    Text(
-                                      "₱${food['price'].toStringAsFixed(0)}",
-                                      style: const TextStyle(
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.w500,
+                                      Text(
+                                        food['classification'],
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),
