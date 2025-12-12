@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'page_routes/preference_popup.dart';
 import 'page_routes/view_estab_profile.dart';
 import 'page_routes/map_route.dart';
+import 'page_routes/search_results_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,7 +20,6 @@ class _HomePageState extends State<HomePage> {
   bool isLoading = true;
   Map<String, dynamic> user = {};
 
-  // Preference lists
   List<String> currentFoodPrefs = [];
   List<String> currentHousingPrefs = [];
 
@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
     fetchEntries();
   }
 
-  Future<void> loadPreferences() async {
+    Future<void> loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     currentFoodPrefs = prefs.getStringList("foodPrefs") ?? [];
     currentHousingPrefs = prefs.getStringList("housingPrefs") ?? [];
@@ -63,18 +63,17 @@ class _HomePageState extends State<HomePage> {
       Future.delayed(Duration.zero, () {
         showDialog(
           context: context,
-          builder:
-              (_) => PreferencePopup(
-                initialFoodPrefs: currentFoodPrefs,
-                initialHousingPrefs: currentHousingPrefs,
-                onSave: (prefsSelected) async {
-                  setState(() {
-                    currentFoodPrefs = prefsSelected["food"] ?? [];
-                    currentHousingPrefs = prefsSelected["housing"] ?? [];
-                  });
-                  await savePreferences();
-                },
-              ),
+          builder: (_) => PreferencePopup(
+            initialFoodPrefs: currentFoodPrefs,
+            initialHousingPrefs: currentHousingPrefs,
+            onSave: (prefsSelected) async {
+              setState(() {
+                currentFoodPrefs = prefsSelected["food"] ?? [];
+                currentHousingPrefs = prefsSelected["housing"] ?? [];
+              });
+              await savePreferences();
+            },
+          ),
         );
       });
     }
@@ -84,16 +83,13 @@ class _HomePageState extends State<HomePage> {
     try {
       List entries = [];
 
-      // Fetch eateries
       final eateryResp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
       );
       if (eateryResp.statusCode == 200) {
         final data = jsonDecode(eateryResp.body);
         final verifiedEateries =
-            (data['eateries'] ?? [])
-                .where((e) => e['is_verified'] == 1)
-                .toList();
+            (data['eateries'] ?? []).where((e) => e['is_verified'] == 1).toList();
         for (var eatery in verifiedEateries) {
           eatery['type'] = 'Eatery';
           eatery['photo'] = eatery['eatery_photo'] ?? '';
@@ -101,16 +97,13 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
-      // Fetch housing
       final housingResp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/housing'),
       );
       if (housingResp.statusCode == 200) {
         final data = jsonDecode(housingResp.body);
         final verifiedHousing =
-            (data['housings'] ?? [])
-                .where((h) => h['is_verified'] == 1)
-                .toList();
+            (data['housings'] ?? []).where((h) => h['is_verified'] == 1).toList();
         for (var house in verifiedHousing) {
           house['type'] = 'Housing';
           house['photo'] = house['housing_photo'] ?? '';
@@ -131,12 +124,12 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget GeneralSearchBar() {
+    Widget GeneralSearchBar() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 255, 255, 255),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Color(0xFF0A4423), width: 1.5),
+        border: Border.all(color: const Color(0xFF0A4423), width: 1.5),
       ),
       child: TextField(
         controller: _searchController,
@@ -151,7 +144,7 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => SearchResultsPage(searchQuery: query),
+                builder: (_) => SearchResultsPage(initialQuery: query),
                 settings: RouteSettings(arguments: allEntries),
               ),
             );
@@ -169,263 +162,224 @@ class _HomePageState extends State<HomePage> {
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children:
-          navCards.map((card) {
-            return Expanded(
-              child: GestureDetector(
-                onTap:
-                    () => Navigator.pushNamed(
-                      context,
-                      card['route']?.toString() ?? '/',
-                    ),
-                child: Container(
-                  height: 90,
-                  margin: const EdgeInsets.symmetric(horizontal: 5),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(
-                          0x660A4423,
-                        ), // slightly transparent for softer shadow
-                        blurRadius: 4,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        card['icon'] as IconData? ?? Icons.help_outline,
-                        size: 30,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        card['name']?.toString() ?? 'Unknown',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
+      children: navCards.map((card) {
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pushNamed(
+              context,
+              card['route']?.toString() ?? '/',
+            ),
+            child: Container(
+              height: 90,
+              margin: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x660A4423),
+                    blurRadius: 4,
+                    offset: Offset(0, 3),
+                  ),
+                ],
               ),
-            );
-          }).toList(),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    card['icon'] as IconData? ?? Icons.help_outline,
+                    size: 30,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    card['name']?.toString() ?? 'Unknown',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
   void showEntryDetails(Map entry) {
-    // Track favorite status for this specific entry
-    bool isLiked = false; // You can initialize from a saved list if needed
+    bool isLiked = false;
 
     showDialog(
       context: context,
-      builder:
-          (_) => Dialog(
-            insetPadding: const EdgeInsets.all(25),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: StatefulBuilder(
-              builder: (context, setState) {
-                void toggleFavorite() {
-                  setState(() => isLiked = !isLiked); // update icon color
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.all(25),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            void toggleFavorite() {
+              setState(() => isLiked = !isLiked);
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isLiked ? 'Added to favorites!' : 'Removed from favorites!',
+                  ),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
+            }
 
-                  // Optional: save/remove from actual favorites list here
-                  // e.g., save to SharedPreferences or your app's favorites map
-
-                  ScaffoldMessenger.of(context).removeCurrentSnackBar();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isLiked
-                            ? 'Added to favorites!'
-                            : 'Removed from favorites!',
-                      ),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                }
-
-                return Stack(
-                  children: [
-                    SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            return Stack(
+              children: [
+                SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            entry['photo'] ?? "assets/images/placeholder.png",
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              height: 200,
+                              color: Colors.grey.shade300,
+                              child: const Icon(Icons.broken_image, size: 40),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Image
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                entry['photo'] ??
-                                    "assets/images/placeholder.png",
-                                height: 200,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder:
-                                    (_, __, ___) => Container(
-                                      width: double.infinity,
-                                      alignment: Alignment.center,
-                                      height: 200,
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(
-                                        Icons.broken_image,
-                                        size: 40,
-                                      ),
-                                    ),
-                              ),
-                            ),
-                            const SizedBox(height: 15),
-
-                            // Title + Favorite icon
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                            Expanded(
+                              child: Text(
+                                "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                GestureDetector(
-                                  onTap: toggleFavorite,
-                                  child: CircleAvatar(
-                                    backgroundColor: Colors.white,
-                                    radius: 16,
-                                    child: Icon(
-                                      isLiked
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      color: isLiked ? Colors.red : Colors.grey,
-                                      size: 18,
-                                    ),
-                                  ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: toggleFavorite,
+                              child: CircleAvatar(
+                                backgroundColor: Colors.white,
+                                radius: 16,
+                                child: Icon(
+                                  isLiked ? Icons.favorite : Icons.favorite_border,
+                                  color: isLiked ? Colors.red : Colors.grey,
+                                  size: 18,
                                 ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 8),
-                            // Location
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.location_on,
-                                  size: 16,
-                                  color: Color(0xFF7A1E1E),
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    entry['location'] ?? '',
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Entry-specific details
-                            if (entry['type'] == 'Eatery') ...[
-                              Text(
-                                "Minimum Price: ₱${entry['min_price'] ?? 'N/A'}",
-                              ),
-                              Text("Open: ${entry['open_time'] ?? ''}"),
-                              Text("Close: ${entry['end_time'] ?? ''}"),
-                            ] else if (entry['type'] == 'Housing') ...[
-                              Text(
-                                "Monthly Price: ₱${entry['price'] ?? 'N/A'}",
-                              ),
-                              Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
-                            ],
-
-                            const SizedBox(height: 20),
-
-                            // Buttons
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0A4423),
-                                minimumSize: const Size(double.infinity, 45),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (_) => EstabProfileForCustomer(
-                                          ownerId:
-                                              entry['owner_id']?.toString() ??
-                                              '',
-                                        ),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                "View Establishment Profile",
-                                style: TextStyle(color: Colors.white),
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0A4423),
-                                minimumSize: const Size(double.infinity, 45),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (_) => MapRoutePage(
-                                          initialLocation:
-                                              entry['location']?.toString() ??
-                                              '',
-                                        ),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                "View Route",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                                                        const Icon(Icons.location_on,
+                                size: 16, color: Color(0xFF7A1E1E)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(entry['location'] ?? '',
+                                  style: const TextStyle(fontSize: 14)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        if (entry['type'] == 'Eatery') ...[
+                          Text("Minimum Price: ₱${entry['min_price'] ?? 'N/A'}"),
+                          Text("Open: ${entry['open_time'] ?? ''}"),
+                          Text("Close: ${entry['end_time'] ?? ''}"),
+                        ] else if (entry['type'] == 'Housing') ...[
+                          Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
+                          Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
+                        ],
+
+                        const SizedBox(height: 20),
+
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0A4423),
+                            minimumSize: const Size(double.infinity, 45),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EstabProfileForCustomer(
+                                  ownerId: entry['owner_id']?.toString() ?? '',
+                                  estType: entry['type']?.toString() ?? '',
+                                  eateryId: entry['eatery_id']?.toString(),
+                                  housingId: entry['housing_id']?.toString(),
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            "View Establishment Profile",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0A4423),
+                            minimumSize: const Size(double.infinity, 45),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MapRoutePage(
+                                  initialLocation:
+                                      entry['location']?.toString() ?? '',
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            "View Route",
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                     ),
-                    Positioned(
-                      right: 0,
-                      child: IconButton(
-                        icon: const Icon(Icons.close, size: 26),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, size: 26),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SingleChildScrollView(
@@ -463,9 +417,6 @@ class _HomePageState extends State<HomePage> {
             _buildNavCardsRow(),
             const SizedBox(height: 15),
 
-            // ------------------------------
-            // RECOMMENDED SECTION (Housing + Eateries)
-            // ------------------------------
             Divider(color: Color(0xFF0A4423)),
             const SizedBox(height: 10),
             Container(
@@ -473,7 +424,6 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFF0A4423),
-                border: Border.all(color: Colors.transparent),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
@@ -502,7 +452,7 @@ class _HomePageState extends State<HomePage> {
             else if (allEntries.isEmpty)
               const Text("No entries found")
             else ...[
-              // --------------------- HOUSING ---------------------
+              // Housing section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -515,24 +465,12 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   TextButton(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      backgroundColor: Colors.transparent,
-                    ),
                     onPressed: () {
                       Navigator.pushNamed(context, '/housing');
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
+                          horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
@@ -549,98 +487,92 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
-              SizedBox(height: 10),
-              Column(
-                children:
-                    allEntries
-                        .where((e) => e['type'] == 'Housing')
-                        .take(5)
-                        .map(
-                          (entry) => ProductCard(
-                            title: entry['name'] ?? '',
-                            subtitle: "Tap to view details",
-                            location: entry['location'] ?? '',
-                            imagePath:
-                                entry['photo'] ??
-                                "assets/images/placeholder.png",
-                            onTap: () => showEntryDetails(entry),
-                          ),
-                        )
-                        .toList(),
+              const SizedBox(height: 10),
+
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                childAspectRatio: 3 / 4,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                children: allEntries
+                    .where((e) => e['type'] == 'Housing')
+                    .take(6)
+                    .map(
+                      (entry) => ProductCard(
+                        title: entry['name'] ?? '',
+                        subtitle: "Tap to view details",
+                        location: entry['location'] ?? '',
+                        imagePath: entry['photo'] ?? "assets/images/placeholder.png",
+                        onTap: () => showEntryDetails(entry),
+                      ),
+                    )
+                    .toList(),
               ),
+                const SizedBox(height: 10),
+                Divider(color: Color(0xFF0A4423)),
+                const SizedBox(height: 10),
 
-              const SizedBox(height: 10),
-              Divider(color: Color(0xFF0A4423)),
-              const SizedBox(height: 10),
-
-              // --------------------- EATERIES ---------------------
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Eateries",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0A4423),
+                // Eateries section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Eateries",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A4423),
+                      ),
                     ),
-                  ),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      backgroundColor: Colors.transparent,
-                    ),
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/food');
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/food');
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        "View more",
-                        style: TextStyle(color: Colors.white, fontSize: 13),
+                        child: const Text(
+                          "View more",
+                          style: TextStyle(color: Colors.white, fontSize: 13),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 10),
+                  ],
+                ),
+                const SizedBox(height: 10),
 
-              Column(
-                children:
-                    allEntries
-                        .where((e) => e['type'] == 'Eatery')
-                        .take(5)
-                        .map(
-                          (entry) => ProductCard(
-                            title: entry['name'] ?? '',
-                            subtitle: "Tap to view details",
-                            location: entry['location'] ?? '',
-                            imagePath:
-                                entry['photo'] ??
-                                "assets/images/placeholder.png",
-                            onTap: () => showEntryDetails(entry),
-                          ),
-                        )
-                        .toList(),
-              ),
-            ],
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  childAspectRatio: 3 / 4,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  children: allEntries
+                      .where((e) => e['type'] == 'Eatery')
+                      .take(6)
+                      .map(
+                        (entry) => ProductCard(
+                          title: entry['name'] ?? '',
+                          subtitle: "Tap to view details",
+                          location: entry['location'] ?? '',
+                          imagePath: entry['photo'] ?? "assets/images/placeholder.png",
+                          onTap: () => showEntryDetails(entry),
+                        ),
+                      )
+                      .toList(),
+                ),
+                          ],
           ],
         ),
       ),
@@ -663,487 +595,6 @@ class _HomePageState extends State<HomePage> {
             );
           }
         },
-      ),
-    );
-  }
-}
-
-// --------------------------
-// SEARCH RESULTS PAGE
-// --------------------------
-class SearchResultsPage extends StatefulWidget {
-  final String searchQuery;
-  const SearchResultsPage({super.key, required this.searchQuery});
-
-  @override
-  State<SearchResultsPage> createState() => _SearchResultsPageState();
-}
-
-class _SearchResultsPageState extends State<SearchResultsPage> {
-  List filteredEntries = [];
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final allEntries =
-        ModalRoute.of(context)?.settings.arguments as List? ?? [];
-    filterEntries(allEntries);
-  }
-
-  void filterEntries(List allEntries) {
-    final query = widget.searchQuery.toLowerCase();
-    filteredEntries =
-        allEntries.where((entry) {
-          final name = (entry['name'] ?? '').toString().toLowerCase();
-          final location = (entry['location'] ?? '').toString().toLowerCase();
-          final type = (entry['type'] ?? '').toString().toLowerCase();
-          final tagsList =
-              (entry['tags'] is List)
-                  ? (entry['tags'] as List)
-                      .map((t) => t.toString().toLowerCase())
-                      .toList()
-                  : [];
-
-          return name.contains(query) ||
-              location.contains(query) ||
-              type.contains(query) ||
-              tagsList.any((t) => t.contains(query));
-        }).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final housingResults =
-        filteredEntries.where((e) => e['type'] == 'Housing').toList();
-
-    final eateryResults =
-        filteredEntries.where((e) => e['type'] == 'Eatery').toList();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Results', style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        iconTheme: const IconThemeData(
-          color: Colors.white, // makes the back button white
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-      ),
-
-      body:
-          filteredEntries.isEmpty
-              ? Center(
-                child: Text('No results found for "${widget.searchQuery}"'),
-              )
-              : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Text(
-                    'Results for "${widget.searchQuery}"',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ---------------- HOUSING RESULTS ----------------
-                  if (housingResults.isNotEmpty) ...[
-                    Text(
-                      "Housing (${housingResults.length})",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0A4423),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    ...housingResults.map(
-                      (entry) => ProductCard(
-                        title: entry['name'] ?? '',
-                        subtitle: "Tap to view details",
-                        location: entry['location'] ?? '',
-                        imagePath:
-                            entry['photo'] ?? "assets/images/placeholder.png",
-                        onTap: () => showEntryDetails(entry),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // ---------------- EATERY RESULTS ----------------
-                  if (eateryResults.isNotEmpty) ...[
-                    Text(
-                      "Eateries (${eateryResults.length})",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0A4423),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    ...eateryResults.map(
-                      (entry) => ProductCard(
-                        title: entry['name'] ?? '',
-                        subtitle: "Tap to view details",
-                        location: entry['location'] ?? '',
-                        imagePath:
-                            entry['photo'] ?? "assets/images/placeholder.png",
-                        onTap: () => showEntryDetails(entry),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-    );
-  }
-
-  void showEntryDetails(Map entry) {
-    // Track favorite status for this specific entry
-    bool isLiked = false; // You can initialize from a saved list if needed
-
-    showDialog(
-      context: context,
-      builder:
-          (_) => Dialog(
-            insetPadding: const EdgeInsets.all(25),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: StatefulBuilder(
-              builder: (context, setState) {
-                void toggleFavorite() {
-                  setState(() => isLiked = !isLiked); // update icon color
-
-                  // Optional: save/remove from actual favorites list here
-                  // e.g., save to SharedPreferences or your app's favorites map
-
-                  ScaffoldMessenger.of(context).removeCurrentSnackBar();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isLiked
-                            ? 'Added to favorites!'
-                            : 'Removed from favorites!',
-                      ),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                }
-
-                return Stack(
-                  children: [
-                    SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Image
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                entry['photo'] ??
-                                    "assets/images/placeholder.png",
-                                height: 200,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder:
-                                    (_, __, ___) => Container(
-                                      height: 200,
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(
-                                        Icons.broken_image,
-                                        size: 40,
-                                      ),
-                                    ),
-                              ),
-                            ),
-                            const SizedBox(height: 15),
-
-                            // Title + Favorite icon
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: toggleFavorite,
-                                  child: CircleAvatar(
-                                    backgroundColor: Colors.white,
-                                    radius: 16,
-                                    child: Icon(
-                                      isLiked
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      color: isLiked ? Colors.red : Colors.grey,
-                                      size: 18,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 8),
-                            // Location
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.location_on,
-                                  size: 16,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    entry['location'] ?? '',
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Entry-specific details
-                            if (entry['type'] == 'Eatery') ...[
-                              Text(
-                                "Minimum Price: ₱${entry['min_price'] ?? 'N/A'}",
-                              ),
-                              Text("Open: ${entry['open_time'] ?? ''}"),
-                              Text("Close: ${entry['end_time'] ?? ''}"),
-                            ] else if (entry['type'] == 'Housing') ...[
-                              Text(
-                                "Monthly Price: ₱${entry['price'] ?? 'N/A'}",
-                              ),
-                              Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
-                            ],
-
-                            const SizedBox(height: 20),
-
-                            // Buttons
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0A4423),
-                                minimumSize: const Size(double.infinity, 45),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (_) => EstabProfileForCustomer(
-                                          ownerId:
-                                              entry['owner_id']?.toString() ??
-                                              '',
-                                        ),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                "View Establishment Profile",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0A4423),
-                                minimumSize: const Size(double.infinity, 45),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (_) => MapRoutePage(
-                                          initialLocation:
-                                              entry['location']?.toString() ??
-                                              '',
-                                        ),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                "View Route",
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: 0,
-                      child: IconButton(
-                        icon: const Icon(Icons.close, size: 26),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-    );
-  }
-}
-
-// --------------------------
-// PRODUCT CARD (UNIFORM HEIGHT)
-// --------------------------
-class ProductCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String location;
-  final String imagePath;
-  final VoidCallback? onTap;
-
-  const ProductCard({
-    super.key,
-    required this.title,
-    required this.subtitle,
-    required this.location,
-    required this.imagePath,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const double cardHeight = 90; // uniform height for all cards
-    const double imageSize = 70; // fixed image size
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: cardHeight,
-        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 6,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.92),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              // Image
-              SizedBox(
-                width: imageSize,
-                height: imageSize,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    imagePath,
-                    width: imageSize,
-                    height: imageSize,
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (_, __, ___) =>
-                            const Icon(Icons.broken_image, size: 35),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              // Text Column
-              Expanded(
-                child: SizedBox(
-                  height: imageSize,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0A4423),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: Color(0xFF7A1E1E),
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              " $location ",
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: const Color.fromARGB(255, 0, 0, 0),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 15),
-                          // Expanded(
-                          //   child: Text(
-                          //     "•$subtitle",
-                          //     maxLines: 2,
-                          //     overflow: TextOverflow.ellipsis,
-                          //     style: TextStyle(
-                          //       fontSize: 13,
-                          //       color: Colors.grey.shade700,
-                          //     ),
-                          //   ),
-                          // ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const Icon(Icons.chevron_right, color: Color(0xFF7A1E1E)),
-            ],
-          ),
-        ),
       ),
     );
   }

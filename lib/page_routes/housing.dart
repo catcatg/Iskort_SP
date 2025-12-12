@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'view_estab_profile.dart';
-import 'map_route.dart';
 
 class HousingPage extends StatefulWidget {
   const HousingPage({super.key});
@@ -12,266 +10,92 @@ class HousingPage extends StatefulWidget {
 }
 
 class _HousingPageState extends State<HousingPage> {
-  final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> allHousing = [];
-  List<Map<String, dynamic>> filteredHousing = [];
+  List<Map<String, dynamic>> allFacilities = [];
+  List<Map<String, dynamic>> filteredFacilities = [];
+  List<String> availableTags = [];
+  List<String> selectedTags = [];
+  double? maxBudget;
   bool isLoading = true;
-  String lastSortOption = 'price_asc';
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_onSearchChanged);
-    fetchVerifiedHousing();
+    fetchVerifiedFacilities();
   }
 
-  Map<String, dynamic> normalizeHousing(Map house) {
-    return {
-      'name': house['name'] ?? '',
-      'location': house['location'] ?? '',
-      'price': house['price'] ?? 0,
-      'priceRange': "₱${house['price'] ?? 'N/A'}",
-      'pax': house['pax'] ?? 'N/A',
-      'image': house['housing_photo'] ?? 'assets/images/placeholder.png',
-      'owner_id': house['owner_id']?.toString() ?? '',
-      'type': 'Housing', // unify with HomePage structure
-      'tags': house['tags'] ?? [],
-    };
-  }
-
-  Future<void> fetchVerifiedHousing() async {
+    Future<void> fetchVerifiedFacilities() async {
     setState(() => isLoading = true);
     try {
       final resp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/housing'),
       );
+
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         final verifiedHousing =
-            (data['housings'] ?? [])
-                .where((h) => h['is_verified'] == 1)
-                .map<Map<String, dynamic>>((h) => normalizeHousing(h))
-                .toList();
+            (data['housings'] ?? []).where((h) => h['is_verified'] == 1);
+
+        List<Map<String, dynamic>> facilities = [];
+        Set<String> tagsSet = {};
+
+        for (var house in verifiedHousing) {
+          final housingId = house['housing_id'];
+          final housingName = house['name'] ?? '';
+          final facResp = await http.get(
+            Uri.parse('https://iskort-public-web.onrender.com/api/facility/$housingId'),
+          );
+          if (facResp.statusCode == 200) {
+            final facData = jsonDecode(facResp.body);
+            for (var f in facData['facilities'] ?? []) {
+              final classification = f['type'] ?? '';
+              facilities.add({
+                "name": f['name'] ?? '',
+                "classification": classification,
+                "price": double.tryParse(f['price'].toString()) ?? 0,
+                "image": f['facility_pic'] ?? 'assets/images/placeholder.png',
+                "housingName": housingName,
+              });
+              if (classification.isNotEmpty) {
+                tagsSet.add(classification.toString());
+              }
+            }
+          }
+        }
+
+        facilities.sort((a, b) => a['name'].compareTo(b['name']));
 
         setState(() {
-          allHousing = verifiedHousing;
-          filteredHousing = List.from(allHousing);
-          _applySort(lastSortOption);
+          allFacilities = facilities;
+          filteredFacilities = List.from(allFacilities);
+          availableTags = tagsSet.toList()..sort();
           isLoading = false;
         });
       } else {
         setState(() => isLoading = false);
       }
     } catch (e) {
-      print("Error fetching housing: $e");
+      print("Error fetching facilities: $e");
       setState(() => isLoading = false);
     }
   }
 
-  void _onSearchChanged() {
-    final query = _searchController.text.toLowerCase();
+    void applyFilters() {
     setState(() {
-      filteredHousing =
-          allHousing.where((house) {
-            final name = house['name'].toString().toLowerCase();
-            final location = house['location'].toString().toLowerCase();
-            final tagsList =
-                (house['tags'] is List)
-                    ? (house['tags'] as List)
-                        .map((t) => t.toString().toLowerCase())
-                        .toList()
-                    : [];
-            return name.contains(query) ||
-                location.contains(query) ||
-                tagsList.any((t) => t.contains(query));
-          }).toList();
-      _applySort(lastSortOption);
+      filteredFacilities = allFacilities.where((fac) {
+        final matchesTag = selectedTags.isEmpty ||
+            selectedTags.contains(fac['classification']);
+        final matchesBudget =
+            maxBudget == null || fac['price'] <= maxBudget!;
+        return matchesTag && matchesBudget;
+      }).toList();
     });
   }
 
-  void _applySort(String sortOption) {
-    lastSortOption = sortOption;
-    setState(() {
-      switch (sortOption) {
-        case 'price_asc':
-          filteredHousing.sort((a, b) => a['price'].compareTo(b['price']));
-          break;
-        case 'price_desc':
-          filteredHousing.sort((a, b) => b['price'].compareTo(a['price']));
-          break;
-        case 'name_asc':
-          filteredHousing.sort((a, b) => a['name'].compareTo(b['name']));
-          break;
-        case 'name_desc':
-          filteredHousing.sort((a, b) => b['name'].compareTo(a['name']));
-          break;
-      }
-    });
-  }
-
-  String _getSortLabel(String sortOption) {
-    switch (sortOption) {
-      case 'price_asc':
-        return 'Price: Low → High';
-      case 'price_desc':
-        return 'Price: High → Low';
-      case 'name_asc':
-        return 'Name: A → Z';
-      case 'name_desc':
-        return 'Name: Z → A';
-      default:
-        return 'Sort';
-    }
-  }
-
-  void _showHousingDialog(Map house) {
-    showDialog(
-      context: context,
-      builder:
-          (_) => Dialog(
-            insetPadding: const EdgeInsets.all(25),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            house['image'],
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder:
-                                (_, __, ___) => Container(
-                                  height: 200,
-                                  color: Colors.grey.shade300,
-                                  child: const Icon(
-                                    Icons.broken_image,
-                                    size: 40,
-                                  ),
-                                ),
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        Text(
-                          house['name'],
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on,
-                              size: 16,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                house['location'],
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          house['priceRange'],
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.green,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "Max Pax: ${house['pax']}",
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4423),
-                            minimumSize: const Size(double.infinity, 45),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => EstabProfileForCustomer(
-                                      ownerId: house['owner_id'],
-                                    ),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "View Establishment Profile",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4423),
-                            minimumSize: const Size(double.infinity, 45),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => MapRoutePage(
-                                      initialLocation: house['location'],
-                                    ),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "View Route",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.close, size: 26),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Housing", style: TextStyle(color: Colors.white)),
+        title: const Text("Facilities", style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -288,203 +112,145 @@ class _HousingPageState extends State<HousingPage> {
       ),
       body: Column(
         children: [
-          // Search Bar
+          // Filter controls
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: const Color(0xFF0A4423), width: 1.5),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Search housing',
-                  border: InputBorder.none,
-                  suffixIcon: Icon(Icons.search, color: Color(0xFF0A4423)),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  children: availableTags.map((tag) => FilterChip(
+                        label: Text(tag),
+                        selected: selectedTags.contains(tag),
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              selectedTags.add(tag);
+                            } else {
+                              selectedTags.remove(tag);
+                            }
+                            applyFilters();
+                          });
+                        },
+                      )).toList(),
                 ),
-              ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Text("Max Budget: "),
+                    Expanded(
+                      child: Slider(
+                        value: maxBudget ?? 100,
+                        min: 20,
+                        max: 5000,
+                        divisions: 100,
+                        label: maxBudget?.toStringAsFixed(0) ?? "Any",
+                        onChanged: (val) {
+                          setState(() {
+                            maxBudget = val;
+                            applyFilters();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-
-          // Sort Menu
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: GestureDetector(
-                onTap: () async {
-                  final selected = await showMenu<String>(
-                    context: context,
-                    position: const RelativeRect.fromLTRB(100, 100, 0, 0),
-                    items: const [
-                      PopupMenuItem(
-                        value: 'price_asc',
-                        child: Text('Price: Low → High'),
-                      ),
-                      PopupMenuItem(
-                        value: 'price_desc',
-                        child: Text('Price: High → Low'),
-                      ),
-                      PopupMenuItem(
-                        value: 'name_asc',
-                        child: Text('Name: A → Z'),
-                      ),
-                      PopupMenuItem(
-                        value: 'name_desc',
-                        child: Text('Name: Z → A'),
-                      ),
-                    ],
-                  );
-                  if (selected != null) _applySort(selected);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0A4423),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.sort, color: Colors.white, size: 18),
-                      const SizedBox(width: 4),
-                      Text(
-                        _getSortLabel(lastSortOption),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Grid
-          Expanded(
-            child:
-                isLoading
-                    ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF0A4423),
-                      ),
-                    )
-                    : GridView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: filteredHousing.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 0.75,
-                          ),
-                      itemBuilder: (_, i) {
-                        final house = filteredHousing[i];
-                        return GestureDetector(
-                          onTap: () => _showHousingDialog(house),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.white,
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black12, blurRadius: 6),
-                              ],
+                    Expanded(
+            child: isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF0A4423)),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: filteredFacilities.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.8,
+                    ),
+                    itemBuilder: (_, i) {
+                      final fac = filteredFacilities[i];
+                      return Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 6),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Image
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: AspectRatio(
+                                aspectRatio: 1.2,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    fac['image'],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: Colors.grey.shade300,
+                                      child: const Icon(Icons.broken_image,
+                                          size: 40),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Image
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: AspectRatio(
-                                    aspectRatio: 1.2,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        house['image'],
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (_, __, ___) => Container(
-                                              color: Colors.grey.shade300,
-                                              child: const Icon(
-                                                Icons.broken_image,
-                                                size: 40,
-                                              ),
-                                            ),
+                            Flexible(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      fac['name'],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      fac['housingName'],
+                                      style: const TextStyle(fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      fac['classification'],
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
                                       ),
                                     ),
-                                  ),
-                                ),
-
-                                // Make this section flexible
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      8,
-                                      4,
-                                      8,
-                                      8,
+                                    Text(
+                                      "₱${fac['price'].toStringAsFixed(0)}",
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment
-                                              .spaceBetween, // optional
-                                      children: [
-                                        Text(
-                                          house['name'],
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.location_on,
-                                              size: 16,
-                                              color: Color(0xFF7A1E1E),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                house['location'],
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        Text(
-                                          house['priceRange'],
-                                          style: const TextStyle(
-                                            color: Colors.green,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

@@ -116,6 +116,7 @@ class ProductCard extends StatelessWidget {
   final String subtitle;
   final String location;
   final String imagePath;
+  final VoidCallback? onTap; // <-- add this
 
   const ProductCard({
     super.key,
@@ -123,61 +124,50 @@ class ProductCard extends StatelessWidget {
     required this.subtitle,
     required this.location,
     required this.imagePath,
+    this.onTap, // <-- add this
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
+    return GestureDetector(
+      onTap: onTap, // <-- wire it up
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 3,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 80,
-              height: 60,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey.shade300,
-              ),
-              clipBehavior: Clip.hardEdge,
-              child: Image.asset(
+            // Image
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: Image.network(
                 imagePath,
+                height: 120,
+                width: double.infinity,
                 fit: BoxFit.cover,
-                errorBuilder:
-                    (context, error, stackTrace) => const Icon(
-                      Icons.broken_image,
-                      color: Colors.red,
-                      size: 40,
-                    ),
+                errorBuilder: (_, __, ___) => Container(
+                  height: 120,
+                  color: Colors.grey.shade300,
+                  child: const Icon(Icons.broken_image, size: 40),
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.all(8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
-                  ),
-                  Text(subtitle),
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        size: 14,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(child: Text(location)),
-                    ],
-                  ),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.black54)),
+                  const SizedBox(height: 4),
+                  Text(location,
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.black87)),
                 ],
               ),
             ),

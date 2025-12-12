@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'view_estab_profile.dart';
-import 'map_route.dart';
 
 class FoodPage extends StatefulWidget {
   const FoodPage({super.key});
@@ -12,21 +10,22 @@ class FoodPage extends StatefulWidget {
 }
 
 class _FoodPageState extends State<FoodPage> {
-  final TextEditingController _searchController = TextEditingController();
-
   List<Map<String, dynamic>> allFoods = [];
   List<Map<String, dynamic>> filteredFoods = [];
   bool isLoading = true;
-  String lastSortOption = 'price_asc';
+
+  // Filters
+  List<String> selectedTags = [];
+  List<String> availableTags = [];
+  double? maxBudget;
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_onSearchChanged);
-    fetchVerifiedEateries();
+    fetchVerifiedFoods();
   }
 
-  Future<void> fetchVerifiedEateries() async {
+    Future<void> fetchVerifiedFoods() async {
     setState(() => isLoading = true);
     try {
       final resp = await http.get(
@@ -36,236 +35,69 @@ class _FoodPageState extends State<FoodPage> {
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         final verifiedEateries =
-            (data['eateries'] ?? [])
-                .where((e) => e['is_verified'] == 1)
-                .map<Map<String, dynamic>>(
-                  (e) => {
-                    "name": e['name'] ?? '',
-                    "location": e['location'] ?? '',
-                    "price": e['min_price'] ?? 0,
-                    "priceRange": "₱${e['min_price'] ?? 'N/A'}",
-                    "image":
-                        e['eatery_photo'] ?? 'assets/images/placeholder.png',
-                    "owner_id": e['owner_id']?.toString() ?? "",
-                    "type": "Eatery", // unify with HomePage structure
-                    "tags": e['tags'] ?? [],
-                  },
-                )
-                .toList();
+            (data['eateries'] ?? []).where((e) => e['is_verified'] == 1);
+
+        List<Map<String, dynamic>> foods = [];
+        Set<String> tagsSet = {};
+
+        for (var eatery in verifiedEateries) {
+          final eateryId = eatery['eatery_id'];
+          final eateryName = eatery['name'] ?? '';
+          final foodResp = await http.get(
+            Uri.parse('https://iskort-public-web.onrender.com/api/food/$eateryId'),
+          );
+          if (foodResp.statusCode == 200) {
+            final foodData = jsonDecode(foodResp.body);
+            for (var f in foodData['foods'] ?? []) {
+              final classification = f['classification'] ?? '';
+              foods.add({
+                "name": f['name'] ?? '',
+                "classification": classification,
+                "price": double.tryParse(f['price'].toString()) ?? 0,
+                "image": f['food_pic'] ?? 'assets/images/placeholder.png',
+                "eateryName": eateryName,
+              });
+              if (classification.isNotEmpty) {
+                tagsSet.add(classification.toString());
+              }
+            }
+          }
+        }
+
+        foods.sort((a, b) => a['name'].compareTo(b['name']));
 
         setState(() {
-          allFoods = verifiedEateries;
+          allFoods = foods;
           filteredFoods = List.from(allFoods);
-          _applySort(lastSortOption);
+          availableTags = tagsSet.toList()..sort();
           isLoading = false;
         });
       } else {
         setState(() => isLoading = false);
       }
     } catch (e) {
-      print("Error fetching eateries: $e");
+      print("Error fetching foods: $e");
       setState(() => isLoading = false);
     }
   }
 
-  void _onSearchChanged() {
-    final query = _searchController.text.toLowerCase();
-
+    void applyFilters() {
     setState(() {
-      filteredFoods =
-          allFoods.where((food) {
-            final name = food["name"].toString().toLowerCase();
-            final location = food["location"].toString().toLowerCase();
-            final tagsList =
-                (food['tags'] is List)
-                    ? (food['tags'] as List)
-                        .map((t) => t.toString().toLowerCase())
-                        .toList()
-                    : [];
-            return name.contains(query) ||
-                location.contains(query) ||
-                tagsList.any((t) => t.contains(query));
-          }).toList();
-
-      _applySort(lastSortOption);
+      filteredFoods = allFoods.where((food) {
+        final matchesTag = selectedTags.isEmpty ||
+            selectedTags.contains(food['classification']);
+        final matchesBudget =
+            maxBudget == null || food['price'] <= maxBudget!;
+        return matchesTag && matchesBudget;
+      }).toList();
     });
   }
 
-  void _applySort(String sortOption) {
-    lastSortOption = sortOption;
-
-    setState(() {
-      switch (sortOption) {
-        case 'price_asc':
-          filteredFoods.sort((a, b) => a['price'].compareTo(b['price']));
-          break;
-        case 'price_desc':
-          filteredFoods.sort((a, b) => b['price'].compareTo(a['price']));
-          break;
-        case 'name_asc':
-          filteredFoods.sort((a, b) => a['name'].compareTo(b['name']));
-          break;
-        case 'name_desc':
-          filteredFoods.sort((a, b) => b['name'].compareTo(a['name']));
-          break;
-      }
-    });
-  }
-
-  String _getSortLabel(String option) {
-    switch (option) {
-      case 'price_asc':
-        return 'Price: Low → High';
-      case 'price_desc':
-        return 'Price: High → Low';
-      case 'name_asc':
-        return 'Name: A → Z';
-      case 'name_desc':
-        return 'Name: Z → A';
-      default:
-        return 'Sort';
-    }
-  }
-
-  void _showFoodDialog(Map food) {
-    showDialog(
-      context: context,
-      builder:
-          (_) => Dialog(
-            insetPadding: const EdgeInsets.all(25),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            food['image'],
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder:
-                                (_, __, ___) => Container(
-                                  width: double.infinity,
-                                  alignment: Alignment.center,
-                                  height: 200,
-                                  color: Colors.grey.shade300,
-                                  child: const Icon(
-                                    Icons.broken_image,
-                                    size: 40,
-                                  ),
-                                ),
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        Text(
-                          food['name'],
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on,
-                              size: 16,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                food['location'],
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          food['priceRange'],
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.green,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4423),
-                            minimumSize: const Size(double.infinity, 45),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => EstabProfileForCustomer(
-                                      ownerId: food['owner_id'],
-                                    ),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "View Establishment Profile",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4423),
-                            minimumSize: const Size(double.infinity, 45),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => MapRoutePage(
-                                      initialLocation: food['location'],
-                                    ),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "View Route",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.close, size: 26),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  @override
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Eateries", style: TextStyle(color: Colors.white)),
+        title: const Text("Food", style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -282,203 +114,145 @@ class _FoodPageState extends State<FoodPage> {
       ),
       body: Column(
         children: [
-          // Search Bar
+          // Filter controls
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: const Color(0xFF0A4423), width: 1.5),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Search food',
-                  border: InputBorder.none,
-                  suffixIcon: Icon(Icons.search, color: Color(0xFF0A4423)),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  children: availableTags.map((tag) => FilterChip(
+                        label: Text(tag),
+                        selected: selectedTags.contains(tag),
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              selectedTags.add(tag);
+                            } else {
+                              selectedTags.remove(tag);
+                            }
+                            applyFilters();
+                          });
+                        },
+                      )).toList(),
                 ),
-              ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Text("Max Budget: "),
+                    Expanded(
+                      child: Slider(
+                        value: maxBudget ?? 100,
+                        min: 20,
+                        max: 500,
+                        divisions: 48,
+                        label: maxBudget?.toStringAsFixed(0) ?? "Any",
+                        onChanged: (val) {
+                          setState(() {
+                            maxBudget = val;
+                            applyFilters();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-
-          // Sort Menu
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: GestureDetector(
-                onTap: () async {
-                  final selected = await showMenu<String>(
-                    context: context,
-                    position: const RelativeRect.fromLTRB(100, 100, 0, 0),
-                    items: const [
-                      PopupMenuItem(
-                        value: 'price_asc',
-                        child: Text('Price: Low → High'),
-                      ),
-                      PopupMenuItem(
-                        value: 'price_desc',
-                        child: Text('Price: High → Low'),
-                      ),
-                      PopupMenuItem(
-                        value: 'name_asc',
-                        child: Text('Name: A → Z'),
-                      ),
-                      PopupMenuItem(
-                        value: 'name_desc',
-                        child: Text('Name: Z → A'),
-                      ),
-                    ],
-                  );
-                  if (selected != null) _applySort(selected);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0A4423),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.sort, color: Colors.white, size: 18),
-                      const SizedBox(width: 4),
-                      Text(
-                        _getSortLabel(lastSortOption),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Grid
-          Expanded(
-            child:
-                isLoading
-                    ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF0A4423),
-                      ),
-                    )
-                    : GridView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: filteredFoods.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 0.75,
-                          ),
-                      itemBuilder: (_, i) {
-                        final food = filteredFoods[i];
-                        return GestureDetector(
-                          onTap: () => _showFoodDialog(food),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.white,
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black12, blurRadius: 6),
-                              ],
+                    Expanded(
+            child: isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF0A4423)),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: filteredFoods.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.8, // slightly taller cells
+                    ),
+                    itemBuilder: (_, i) {
+                      final food = filteredFoods[i];
+                      return Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white,
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 6),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Image
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: AspectRatio(
+                                aspectRatio: 1.2,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    food['image'],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: Colors.grey.shade300,
+                                      child: const Icon(Icons.broken_image,
+                                          size: 40),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Image
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: AspectRatio(
-                                    aspectRatio: 1.2,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        food['image'],
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (_, __, ___) => Container(
-                                              color: Colors.grey.shade300,
-                                              child: const Icon(
-                                                Icons.broken_image,
-                                                size: 40,
-                                              ),
-                                            ),
+                            Flexible(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      food['name'],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      food['eateryName'],
+                                      style: const TextStyle(fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      food['classification'],
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
                                       ),
                                     ),
-                                  ),
-                                ),
-
-                                // Make this section flexible
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      8,
-                                      4,
-                                      8,
-                                      8,
+                                    Text(
+                                      "₱${food['price'].toStringAsFixed(0)}",
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment
-                                              .spaceBetween, // optional
-                                      children: [
-                                        Text(
-                                          food['name'],
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.location_on,
-                                              size: 16,
-                                              color: Color(0xFF7A1E1E),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                food['location'],
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        Text(
-                                          food['priceRange'],
-                                          style: const TextStyle(
-                                            color: Colors.green,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
