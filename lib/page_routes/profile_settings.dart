@@ -170,12 +170,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                 ),
                 const SizedBox(width: 20),
 
-                Icon(Icons.notifications, color: Color(0xFF0A4423)),
-                const SizedBox(width: 8),
-                Text(
-                  _notifPreference ?? 'N/A',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+                // Icon(Icons.notifications, color: Color(0xFF0A4423)),
+                // const SizedBox(width: 8),
+                // Text(
+                //   _notifPreference ?? 'N/A',
+                //   style: const TextStyle(fontWeight: FontWeight.bold),
+                // ),
               ],
             ),
             const SizedBox(height: 20),
@@ -224,12 +224,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                   ),
 
                   const SizedBox(height: 12),
-                  TextFormField(
-                    initialValue: _phone,
-                    decoration: const InputDecoration(labelText: "Address"),
-                    onSaved: (val) => _address = val,
-                  ),
 
+                  // TextFormField(
+                  //   initialValue: _phone,
+                  //   decoration: const InputDecoration(labelText: "Address"),
+                  //   onSaved: (val) => _address = val,
+                  // ),
                   const SizedBox(height: 20),
 
                   // Preferences for non-owners
