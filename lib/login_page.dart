@@ -16,6 +16,8 @@ class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool isLoading = false;
+  String? emailError;
+  String? passwordError;
 
   Future<void> login() async {
     setState(() => isLoading = true);
@@ -98,27 +100,32 @@ class _LoginPageState extends State<LoginPage> {
         } else {
           Navigator.pushNamed(context, '/homepage', arguments: user);
         }
+      } else if (response.statusCode == 403) {
+        showFadingPopup(context, "Account not yet verified by admin.");
       } else if (response.statusCode == 404) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Account not registered")));
+        showFadingPopup(context, "Account not registered");
       } else if (response.statusCode == 401) {
-        ScaffoldMessenger.of(
+        showFadingPopup(
           context,
-        ).showSnackBar(const SnackBar(content: Text("Invalid credentials")));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Login failed: ${response.statusCode}")),
+          "Invalid login credentials. Check your email and password.",
         );
+      } else {
+        showFadingPopup(context, "Login failed: ${response.statusCode}");
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Network or server error: $e")));
-      print('Network error: $e');
+      showFadingPopup(context, "Network or server error: $e");
     }
+  }
+
+  void validateFields() {
+    setState(() {
+      emailError = emailController.text.isEmpty ? 'Email is required' : null;
+
+      passwordError =
+          passwordController.text.isEmpty ? 'Password is required' : null;
+    });
   }
 
   @override
@@ -177,6 +184,7 @@ class _LoginPageState extends State<LoginPage> {
                     title: 'Email',
                     label: "Enter your email",
                     controller: emailController,
+                    errorText: emailError,
                   ),
                   const SizedBox(height: 15),
 
@@ -185,8 +193,27 @@ class _LoginPageState extends State<LoginPage> {
                     label: "Enter your password",
                     isPassword: true,
                     controller: passwordController,
+                    errorText: passwordError,
                   ),
                   const SizedBox(height: 25),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pushNamed(context, '/forgot-password');
+                      },
+                      child: const Text(
+                        "Forgot Password?",
+                        style: TextStyle(
+                          color: Color(0xFF791317),
+
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 15),
 
                   SizedBox(
                     width: double.infinity,
@@ -195,7 +222,18 @@ class _LoginPageState extends State<LoginPage> {
                         backgroundColor: const Color(0xFF0A4423),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      onPressed: isLoading ? null : login,
+                      onPressed:
+                          isLoading
+                              ? null
+                              : () {
+                                validateFields();
+
+                                if (emailError == null &&
+                                    passwordError == null) {
+                                  login();
+                                }
+                              },
+
                       child:
                           isLoading
                               ? const CircularProgressIndicator(
@@ -239,6 +277,109 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class ForgotPasswordPage extends StatefulWidget {
+  const ForgotPasswordPage({super.key});
+
+  @override
+  State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
+}
+
+class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
+  final emailController = TextEditingController();
+  bool isLoading = false;
+
+  Future<void> sendReset() async {
+    setState(() => isLoading = true);
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          'https://iskort-public-web.onrender.com/api/auth/request-reset',
+        ),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': emailController.text.trim()}),
+      );
+
+      setState(() => isLoading = false);
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password reset email sent.")),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Failed: ${response.body}")));
+      }
+    } catch (e) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Forgot Password")),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Text(
+              "Enter your email to reset your password.",
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 20),
+
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(
+                labelText: "Email",
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A4423),
+                foregroundColor: const Color(0xFFFBAC24),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 20,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onPressed: isLoading ? null : sendReset,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 6,
+                  horizontal: 10,
+                ),
+                child:
+                    isLoading
+                        ? const CircularProgressIndicator(
+                          color: Color(0xFFFBAC24),
+                        )
+                        : const Text(
+                          "Send Reset Link",
+                          style: TextStyle(fontSize: 14),
+                        ),
+              ),
+            ),
+          ],
         ),
       ),
     );
