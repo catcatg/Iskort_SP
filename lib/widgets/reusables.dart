@@ -8,6 +8,8 @@ class CustomTextField extends StatefulWidget {
   final TextEditingController? controller;
   final TextInputType? keyboardType; // optional
   final List<TextInputFormatter>? inputFormatters; // optional
+  final String? errorText;
+  final String? hintText;
 
   const CustomTextField({
     super.key,
@@ -17,6 +19,8 @@ class CustomTextField extends StatefulWidget {
     this.controller,
     this.keyboardType,
     this.inputFormatters,
+    this.errorText,
+    this.hintText,
   });
 
   @override
@@ -47,9 +51,12 @@ class _CustomTextFieldState extends State<CustomTextField> {
           obscureText: _obscureText,
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters,
+
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             labelText: widget.label,
+            errorText: widget.errorText,
+            hintText: widget.hintText,
             suffixIcon:
                 widget.isPassword
                     ? IconButton(
@@ -139,17 +146,20 @@ class ProductCard extends StatelessWidget {
           children: [
             // Image
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
               child: Image.network(
                 imagePath,
                 height: 120,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 120,
-                  color: Colors.grey.shade300,
-                  child: const Icon(Icons.broken_image, size: 40),
-                ),
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      height: 120,
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.broken_image, size: 40),
+                    ),
               ),
             ),
             Padding(
@@ -157,17 +167,23 @@ class ProductCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.black54)),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
                   const SizedBox(height: 4),
-                  Text(location,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.black87)),
+                  Text(
+                    location,
+                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                  ),
                 ],
               ),
             ),
@@ -263,6 +279,81 @@ class DisplayCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+void showFadingPopup(BuildContext context, String message) {
+  OverlayEntry? entry;
+
+  entry = OverlayEntry(
+    builder: (context) {
+      return Center(
+        child: ConstrainedBox(
+          child: _FadingMessage(
+            message: message,
+            onFinish: () {
+              entry?.remove();
+            },
+          ),
+          constraints: const BoxConstraints(maxWidth: 300),
+        ),
+      );
+    },
+  );
+
+  Overlay.of(context).insert(entry);
+}
+
+class _FadingMessage extends StatefulWidget {
+  final String message;
+  final VoidCallback onFinish;
+
+  const _FadingMessage({required this.message, required this.onFinish});
+
+  @override
+  State<_FadingMessage> createState() => _FadingMessageState();
+}
+
+class _FadingMessageState extends State<_FadingMessage> {
+  double opacity = 0;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Fade in
+    Future.delayed(const Duration(milliseconds: 50), () {
+      setState(() => opacity = 1);
+    });
+
+    // Stay for 2 seconds then fade out
+    Future.delayed(const Duration(seconds: 5), () {
+      setState(() => opacity = 0);
+    });
+
+    // Remove overlay after fade out
+    Future.delayed(const Duration(milliseconds: 2800), widget.onFinish);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 500),
+      opacity: opacity,
+      child: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        color: Color.fromARGB(229, 11, 85, 43),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+          child: Text(
+            widget.message,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
         ),
       ),
     );

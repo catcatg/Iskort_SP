@@ -20,59 +20,133 @@ class _SignupPageState extends State<SignupPage> {
   final confirmPasswordController = TextEditingController();
   final phoneController = TextEditingController();
 
+  String? nameError;
+  String? emailError;
+  String? phoneError;
+  String? passwordError;
+  String? confirmPasswordError;
+
   String selectedRole = '';
   String notifPreference = 'email';
+
+  String capitalize(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1).toLowerCase();
+  }
+
+  bool isValidPassword(String password) {
+    final passwordRegExp = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$');
+    return passwordRegExp.hasMatch(password);
+  }
+
+  bool isValidPhone(String phone) {
+    final phoneRegExp = RegExp(r'^\d{11}$');
+    return phoneRegExp.hasMatch(phone);
+  }
+
+  bool isValidUpmail(String email, String role) {
+    final roleLower = role.toLowerCase();
+    if (roleLower == 'user' || roleLower == 'student') {
+      return email.toLowerCase().endsWith('@up.edu.ph');
+    }
+    return true;
+  }
 
   @override
   void initState() {
     super.initState();
-    // Initialize role if passed from ChooseRolePage
     selectedRole = widget.preselectedRole?.toLowerCase() ?? '';
   }
 
   Future<void> register() async {
-    if (passwordController.text != confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
-      return;
-    }
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final confirmPassword = confirmPasswordController.text;
+    final phone = phoneController.text.trim();
 
+    // Reset previous errors
+    setState(() {
+      nameError = null;
+      emailError = null;
+      phoneError = null;
+      passwordError = null;
+      confirmPasswordError = null;
+    });
+
+    // Validate fields
+    setState(() {
+      nameError = name.isEmpty ? 'Name is required' : null;
+      emailError =
+          email.isEmpty
+              ? 'Email is required'
+              : (!isValidUpmail(email, selectedRole)
+                  ? 'Students must use their UP email'
+                  : null);
+      phoneError =
+          !isValidPhone(phone)
+              ? 'Enter a valid phone number (11 digits starting with 09)'
+              : null;
+      passwordError =
+          !isValidPassword(password)
+              ? 'Password must be 8+ chars, include uppercase, lowercase, and a number'
+              : null;
+      confirmPasswordError =
+          password != confirmPassword ? 'Passwords do not match' : null;
+    });
+
+    // Stop if any errors exist
+    if ([
+      nameError,
+      emailError,
+      phoneError,
+      passwordError,
+      confirmPasswordError,
+    ].any((e) => e != null))
+      return;
+
+    // Send registration request
     try {
       final response = await http.post(
         Uri.parse('https://iskort-public-web.onrender.com/api/admin/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'name': nameController.text,
-          'email': emailController.text,
-          'password': passwordController.text,
-          'phone_num': phoneController.text,
-          'role': selectedRole, 
+          'name': name,
+          'email': email,
+          'password': password,
+          'phone_num': phone,
+          'role': selectedRole,
           'notif_preference': notifPreference,
         }),
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registered successfully! Please wait for admin verification.')),
+        showFadingPopup(
+          context,
+          'Registered successfully! Please wait for admin verification. Your selected notification method will be used.',
         );
+
         nameController.clear();
         emailController.clear();
         passwordController.clear();
         confirmPasswordController.clear();
         phoneController.clear();
+
         Navigator.pushReplacementNamed(context, '/login');
-      }  else {
-          print('Status code: ${response.statusCode}');
-          print('Body: ${response.body}');
-          final body = jsonDecode(response.body);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${body['message'] ?? body['error'] ?? 'Registration failed'}')),
-          );
-        }
+      } else {
+        final body = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${body['message'] ?? body['error'] ?? 'Registration failed'}',
+            ),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not connect to the server')),
+      showFadingPopup(
+        context,
+        'Could not connect to the server. Please try again later.',
       );
     }
   }
@@ -136,18 +210,34 @@ class _SignupPageState extends State<SignupPage> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A4423),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                "Signing up as: ${selectedRole.isNotEmpty ? capitalize(selectedRole) : 'User'}",
+                style: const TextStyle(fontSize: 16, color: Color(0xFFFBAC24)),
+              ),
+            ),
+            const SizedBox(height: 20),
 
-            // 🔹 Form fields only
+            // Form fields with error messages
             CustomTextField(
               title: 'Name',
               label: 'Enter your full name',
               controller: nameController,
+              errorText: nameError,
+              hintText: "e.g., Juan Dela Cruz",
             ),
             const SizedBox(height: 15),
             CustomTextField(
               title: 'Email',
               label: 'Enter your email',
               controller: emailController,
+              errorText: emailError,
             ),
             const SizedBox(height: 15),
             CustomTextField(
@@ -155,7 +245,11 @@ class _SignupPageState extends State<SignupPage> {
               label: 'Enter your phone number',
               controller: phoneController,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(11),
+              ],
+              errorText: phoneError,
             ),
             const SizedBox(height: 15),
             CustomTextField(
@@ -163,6 +257,7 @@ class _SignupPageState extends State<SignupPage> {
               label: 'Enter your password',
               isPassword: true,
               controller: passwordController,
+              errorText: passwordError,
             ),
             const SizedBox(height: 15),
             CustomTextField(
@@ -170,10 +265,10 @@ class _SignupPageState extends State<SignupPage> {
               label: 'Confirm your password',
               isPassword: true,
               controller: confirmPasswordController,
+              errorText: confirmPasswordError,
             ),
             const SizedBox(height: 20),
 
-            // 🔹 Notification preference at the bottom
             const Text(
               'Preferred way to get notifications:',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -187,7 +282,6 @@ class _SignupPageState extends State<SignupPage> {
             ),
             const SizedBox(height: 20),
 
-            // 🔹 Submit button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
