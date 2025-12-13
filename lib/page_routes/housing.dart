@@ -203,6 +203,13 @@ class _HousingPageState extends State<HousingPage> {
                         color: Color(0xFF0A4423),
                       ),
                     )
+                    : filteredFacilities.isEmpty
+                    ? const Center(
+                      child: Text(
+                        "No facilities found with the selected filters.",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    )
                     : GridView.builder(
                       padding: const EdgeInsets.all(12),
                       itemCount: filteredFacilities.length,

@@ -207,6 +207,13 @@ class _FoodPageState extends State<FoodPage> {
                         color: Color(0xFF0A4423),
                       ),
                     )
+                    : filteredFoods.isEmpty
+                    ? const Center(
+                      child: Text(
+                        "No foods found with the selected filters.",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    )
                     : GridView.builder(
                       padding: const EdgeInsets.all(12),
                       itemCount: filteredFoods.length,
