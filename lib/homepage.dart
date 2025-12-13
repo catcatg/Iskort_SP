@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
     fetchEntries();
   }
 
-    Future<void> loadPreferences() async {
+  Future<void> loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     currentFoodPrefs = prefs.getStringList("foodPrefs") ?? [];
     currentHousingPrefs = prefs.getStringList("housingPrefs") ?? [];
@@ -63,17 +63,18 @@ class _HomePageState extends State<HomePage> {
       Future.delayed(Duration.zero, () {
         showDialog(
           context: context,
-          builder: (_) => PreferencePopup(
-            initialFoodPrefs: currentFoodPrefs,
-            initialHousingPrefs: currentHousingPrefs,
-            onSave: (prefsSelected) async {
-              setState(() {
-                currentFoodPrefs = prefsSelected["food"] ?? [];
-                currentHousingPrefs = prefsSelected["housing"] ?? [];
-              });
-              await savePreferences();
-            },
-          ),
+          builder:
+              (_) => PreferencePopup(
+                initialFoodPrefs: currentFoodPrefs,
+                initialHousingPrefs: currentHousingPrefs,
+                onSave: (prefsSelected) async {
+                  setState(() {
+                    currentFoodPrefs = prefsSelected["food"] ?? [];
+                    currentHousingPrefs = prefsSelected["housing"] ?? [];
+                  });
+                  await savePreferences();
+                },
+              ),
         );
       });
     }
@@ -89,7 +90,9 @@ class _HomePageState extends State<HomePage> {
       if (eateryResp.statusCode == 200) {
         final data = jsonDecode(eateryResp.body);
         final verifiedEateries =
-            (data['eateries'] ?? []).where((e) => e['is_verified'] == 1).toList();
+            (data['eateries'] ?? [])
+                .where((e) => e['is_verified'] == 1)
+                .toList();
         for (var eatery in verifiedEateries) {
           eatery['type'] = 'Eatery';
           eatery['photo'] = eatery['eatery_photo'] ?? '';
@@ -103,7 +106,9 @@ class _HomePageState extends State<HomePage> {
       if (housingResp.statusCode == 200) {
         final data = jsonDecode(housingResp.body);
         final verifiedHousing =
-            (data['housings'] ?? []).where((h) => h['is_verified'] == 1).toList();
+            (data['housings'] ?? [])
+                .where((h) => h['is_verified'] == 1)
+                .toList();
         for (var house in verifiedHousing) {
           house['type'] = 'Housing';
           house['photo'] = house['housing_photo'] ?? '';
@@ -124,7 +129,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-    Widget GeneralSearchBar() {
+  Widget GeneralSearchBar() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -162,54 +167,56 @@ class _HomePageState extends State<HomePage> {
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: navCards.map((card) {
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => Navigator.pushNamed(
-              context,
-              card['route']?.toString() ?? '/',
-            ),
-            child: Container(
-              height: 90,
-              margin: const EdgeInsets.symmetric(horizontal: 5),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x660A4423),
-                    blurRadius: 4,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    card['icon'] as IconData? ?? Icons.help_outline,
-                    size: 30,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    card['name']?.toString() ?? 'Unknown',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      fontSize: 14,
+      children:
+          navCards.map((card) {
+            return Expanded(
+              child: GestureDetector(
+                onTap:
+                    () => Navigator.pushNamed(
+                      context,
+                      card['route']?.toString() ?? '/',
                     ),
+                child: Container(
+                  height: 90,
+                  margin: const EdgeInsets.symmetric(horizontal: 5),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x660A4423),
+                        blurRadius: 4,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
                   ),
-                ],
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        card['icon'] as IconData? ?? Icons.help_outline,
+                        size: 30,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        card['name']?.toString() ?? 'Unknown',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 
@@ -218,168 +225,195 @@ class _HomePageState extends State<HomePage> {
 
     showDialog(
       context: context,
-      builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.all(25),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: StatefulBuilder(
-          builder: (context, setState) {
-            void toggleFavorite() {
-              setState(() => isLiked = !isLiked);
-              ScaffoldMessenger.of(context).removeCurrentSnackBar();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    isLiked ? 'Added to favorites!' : 'Removed from favorites!',
-                  ),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            }
-
-            return Stack(
-              children: [
-                SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            entry['photo'] ?? "assets/images/placeholder.png",
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              height: 200,
-                              color: Colors.grey.shade300,
-                              child: const Icon(Icons.broken_image, size: 40),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: toggleFavorite,
-                              child: CircleAvatar(
-                                backgroundColor: Colors.white,
-                                radius: 16,
-                                child: Icon(
-                                  isLiked ? Icons.favorite : Icons.favorite_border,
-                                  color: isLiked ? Colors.red : Colors.grey,
-                                  size: 18,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                                                        const Icon(Icons.location_on,
-                                size: 16, color: Color(0xFF7A1E1E)),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(entry['location'] ?? '',
-                                  style: const TextStyle(fontSize: 14)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        if (entry['type'] == 'Eatery') ...[
-                          Text("Minimum Price: ₱${entry['min_price'] ?? 'N/A'}"),
-                          Text("Open: ${entry['open_time'] ?? ''}"),
-                          Text("Close: ${entry['end_time'] ?? ''}"),
-                        ] else if (entry['type'] == 'Housing') ...[
-                          Text("Monthly Price: ₱${entry['price'] ?? 'N/A'}"),
-                          Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
-                        ],
-
-                        const SizedBox(height: 20),
-
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4423),
-                            minimumSize: const Size(double.infinity, 45),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => EstabProfileForCustomer(
-                                  ownerId: entry['owner_id']?.toString() ?? '',
-                                  estType: entry['type']?.toString() ?? '',
-                                  eateryId: entry['eatery_id']?.toString(),
-                                  housingId: entry['housing_id']?.toString(),
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "View Establishment Profile",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4423),
-                            minimumSize: const Size(double.infinity, 45),
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => MapRoutePage(
-                                  initialLocation:
-                                      entry['location']?.toString() ?? '',
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "View Route",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
+      builder:
+          (_) => Dialog(
+            insetPadding: const EdgeInsets.all(25),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                void toggleFavorite() {
+                  setState(() => isLiked = !isLiked);
+                  ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isLiked
+                            ? 'Added to favorites!'
+                            : 'Removed from favorites!',
+                      ),
+                      duration: const Duration(seconds: 1),
                     ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.close, size: 26),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+                  );
+                }
+
+                return Stack(
+                  children: [
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                entry['photo'] ??
+                                    "assets/images/placeholder.png",
+                                height: 200,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder:
+                                    (_, __, ___) => Container(
+                                      height: 200,
+                                      color: Colors.grey.shade300,
+                                      child: const Icon(
+                                        Icons.broken_image,
+                                        size: 40,
+                                      ),
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: toggleFavorite,
+                                  child: CircleAvatar(
+                                    backgroundColor: Colors.white,
+                                    radius: 16,
+                                    child: Icon(
+                                      isLiked
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: isLiked ? Colors.red : Colors.grey,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Color(0xFF7A1E1E),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    entry['location'] ?? '',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            if (entry['type'] == 'Eatery') ...[
+                              Text(
+                                "Minimum Price: ₱${entry['min_price'] ?? 'N/A'}",
+                              ),
+                              Text("Open: ${entry['open_time'] ?? ''}"),
+                              Text("Close: ${entry['end_time'] ?? ''}"),
+                            ] else if (entry['type'] == 'Housing') ...[
+                              Text(
+                                "Monthly Price: ₱${entry['price'] ?? 'N/A'}",
+                              ),
+                              Text("Curfew: ${entry['curfew'] ?? 'N/A'}"),
+                            ],
+
+                            const SizedBox(height: 20),
+
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A4423),
+                                minimumSize: const Size(double.infinity, 45),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => EstabProfileForCustomer(
+                                          ownerId:
+                                              entry['owner_id']?.toString() ??
+                                              '',
+                                          estType:
+                                              entry['type']?.toString() ?? '',
+                                          eateryId:
+                                              entry['eatery_id']?.toString(),
+                                          housingId:
+                                              entry['housing_id']?.toString(),
+                                        ),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                "View Establishment Profile",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A4423),
+                                minimumSize: const Size(double.infinity, 45),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => MapRoutePage(
+                                          initialLocation:
+                                              entry['location']?.toString() ??
+                                              '',
+                                        ),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                "View Route",
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, size: 26),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
     );
   }
 
-    @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SingleChildScrollView(
@@ -470,7 +504,9 @@ class _HomePageState extends State<HomePage> {
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
@@ -496,83 +532,91 @@ class _HomePageState extends State<HomePage> {
                 childAspectRatio: 3 / 4,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                children: allEntries
-                    .where((e) => e['type'] == 'Housing')
-                    .take(6)
-                    .map(
-                      (entry) => ProductCard(
-                        title: entry['name'] ?? '',
-                        subtitle: "Tap to view details",
-                        location: entry['location'] ?? '',
-                        imagePath: entry['photo'] ?? "assets/images/placeholder.png",
-                        onTap: () => showEntryDetails(entry),
-                      ),
-                    )
-                    .toList(),
-              ),
-                const SizedBox(height: 10),
-                Divider(color: Color(0xFF0A4423)),
-                const SizedBox(height: 10),
-
-                // Eateries section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Eateries",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0A4423),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/food');
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                children:
+                    allEntries
+                        .where((e) => e['type'] == 'Housing')
+                        .take(6)
+                        .map(
+                          (entry) => ProductCard(
+                            title: entry['name'] ?? '',
+                            // subtitle: "Tap to view details",
+                            location: entry['location'] ?? '',
+                            imagePath:
+                                entry['photo'] ??
+                                "assets/images/placeholder.png",
+                            onTap: () => showEntryDetails(entry),
                           ),
-                          borderRadius: BorderRadius.circular(20),
+                        )
+                        .toList(),
+              ),
+              const SizedBox(height: 10),
+              Divider(color: Color(0xFF0A4423)),
+              const SizedBox(height: 10),
+
+              // Eateries section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Eateries",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0A4423),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/food');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        child: const Text(
-                          "View more",
-                          style: TextStyle(color: Colors.white, fontSize: 13),
-                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        "View more",
+                        style: TextStyle(color: Colors.white, fontSize: 13),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 10),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
 
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  childAspectRatio: 3 / 4,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  children: allEntries
-                      .where((e) => e['type'] == 'Eatery')
-                      .take(6)
-                      .map(
-                        (entry) => ProductCard(
-                          title: entry['name'] ?? '',
-                          subtitle: "Tap to view details",
-                          location: entry['location'] ?? '',
-                          imagePath: entry['photo'] ?? "assets/images/placeholder.png",
-                          onTap: () => showEntryDetails(entry),
-                        ),
-                      )
-                      .toList(),
-                ),
-                          ],
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                childAspectRatio: 3 / 4,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                children:
+                    allEntries
+                        .where((e) => e['type'] == 'Eatery')
+                        .take(6)
+                        .map(
+                          (entry) => ProductCard(
+                            title: entry['name'] ?? '',
+                            // subtitle: "Tap to view details",
+                            location: entry['location'] ?? '',
+                            imagePath:
+                                entry['photo'] ??
+                                "assets/images/placeholder.png",
+                            onTap: () => showEntryDetails(entry),
+                          ),
+                        )
+                        .toList(),
+              ),
+            ],
           ],
         ),
       ),
