@@ -23,26 +23,15 @@ class _PreferencePopupState extends State<PreferencePopup> {
   List<String> selectedHousingTags = [];
 
   final List<String> foodOptions = [
+    "Alcoholic Drinks",
     "Chicken",
-    "Beef",
-    "Lutong Bahay",
+    "Coffee Drinks",
+    "Desserts",
     "Pork",
-    "Vegetables",
-    "Silog Meals",
-    "Seafood",
-    "Snacks / Merienda",
+    "Snacks",
   ];
 
-  final List<String> housingOptions = [
-    "Solo Room",
-    "Bedspace",
-    "With Aircon",
-    "With CR Inside",
-    "With Wifi",
-    "Pet-friendly",
-    "Near Campus",
-    "Fully Furnished",
-  ];
+  final List<String> housingOptions = ["Shared", "Solo"];
 
   @override
   void initState() {
