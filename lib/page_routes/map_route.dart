@@ -9,6 +9,7 @@ import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iskort/page_routes/saved_locations.dart';
+import 'package:iskort/widgets/reusables.dart';
 
 class LocationRecord {
   final String name;
@@ -81,6 +82,17 @@ class _MapRoutePageState extends State<MapRoutePage> {
   // Route info
   double? _distanceKm;
   double? _durationMin;
+
+  String _formatDuration(double totalMinutes) {
+    final minutes = totalMinutes.toInt();
+    if (minutes < 60) {
+      return '$minutes mins';
+    } else {
+      final hours = minutes ~/ 60; // integer division
+      final remainingMinutes = minutes % 60;
+      return '$hours hr${hours > 1 ? 's' : ''} $remainingMinutes mins';
+    }
+  }
 
   @override
   void initState() {
@@ -181,6 +193,87 @@ class _MapRoutePageState extends State<MapRoutePage> {
   //   }
   // }
 
+  Future<void> fetchNearestCoord(String query) async {
+    if (_userLocation == null) {
+      await showTemporaryPopup(
+        context,
+        "User location not available. Try pressing location button on bottom right.",
+      );
+      return;
+    }
+
+    // Bounding box for Iloilo province
+    const double minLat = 10.5;
+    const double maxLat = 11.7;
+    const double minLon = 121.9;
+    const double maxLon = 123.0;
+
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/search'
+      '?q=$query'
+      '&format=json'
+      '&limit=5' // get multiple results to choose nearest
+      '&addressdetails=1'
+      '&viewbox=$minLon,$minLat,$maxLon,$maxLat'
+      '&bounded=1',
+    );
+
+    final response = await http.get(
+      url,
+      headers: {"User-Agent": "IskortMap/1.0"},
+    );
+
+    if (response.statusCode != 200) {
+      await showTemporaryPopup(context, "Error fetching location data.");
+      return;
+    }
+
+    final List data = json.decode(response.body);
+    if (data.isEmpty) {
+      await showTemporaryPopup(context, "Location not found in Iloilo.");
+      return;
+    }
+
+    // Compute nearest to user location
+    final Distance distance = Distance();
+    data.sort((a, b) {
+      final LatLng posA = LatLng(
+        double.parse(a['lat']),
+        double.parse(a['lon']),
+      );
+      final LatLng posB = LatLng(
+        double.parse(b['lat']),
+        double.parse(b['lon']),
+      );
+      final dA = distance(_userLocation!, posA);
+      final dB = distance(_userLocation!, posB);
+      return dA.compareTo(dB);
+    });
+
+    final nearest = data.first;
+    final lat = double.parse(nearest['lat']);
+    final lon = double.parse(nearest['lon']);
+
+    // Extra safety check
+    if (lat < minLat || lat > maxLat || lon < minLon || lon > maxLon) {
+      await showTemporaryPopup(context, "Location is outside Iloilo.");
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _userDestination = LatLng(lat, lon);
+      _searchController.text = nearest['display_name'];
+      _searchSuggestions.clear();
+      _hasArrived = false;
+    });
+
+    _mapController.move(_userDestination!, 18);
+    await _fetchRoute();
+    await _saveLastDestination(query);
+    await _checkIfLocationIsSaved();
+  }
+
   Future<void> _saveLastDestination(String location) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_destination', location);
@@ -237,11 +330,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
 
           // Extra safety check
           if (lat < minLat || lat > maxLat || lon < minLon || lon > maxLon) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Location is outside Iloilo province.'),
-              ),
-            );
+            await showTemporaryPopup(context, "Location is outside Iloilo.");
             return;
           }
 
@@ -258,22 +347,17 @@ class _MapRoutePageState extends State<MapRoutePage> {
           _saveLastDestination(location);
           await _checkIfLocationIsSaved();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location not found in Iloilo province.'),
-            ),
+          await showTemporaryPopup(
+            context,
+            "Location not found in Iloilo province. Try removing ZIP code on address.",
           );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error fetching location data.')),
-        );
+        await showTemporaryPopup(context, "Error fetching location data.");
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      await showTemporaryPopup(context, "Error $e . Try again later.");
     }
   }
 
@@ -453,7 +537,11 @@ class _MapRoutePageState extends State<MapRoutePage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User location not available.')),
+        const SnackBar(
+          content: Text(
+            'User location not available. Try pressing location button on bottom right.',
+          ),
+        ),
       );
     }
   }
@@ -696,7 +784,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    'ETA: ${_durationMin!.toStringAsFixed(0)} mins',
+                                    'ETA: ${_formatDuration(_durationMin!)}',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -783,9 +871,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
                     });
                   },
                   onSubmitted: (value) {
-                    fetchCoordPoint(
-                      value,
-                    ); // fetch route when user presses enter
+                    fetchNearestCoord(value);
                   },
                   decoration: InputDecoration(
                     filled: true,
@@ -817,7 +903,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
                       onPressed: () {
                         final query = _searchController.text;
                         if (query.isNotEmpty) {
-                          fetchCoordPoint(query);
+                          fetchNearestCoord(query);
                         }
                       },
                     ),

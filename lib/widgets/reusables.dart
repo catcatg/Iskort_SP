@@ -356,3 +356,30 @@ class _FadingMessageState extends State<_FadingMessage> {
     );
   }
 }
+
+Future<void> showTemporaryPopup(BuildContext context, String message) async {
+  if (!context.mounted) return;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false, // prevents manual dismissal
+    builder:
+        (_) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Color(0xFF0A4423)),
+              const SizedBox(width: 10),
+              Expanded(child: Text(message)),
+            ],
+          ),
+        ),
+  );
+
+  // Auto close after 3 seconds
+  await Future.delayed(const Duration(seconds: 3));
+  if (Navigator.canPop(context)) Navigator.pop(context);
+}
