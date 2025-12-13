@@ -552,17 +552,38 @@ class _MapRoutePageState extends State<MapRoutePage> {
               ),
               CurrentLocationLayer(
                 alignPositionOnUpdate: AlignOnUpdate.always,
-                style: const LocationMarkerStyle(
+                style: LocationMarkerStyle(
+                  markerSize: Size(40, 40), // size of the whole marker
+                  markerDirection: MarkerDirection.heading,
                   marker: DefaultLocationMarker(
-                    child: Icon(
-                      Icons.location_pin,
-                      color: Color.fromARGB(255, 150, 29, 20),
+                    child: Center(
+                      child: Container(
+                        width: 40, // circle width
+                        height: 40, // circle height
+                        decoration: BoxDecoration(
+                          color: Color(0xFFFBAC24),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.navigation,
+                            color: Colors.white,
+                            size: 24, // size of the icon itself
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  markerSize: Size(0, 0),
-                  markerDirection: MarkerDirection.heading,
                 ),
               ),
+
               if (_userDestination != null)
                 MarkerLayer(
                   markers: [
