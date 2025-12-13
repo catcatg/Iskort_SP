@@ -152,7 +152,10 @@ class _HomePageState extends State<HomePage> {
                 builder: (_) => SearchResultsPage(initialQuery: query),
                 settings: RouteSettings(arguments: allEntries),
               ),
-            );
+            ).then((_) {
+              // Clear the search bar after returning from the search results page
+              _searchController.clear();
+            });
           }
         },
       ),
@@ -256,25 +259,29 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                entry['photo'] ??
-                                    "assets/images/placeholder.png",
-                                height: 200,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder:
-                                    (_, __, ___) => Container(
-                                      height: 200,
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(
-                                        Icons.broken_image,
-                                        size: 40,
+                            AspectRatio(
+                              aspectRatio: 1.2,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  entry['photo'] ??
+                                      "assets/images/placeholder.png",
+                                  height: 200,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (_, __, ___) => Container(
+                                        height: 200,
+                                        color: Colors.grey.shade300,
+                                        child: const Icon(
+                                          Icons.broken_image,
+                                          size: 40,
+                                        ),
                                       ),
-                                    ),
+                                ),
                               ),
                             ),
+
                             const SizedBox(height: 15),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
