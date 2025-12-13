@@ -120,24 +120,22 @@ class CustomBottomNavBar extends StatelessWidget {
 
 class ProductCard extends StatelessWidget {
   final String title;
-  final String subtitle;
   final String location;
   final String imagePath;
-  final VoidCallback? onTap; // <-- add this
+  final VoidCallback? onTap;
 
   const ProductCard({
     super.key,
     required this.title,
-    required this.subtitle,
     required this.location,
     required this.imagePath,
-    this.onTap, // <-- add this
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap, // <-- wire it up
+      onTap: onTap,
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 3,
@@ -145,21 +143,22 @@ class ProductCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(12),
-              ),
-              child: Image.network(
-                imagePath,
-                height: 120,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      height: 120,
-                      color: Colors.grey.shade300,
-                      child: const Icon(Icons.broken_image, size: 40),
-                    ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: AspectRatio(
+                aspectRatio: 1.2,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (_, __, ___) => Container(
+                          color: Colors.grey.shade300,
+                          child: const Icon(Icons.broken_image, size: 40),
+                        ),
+                  ),
+                ),
               ),
             ),
             Padding(
@@ -175,14 +174,12 @@ class ProductCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 4),
+                  // Make location text wrap instead of overflowing
                   Text(
                     location,
                     style: const TextStyle(fontSize: 12, color: Colors.black87),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
                   ),
                 ],
               ),
