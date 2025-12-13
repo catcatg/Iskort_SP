@@ -69,13 +69,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: TextField(
-          controller: _controller,
-          decoration: const InputDecoration(
-            hintText: 'Search housing or eateries',
-            border: InputBorder.none,
-          ),
-          style: const TextStyle(color: Colors.white),
+        title: const Text(
+          "Search Results",
+          style: TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
@@ -93,6 +89,15 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Search results for "${_controller.text}"',
+              style: const TextStyle(
+                fontSize: 16,
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF0A4423),
+              ),
+            ),
+            const SizedBox(height: 20),
             // Eateries Section
             const Text(
               "Eateries",
@@ -198,21 +203,25 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        entry['photo'] ?? "assets/images/placeholder.png",
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder:
-                            (_, __, ___) => Container(
-                              height: 200,
-                              color: Colors.grey.shade300,
-                              child: const Icon(Icons.broken_image, size: 40),
-                            ),
+                    AspectRatio(
+                      aspectRatio: 1.2,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          entry['photo'] ?? "assets/images/placeholder.png",
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) => Container(
+                                height: 200,
+                                color: Colors.grey.shade300,
+                                child: const Icon(Icons.broken_image, size: 40),
+                              ),
+                        ),
                       ),
                     ),
+
                     const SizedBox(height: 15),
                     Text(
                       "${entry['name'] ?? 'Details'} (${entry['type'] ?? 'Unknown'})",
