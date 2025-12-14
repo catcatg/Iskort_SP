@@ -376,18 +376,77 @@ app.get('/api/eatery', (req, res) => {
   });
 });
 
-// Update eatery
-app.put('/api/eatery/:id', (req, res) => {
-  const { id } = req.params;
-  const { name, location, open_time, end_time, about_desc, status } = req.body;
+// UPDATE EATERY
+app.put('/api/eatery/:eatery_id', (req, res) => {
+  const eatery_id = req.params.eatery_id;
+  const updates = req.body;
 
-  const sql = `UPDATE eatery SET name=?, location=?, open_time=?, end_time=?, about_desc=?, status=? WHERE eatery_id=?`;
-  db.query(sql, [name, location, open_time, end_time, about_desc, status, id], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Eatery not found' });
-    res.json({ success: true, message: 'Eatery updated successfully' });
-  });
+  db.query(
+    "SELECT is_verified FROM eatery WHERE eatery_id = ?",
+    [eatery_id],
+    (err, rows) => {
+      if (err) return res.status(500).json({ success: false, error: err.message });
+      if (rows.length === 0)
+        return res.status(404).json({ success: false, message: "Eatery not found" });
+
+      if (rows[0].is_verified !== 1) {
+        return res.status(403).json({
+          success: false,
+          message: "Eatery is NOT verified. Editing is not allowed."
+        });
+      }
+
+      const allowedFields = [
+        "name",
+        "location",
+        "price_range",
+        "owner_name",
+        "owner_email",
+        "owner_phone",
+        "about_desc",
+        "open_time",
+        "end_time",
+        "curfew",
+        "status",
+        "eatery_photo"
+      ];
+
+      const fields = [];
+      const values = [];
+
+      for (const key of allowedFields) {
+        if (updates[key] !== undefined) {
+          fields.push(`${key} = ?`);
+          values.push(updates[key]);
+        }
+      }
+
+      if (fields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No valid fields provided"
+        });
+      }
+
+      values.push(eatery_id);
+
+      // 3. Perform update
+      db.query(
+        `UPDATE eatery SET ${fields.join(", ")} WHERE eatery_id = ?`,
+        values,
+        (err) => {
+          if (err) return res.status(500).json({ success: false, error: err.message });
+
+          return res.json({
+            success: true,
+            message: "Eatery updated successfully"
+          });
+        }
+      );
+    }
+  );
 });
+
 
 //VERIFY EATERY
 app.put('/api/admin/verify/eatery/:id', (req, res) => {
@@ -563,18 +622,76 @@ app.get('/api/housing', (req, res) => {
   });
 });
 
-// Update housing
-app.put('/api/housing/:id', (req, res) => {
-  const { id } = req.params;
-  const { name, location, price, curfew, about_desc, status } = req.body;
+// UPDATE HOUSING
+app.put('/api/housing/:housing_id', (req, res) => {
+  const housing_id = req.params.housing_id;
+  const updates = req.body;
 
-  const sql = `UPDATE housing SET name=?, location=?, price=?, curfew=?, about_desc=?, status=? WHERE housing_id=?`;
-  db.query(sql, [name, location, price, curfew, about_desc, status, id], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Housing not found' });
-    res.json({ success: true, message: 'Housing updated successfully' });
-  });
+  db.query(
+    "SELECT is_verified FROM housing WHERE housing_id = ?",
+    [housing_id],
+    (err, rows) => {
+      if (err) return res.status(500).json({ success: false, error: err.message });
+      if (rows.length === 0)
+        return res.status(404).json({ success: false, message: "Housing not found" });
+
+      if (rows[0].is_verified !== 1) {
+        return res.status(403).json({
+          success: false,
+          message: "Housing is NOT verified. Editing is not allowed."
+        });
+      }
+
+      // 2. Build update fields dynamically
+      const allowedFields = [
+        "name",
+        "location",
+        "owner_name",
+        "owner_email",
+        "owner_phone",
+        "about_desc",
+        "curfew",
+        "status",
+        "housing_photo",
+        "price_range"
+      ];
+
+      const fields = [];
+      const values = [];
+
+      for (const key of allowedFields) {
+        if (updates[key] !== undefined) {
+          fields.push(`${key} = ?`);
+          values.push(updates[key]);
+        }
+      }
+
+      if (fields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No valid fields provided"
+        });
+      }
+
+      values.push(housing_id);
+
+      // 3. Perform update
+      db.query(
+        `UPDATE housing SET ${fields.join(", ")} WHERE housing_id = ?`,
+        values,
+        (err) => {
+          if (err) return res.status(500).json({ success: false, error: err.message });
+
+          return res.json({
+            success: true,
+            message: "Housing updated successfully"
+          });
+        }
+      );
+    }
+  );
 });
+
 
 // ===== VERIFY HOUSING =====
 app.put('/api/admin/verify/housing/:id', (req, res) => {
@@ -889,6 +1006,162 @@ app.get('/api/owner/:id', (req, res) => {
     if (results.length === 0)
       return res.status(404).json({ success: false, message: 'Owner not found' });
     res.json({ success: true, owner: results[0] });
+  });
+});
+
+app.post('/api/eatery_reviews', (req, res) => {
+  const { user_id, eatery_id, rating, comment } = req.body;
+  const sql = `INSERT INTO eatery_reviews (user_id, eatery_id, rating, comment, created_at)
+               VALUES (?, ?, ?, ?, NOW())`;
+  db.query(sql, [user_id, eatery_id, rating, comment], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, review_id: result.insertId });
+  });
+});
+
+// Getting reviews from user
+app.get('/api/user/:id/reviews', (req, res) => {
+  const { id } = req.params;
+  const sql = `
+    SELECT r.review_id, r.user_id, r.eatery_id AS place_id, r.rating, r.comment, r.created_at,
+           e.name AS place_name, 'eatery' AS type
+    FROM eatery_reviews r
+    JOIN eatery e ON r.eatery_id = e.eatery_id
+    WHERE r.user_id = ?
+    UNION ALL
+    SELECT r.review_id, r.user_id, r.housing_id AS place_id, r.rating, r.comment, r.created_at,
+           h.name AS place_name, 'housing' AS type
+    FROM housing_reviews r
+    JOIN housing h ON r.housing_id = h.housing_id
+    WHERE r.user_id = ?
+    ORDER BY created_at DESC
+  `;
+  db.query(sql, [id, id], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, reviews: results });
+  });
+});
+
+// Eatery reviews
+app.post('/api/eatery_reviews', (req, res) => {
+  const { user_id, eatery_id, rating, comment } = req.body;
+  const sql = `INSERT INTO eatery_reviews (user_id, eatery_id, rating, comment, created_at)
+               VALUES (?, ?, ?, ?, NOW())`;
+  db.query(sql, [user_id, eatery_id, rating, comment], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, review_id: result.insertId });
+  });
+});
+
+// Housing review
+app.post('/api/housing_reviews', (req, res) => {
+  const { user_id, housing_id, rating, comment } = req.body;
+  const sql = `INSERT INTO housing_reviews (user_id, housing_id, rating, comment, created_at)
+               VALUES (?, ?, ?, ?, NOW())`;
+  db.query(sql, [user_id, housing_id, rating, comment], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, review_id: result.insertId });
+  });
+});
+
+// Edit an eatery review
+app.put('/api/eatery_reviews/:id', (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+
+  // Optional validation
+  if (rating < 1 || rating > 5) {
+    return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+  }
+
+  const sql = `UPDATE eatery_reviews SET rating = ?, comment = ? WHERE review_id = ?`;
+  db.query(sql, [rating, comment, id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Review not found' });
+    }
+    res.json({ success: true, message: 'Eatery review updated successfully' });
+  });
+});
+
+// Delete an eatery review
+app.delete('/api/eatery_reviews/:id', (req, res) => {
+  const { id } = req.params;
+
+  const sql = `DELETE FROM eatery_reviews WHERE review_id = ?`;
+  db.query(sql, [id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Review not found' });
+    }
+    res.json({ success: true, message: 'Eatery review deleted successfully' });
+  });
+});
+
+
+// Edit a housing review
+app.put('/api/housing_reviews/:id', (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+
+  if (rating < 1 || rating > 5) {
+    return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
+  }
+
+  const sql = `UPDATE housing_reviews SET rating = ?, comment = ? WHERE review_id = ?`;
+  db.query(sql, [rating, comment, id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Review not found' });
+    }
+    res.json({ success: true, message: 'Housing review updated successfully' });
+  });
+});
+
+// Delete a housing review
+app.delete('/api/housing_reviews/:id', (req, res) => {
+  const { id } = req.params;
+
+  const sql = `DELETE FROM housing_reviews WHERE review_id = ?`;
+  db.query(sql, [id], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Review not found' });
+    }
+    res.json({ success: true, message: 'Housing review deleted successfully' });
+  });
+});
+
+// Get all reviews for an establishment
+app.get('/api/eatery_reviews/:eateryId', (req, res) => {
+  const { eateryId } = req.params;
+  const sql = `
+    SELECT er.*, u.username 
+    FROM eatery_reviews er 
+    JOIN users u ON er.user_id = u.user_id 
+    WHERE er.eatery_id = ? 
+    ORDER BY er.created_at DESC
+  `;
+  
+  db.query(sql, [eateryId], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, reviews: result });
+  });
+});
+
+app.get('/api/housing_reviews/:housingId', (req, res) => {
+  const { housingId } = req.params;
+  const sql = `
+    SELECT hr.*, u.username 
+    FROM housing_reviews hr 
+    JOIN users u ON hr.user_id = u.user_id 
+    WHERE hr.housing_id = ? 
+    ORDER BY hr.created_at DESC
+  `;
+  
+  db.query(sql, [housingId], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, reviews: result });
   });
 });
 

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+//import 'user_reviews.dart';
 
 // Mirrors owner layout but read-only for customers
 enum SortMode { classificationName, classificationPrice, globalPrice }
+
+
 
 class EstabProfileForCustomer extends StatefulWidget {
   final String ownerId;
@@ -29,6 +32,19 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
     with TickerProviderStateMixin {
   late TabController _tabController;
 
+  //Logged in user
+
+  Future<int?> getLoggedInUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('user_id');
+  }
+
+  Future<String?> getLoggedInUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_name');
+  }
+
+
   Map<String, dynamic>? business;
   bool loading = true;
 
@@ -42,11 +58,15 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
   SortMode sortMode = SortMode.classificationName; // default
   String reviewSortOrder = 'Newest'; // reviews sorting
 
+  // Current logged-in user’s own review (if any)
+  Map<String, dynamic>? userReview;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _bootstrap();
+    _fetchUserReview(); // ensure your own review shows up
   }
 
   @override
@@ -55,48 +75,70 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
     super.dispose();
   }
 
-    Future<void> _bootstrap() async {
+  Future<void> _bootstrap() async {
     await fetchBusiness();
     await _fetchProductsForEstablishment();
     _deriveTagsFromProducts();
     sortProducts();
   }
 
-  Future<void> fetchBusiness() async {
+    Future<void> fetchBusiness() async {
     try {
       if (widget.estType == 'Eatery' && widget.eateryId != null) {
         final res = await http.get(
           Uri.parse("https://iskort-public-web.onrender.com/api/eatery"),
         );
+
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
-          final match = (data['eateries'] ?? [])
-              .firstWhere(
-                (e) => e['eatery_id'].toString() == widget.eateryId,
-                orElse: () => null,
-              );
+          final list = List<Map<String, dynamic>>.from(data['eateries'] ?? []);
+
+          Map<String, dynamic>? found;
+
+          for (final e in list) {
+            if (e['eatery_id'].toString() == widget.eateryId) {
+              found = e;
+              break;
+            }
+          }
+
           setState(() {
-            business = match;
+            business = found;
             loading = false;
           });
+        } else {
+          setState(() => loading = false);
         }
-      } else if (widget.estType == 'Housing' && widget.housingId != null) {
+      }
+
+      else if (widget.estType == 'Housing' && widget.housingId != null) {
         final res = await http.get(
           Uri.parse("https://iskort-public-web.onrender.com/api/housing"),
         );
+
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
-          final match = (data['housings'] ?? [])
-              .firstWhere(
-                (h) => h['housing_id'].toString() == widget.housingId,
-                orElse: () => null,
-              );
+          final list = List<Map<String, dynamic>>.from(data['housings'] ?? []);
+
+          Map<String, dynamic>? found;
+
+          for (final h in list) {
+            if (h['housing_id'].toString() == widget.housingId) {
+              found = h;
+              break;
+            }
+          }
+
           setState(() {
-            business = match;
+            business = found;
             loading = false;
           });
+        } else {
+          setState(() => loading = false);
         }
-      } else {
+      }
+
+      else {
         setState(() => loading = false);
       }
     } catch (e) {
@@ -104,7 +146,8 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
     }
   }
 
-  Future<void> _fetchProductsForEstablishment() async {
+
+    Future<void> _fetchProductsForEstablishment() async {
     try {
       if (widget.estType == 'Eatery' && widget.eateryId != null) {
         final res = await http.get(
@@ -140,6 +183,232 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
     }
   }
 
+  Future<void> _fetchUserReview() async {
+    final userId = await getLoggedInUserId();
+      if (userId == null) return;
+
+
+    final estId = widget.estType == 'Eatery' ? widget.eateryId : widget.housingId;
+    final endpoint = widget.estType == 'Eatery'
+        ? 'https://iskort-public-web.onrender.com/api/eatery_reviews/user/$userId/$estId'
+        : 'https://iskort-public-web.onrender.com/api/housing_reviews/user/$userId/$estId';
+
+    try {
+      final res = await http.get(Uri.parse(endpoint));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          userReview = data['review'];
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _addReview(String type, int rating, String comment) async {
+    final baseUrl = 'https://iskort-public-web.onrender.com';
+    final userId = await getLoggedInUserId();
+      if (userId == null) return;
+    final endpoint = type == 'Eatery'
+        ? '$baseUrl/api/eatery_reviews'
+        : '$baseUrl/api/housing_reviews';
+
+    final body = {
+      'user_id': userId.toString(),
+      if (type == 'Eatery') 'eatery_id': widget.eateryId ?? '',
+      if (type == 'Housing') 'housing_id': widget.housingId ?? '',
+      'rating': rating.toString(),
+      'comment': comment,
+    };
+
+    try {
+      final res = await http.post(Uri.parse(endpoint), body: body);
+      if (res.statusCode == 200) {
+        await _fetchUserReview();
+        await fetchBusiness();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Your review is saved.")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to save review.")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Network error while saving review.")),
+      );
+    }
+  }
+
+  Future<void> _editReview(int reviewId, String type, int rating, String comment) async {
+    final endpoint = type == 'Eatery'
+        ? 'https://iskort-public-web.onrender.com/api/eatery_reviews/$reviewId'
+        : 'https://iskort-public-web.onrender.com/api/housing_reviews/$reviewId';
+
+    try {
+      final res = await http.put(Uri.parse(endpoint),
+          body: {'rating': rating.toString(), 'comment': comment});
+      if (res.statusCode == 200) {
+        await _fetchUserReview();
+        await fetchBusiness();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Your review is updated.")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to update review.")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Network error while updating review.")),
+      );
+    }
+  }
+
+  Future<void> _deleteReview(int reviewId, String type) async {
+    final endpoint = type == 'Eatery'
+        ? 'https://iskort-public-web.onrender.com/api/eatery_reviews/$reviewId'
+        : 'https://iskort-public-web.onrender.com/api/housing_reviews/$reviewId';
+
+    try {
+      final res = await http.delete(Uri.parse(endpoint));
+      if (res.statusCode == 200) {
+        setState(() => userReview = null);
+        await fetchBusiness();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Your review is deleted.")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to delete review.")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Network error while deleting review.")),
+      );
+    }
+  }
+
+    void _showAddReviewDialog() {
+    final TextEditingController commentController = TextEditingController();
+    int rating = 0;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            "Add a review",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0A4423),
+            ),
+          ),
+          content: StatefulBuilder(
+            builder: (context, setInnerState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: commentController,
+                      decoration: const InputDecoration(labelText: 'Comment'),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: List.generate(5, (index) {
+                        final filled = index < rating;
+                        return IconButton(
+                          icon: Icon(
+                            filled ? Icons.local_florist : Icons.local_florist_outlined,
+                            color: filled ? const Color(0xFFFBAC24) : Colors.grey,
+                          ),
+                          onPressed: () {
+                            setInnerState(() => rating = index + 1);
+                          },
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF791317),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (commentController.text.isEmpty || rating == 0) return;
+                await _addReview(widget.estType, rating, commentController.text);
+                Navigator.pop(context);
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF0A4423),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text("Submit"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditReviewDialog(Map<String, dynamic> review) {
+    final TextEditingController commentController =
+        TextEditingController(text: review['comment']);
+    int rating = review['rating'];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Edit Review"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: commentController),
+              const SizedBox(height: 10),
+              Row(
+                children: List.generate(5, (i) {
+                  return IconButton(
+                    icon: Icon(Icons.local_florist,
+                        color: i < rating ? const Color(0xFFFBAC24) : Colors.grey),
+                    onPressed: () => setState(() => rating = i + 1),
+                  );
+                }),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                _editReview(review['review_id'], widget.estType, rating,
+                    commentController.text);
+                Navigator.pop(context);
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _deriveTagsFromProducts() {
     final tags = <String>{};
     for (var item in products) {
@@ -156,12 +425,10 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
 
   void sortProducts() {
     if (sortMode == SortMode.globalPrice) {
-      // LOWEST → HIGHEST across all items
       products.sort((a, b) =>
           double.parse(a['price'].toString()).compareTo(double.parse(b['price'].toString())));
     } else {
       products.sort((a, b) {
-        // Group order by category (Eatery: classification; Housing: type)
         final groupA = widget.estType == 'Eatery'
             ? (a['classification'] ?? '')
             : (a['type'] ?? '');
@@ -171,7 +438,6 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
         final cmp = groupA.compareTo(groupB);
         if (cmp != 0) return cmp;
 
-        // Within group: by price or by name
         if (sortMode == SortMode.classificationPrice) {
           return double.parse(a['price'].toString())
               .compareTo(double.parse(b['price'].toString()));
@@ -183,8 +449,7 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
     setState(() {});
   }
 
-  List<Widget> _buildCategorizedProductList() {
-    // Group products by category key
+    List<Widget> _buildCategorizedProductList() {
     final Map<String, List<dynamic>> grouped = {};
 
     for (var item in products) {
@@ -204,7 +469,6 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
     for (final key in sortedKeys) {
       final groupItems = grouped[key]!;
 
-      // Category header
       widgets.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
@@ -219,7 +483,6 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
         ),
       );
 
-      // Category items (read-only cards)
       for (final item in groupItems) {
         widgets.add(
           GestureDetector(
@@ -305,22 +568,24 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
 
     List<Map<String, dynamic>> get sortedReviews {
     if (business?['reviews'] == null) return [];
-    final reviews = List<Map<String, dynamic>>.from(
-      business!['reviews'] ?? [],
-    );
+
+    final reviews = List<Map<String, dynamic>>.from(business!['reviews']);
 
     reviews.sort((a, b) {
-      final dateA = DateTime.tryParse(a['date'] ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      final dateB = DateTime.tryParse(b['date'] ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      return reviewSortOrder == 'Newest' ? dateB.compareTo(dateA) : dateA.compareTo(dateB);
+      final aDate = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(1970);
+      final bDate = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(1970);
+      return reviewSortOrder == 'Newest'
+          ? bDate.compareTo(aDate)
+          : aDate.compareTo(bDate);
     });
 
     return reviews;
   }
 
-  @override
+
+  // UI
+
+    @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -446,7 +711,7 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                         child: TabBarView(
                           controller: _tabController,
                           children: [
-                            // Products tab: read-only mirror of owner layout
+                            // Products tab
                             Padding(
                               padding: const EdgeInsets.all(8.0),
                               child: Column(
@@ -489,7 +754,6 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                     ],
                                   ),
                                   const SizedBox(height: 10),
-
                                   Expanded(
                                     child: products.isEmpty
                                         ? const Center(child: Text("No products yet"))
@@ -498,7 +762,8 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                 ],
                               ),
                             ),
-                                                        // Reviews tab
+
+                            // Reviews tab
                             Padding(
                               padding: const EdgeInsets.all(10),
                               child: Column(
@@ -519,14 +784,8 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                         style: const TextStyle(color: Color(0xFF0A4423)),
                                         value: reviewSortOrder,
                                         items: const [
-                                          DropdownMenuItem(
-                                            value: 'Newest',
-                                            child: Text('Newest'),
-                                          ),
-                                          DropdownMenuItem(
-                                            value: 'Oldest',
-                                            child: Text('Oldest'),
-                                          ),
+                                          DropdownMenuItem(value: 'Newest', child: Text('Newest')),
+                                          DropdownMenuItem(value: 'Oldest', child: Text('Oldest')),
                                         ],
                                         onChanged: (value) {
                                           if (value == null) return;
@@ -539,7 +798,7 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                   ),
                                   const SizedBox(height: 10),
 
-                                  // Add review works; keep as-is
+                                  // Add review button
                                   ElevatedButton.icon(
                                     onPressed: _showAddReviewDialog,
                                     icon: const Icon(Icons.add),
@@ -547,14 +806,77 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                       backgroundColor: const Color(0xFF0A4423),
                                       foregroundColor: Colors.white,
                                     ),
-                                    label: const Text(
-                                      "Add a review",
-                                      style: TextStyle(color: Colors.white),
-                                    ),
+                                    label: const Text("Add a review"),
                                   ),
 
                                   const SizedBox(height: 10),
 
+                                  // Show user's own review first
+                                  if (userReview != null) ...[
+                                    const Text(
+                                      "Your Review",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Color(0xFF0A4423),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Card(
+                                      margin: const EdgeInsets.symmetric(vertical: 6),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      elevation: 2,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(10),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                const Text("You", style: TextStyle(fontWeight: FontWeight.bold)),
+                                                const Spacer(),
+                                                Row(
+                                                  children: List.generate(
+                                                    userReview!['rating'] ?? 0,
+                                                    (_) => const Icon(Icons.local_florist,
+                                                        size: 16, color: Color(0xFFFBAC24)),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(userReview!['comment'] ?? '', style: const TextStyle(fontSize: 14)),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              userReview!['created_at'] ?? '',
+                                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                TextButton(
+                                                  onPressed: () {
+                                                    _showEditReviewDialog(userReview!);
+                                                  },
+                                                  child: const Text("Edit"),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () {
+                                                    _deleteReview(userReview!['review_id'], widget.estType);
+                                                  },
+                                                  child: const Text("Delete",
+                                                      style: TextStyle(color: Colors.red)),
+                                                ),
+                                              ],
+                                            )
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const Divider(),
+                                  ],
+
+                                  // Show all reviews
                                   Expanded(
                                     child: sortedReviews.isEmpty
                                         ? const Center(child: Text("No reviews yet"))
@@ -580,19 +902,14 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                                     children: [
                                                       Row(
                                                         children: [
-                                                          Text(
-                                                            reviewer,
-                                                            style: const TextStyle(fontWeight: FontWeight.bold),
-                                                          ),
+                                                          Text(reviewer,
+                                                              style: const TextStyle(fontWeight: FontWeight.bold)),
                                                           const Spacer(),
                                                           Row(
                                                             children: List.generate(
                                                               rating,
-                                                              (_) => const Icon(
-                                                                Icons.local_florist,
-                                                                size: 16,
-                                                                color: Color(0xFFFBAC24),
-                                                              ),
+                                                              (_) => const Icon(Icons.local_florist,
+                                                                  size: 16, color: Color(0xFFFBAC24)),
                                                             ),
                                                           ),
                                                         ],
@@ -600,10 +917,8 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                                                       const SizedBox(height: 4),
                                                       Text(comment, style: const TextStyle(fontSize: 14)),
                                                       const SizedBox(height: 4),
-                                                      Text(
-                                                        date,
-                                                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                                      ),
+                                                      Text(date,
+                                                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                                                     ],
                                                   ),
                                                 ),
@@ -705,98 +1020,6 @@ class _EstabProfileForCustomerState extends State<EstabProfileForCustomer>
                     ],
                   ),
                 ),
-    );
-  }
-
-  void _showAddReviewDialog() {
-    final _nameController = TextEditingController();
-    final _commentController = TextEditingController();
-    int _rating = 0;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            "Add a review",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0A4423),
-            ),
-          ),
-          content: StatefulBuilder(
-            builder: (context, setState) {
-              return SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(labelText: 'Your Name'),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _commentController,
-                      decoration: const InputDecoration(labelText: 'Comment'),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: List.generate(5, (index) {
-                        final filled = index < _rating;
-                        return IconButton(
-                          icon: Icon(
-                            filled ? Icons.local_florist : Icons.local_florist_outlined,
-                            color: filled ? const Color(0xFFFBAC24) : Colors.grey,
-                          ),
-                          onPressed: () {
-                            setState(() => _rating = index + 1);
-                          },
-                        );
-                      }),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF791317),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (_nameController.text.isEmpty ||
-                    _commentController.text.isEmpty ||
-                    _rating == 0) {
-                  return;
-                }
-                setState(() {
-                  business ??= {};
-                  business!['reviews'] ??= [];
-                  (business!['reviews'] as List).add({
-                    'reviewer_name': _nameController.text,
-                    'comment': _commentController.text,
-                    'rating': _rating,
-                    'date': DateTime.now().toIso8601String(),
-                  });
-                });
-                Navigator.pop(context);
-              },
-              style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF0A4423),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text("Submit"),
-            ),
-          ],
-        );
-      },
     );
   }
 }

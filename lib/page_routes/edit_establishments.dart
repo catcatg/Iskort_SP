@@ -192,7 +192,30 @@ String getHousingStatus(Map<String, dynamic> biz) {
                   children: [
                     input(name, hint: "Facility Name"),
                     input(price, hint: "Price"),
-                    input(pic, hint: "Image URL"),
+                    TextFormField(
+                      controller: pic,
+                      decoration: const InputDecoration(
+                        labelText: "Facility Image URL",
+                        hintText: "Auto-filled after upload",
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final picker = ImagePicker();
+                        final picked = await picker.pickImage(source: ImageSource.gallery);
+                        if (picked != null) {
+                          final url = await uploadToCloudinary(picked);
+                          if (url != null) {
+                            pic.text = url;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Image uploaded successfully")),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text("Upload Food Image"),
+                    ),
                     DropdownButtonFormField<String>(
                       value: type,
                       hint: const Text("Type"),
