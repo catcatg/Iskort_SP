@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:iskort/widgets/format_date.dart';
+import 'dart:html' as html;
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -29,6 +30,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     fetchUsers();
     fetchEateries();
     fetchHousings();
+    final uri = Uri.base;
+    final page = int.tryParse(uri.queryParameters['page'] ?? '0') ?? 0;
+    selectedPage = page;
   }
 
   // -------------------- FETCH FUNCTIONS --------------------
@@ -105,27 +109,43 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Future<void> performEateryAction(String id, String action) async {
     try {
-      if (action == 'verify') {
-        await http.put(Uri.parse('$baseUrl/api/admin/verify/eatery/$id'));
+      final res =
+          action == 'verify'
+              ? await http.put(
+                Uri.parse('$baseUrl/api/admin/verify/eatery/$id'),
+              )
+              : await http.delete(
+                Uri.parse('$baseUrl/api/admin/reject/eatery/$id'),
+              );
+
+      if (res.statusCode == 200) {
+        fetchEateries();
       } else {
-        await http.delete(Uri.parse('$baseUrl/api/admin/reject/eatery/$id'));
+        debugPrint('Eatery action failed: ${res.body}');
       }
-      fetchEateries();
     } catch (e) {
-      print('performEateryAction error: $e');
+      debugPrint('performEateryAction error: $e');
     }
   }
 
   Future<void> performHousingAction(String id, String action) async {
     try {
-      if (action == 'verify') {
-        await http.put(Uri.parse('$baseUrl/api/admin/verify/housing/$id'));
+      final res =
+          action == 'verify'
+              ? await http.put(
+                Uri.parse('$baseUrl/api/admin/verify/housing/$id'),
+              )
+              : await http.delete(
+                Uri.parse('$baseUrl/api/admin/reject/housing/$id'),
+              );
+
+      if (res.statusCode == 200) {
+        fetchHousings();
       } else {
-        await http.delete(Uri.parse('$baseUrl/api/admin/reject/housing/$id'));
+        debugPrint('Housing action failed: ${res.body}');
       }
-      fetchHousings();
     } catch (e) {
-      print('performHousingAction error: $e');
+      debugPrint('performHousingAction error: $e');
     }
   }
 
@@ -275,7 +295,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final isActive = selectedPage == index;
 
     return InkWell(
-      onTap: () => setState(() => selectedPage = index),
+      onTap: () {
+        setState(() => selectedPage = index);
+        final uri = Uri(
+          path: Uri.base.path,
+          queryParameters: {'page': index.toString()},
+        );
+        // ignore: avoid_web_libraries_in_flutter
+
+        html.window.history.pushState(null, '', uri.toString());
+      },
+
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
         decoration: BoxDecoration(
@@ -503,7 +533,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ),
                   ),
                 ),
-                Expanded(child: buildPageContent()),
+                Expanded(
+                  child: IndexedStack(
+                    index: selectedPage,
+                    children: [
+                      buildAdminDashboard(),
+                      UserManagementPage(
+                        users: users,
+                        isLoading: isLoadingUsers,
+                        onAction: performUserAction,
+                      ),
+                      EateryPage(
+                        eateries: eateries,
+                        isLoading: isLoadingEateries,
+                        onAction: performEateryAction,
+                        onRejectWithReason: showRejectReasonDialog,
+                        onApproveConfirm: (id, type) async {
+                          await showApproveConfirmDialog(
+                            id,
+                            type,
+                            performEateryAction,
+                          );
+                        },
+                      ),
+                      HousingApplication(
+                        housings: housings,
+                        isLoading: isLoadingHousings,
+                        onAction: performHousingAction,
+                        onRejectWithReason: showRejectReasonDialog,
+                        onApproveConfirm: (id, type) async {
+                          await showApproveConfirmDialog(
+                            id,
+                            type,
+                            performHousingAction,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -699,97 +767,111 @@ class EateryPage extends StatelessWidget {
   ) {
     showDialog(
       context: context,
-      builder: (_) => Dialog(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, size: 24),
-                ),
-              ),
-              Text(
-                '$name Credentials',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(height: 15),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: documents.entries.map((doc) {
-                      final url = doc.value;
-                      final label = formatLabel(doc.key);
+      builder:
+          (_) => Dialog(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.close, size: 24),
+                    ),
+                  ),
+                  Text(
+                    '$name Credentials',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children:
+                            documents.entries.map((doc) {
+                              final url = doc.value;
+                              final label = formatLabel(doc.key);
 
-                      return Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 1,
-                                  child: Text(
-                                    label,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
+                              return Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  flex: 1,
-                                  child: url.isEmpty
-                                      ? const Text(
-                                          "User has not uploaded this requirement yet.",
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                        )
-                                      : GestureDetector(
-                                          onTap: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (_) => Dialog(
-                                                child: InteractiveViewer(
-                                                  child: Image.network(url),
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Image.network(
-                                              url,
-                                              width: 120,
-                                              height: 120,
-                                              fit: BoxFit.cover,
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            label,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                         ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Divider(thickness: 1),
-                        ],
-                      );
-                    }).toList(),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          flex: 1,
+                                          child:
+                                              url.isEmpty
+                                                  ? const Text(
+                                                    "User has not uploaded this requirement yet.",
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                    ),
+                                                  )
+                                                  : GestureDetector(
+                                                    onTap: () {
+                                                      showDialog(
+                                                        context: context,
+                                                        builder:
+                                                            (_) => Dialog(
+                                                              child: InteractiveViewer(
+                                                                child:
+                                                                    Image.network(
+                                                                      url,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                      );
+                                                    },
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                      child: Image.network(
+                                                        url,
+                                                        width: 120,
+                                                        height: 120,
+                                                        fit: BoxFit.cover,
+                                                      ),
+                                                    ),
+                                                  ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Divider(thickness: 1),
+                                ],
+                              );
+                            }).toList(),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -806,7 +888,7 @@ class EateryPage extends StatelessWidget {
 
     final pending =
         eateries
-            .where((e) => e['is_verified'] != 1)
+            .where((e) => e['is_verified'] == 0)
             .map((e) => Map<String, dynamic>.from(e))
             .toList();
 
@@ -910,8 +992,10 @@ class EateryPage extends StatelessWidget {
                           ),
                         ),
                         onPressed:
-                            () =>
-                                onApproveConfirm(e['id'].toString(), 'eatery'),
+                            () => onApproveConfirm(
+                              e['eatery_id'].toString(),
+                              'eatery',
+                            ),
 
                         child: const Text('Approve'),
                       ),
@@ -931,7 +1015,7 @@ class EateryPage extends StatelessWidget {
                         ),
                         onPressed:
                             () => onRejectWithReason(
-                              e['id'].toString(),
+                              e['eatery_id'].toString(),
                               'eatery',
                             ),
                         child: const Text(' Reject '),
@@ -993,101 +1077,117 @@ class HousingApplication extends StatelessWidget {
   ) {
     showDialog(
       context: context,
-      builder: (_) => Dialog(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, size: 24),
-                ),
-              ),
-              Text(
-                '$name Credentials',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(height: 15),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: documents.entries.map((doc) {
-                      final url = doc.value;
-                      final label = doc.key
-                          .replaceAll("_base64", "")
-                          .split('_')
-                          .map((w) => w[0].toUpperCase() + w.substring(1))
-                          .join(' ');
+      builder:
+          (_) => Dialog(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.close, size: 24),
+                    ),
+                  ),
+                  Text(
+                    '$name Credentials',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children:
+                            documents.entries.map((doc) {
+                              final url = doc.value;
+                              final label = doc.key
+                                  .replaceAll("_base64", "")
+                                  .split('_')
+                                  .map(
+                                    (w) => w[0].toUpperCase() + w.substring(1),
+                                  )
+                                  .join(' ');
 
-                      return Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 1,
-                                  child: Text(
-                                    label,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
+                              return Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  flex: 1,
-                                  child: url.isEmpty
-                                      ? const Text(
-                                          "User has not uploaded this requirement yet.",
-                                          style: TextStyle(
-                                            color: Colors.grey,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                        )
-                                      : GestureDetector(
-                                          onTap: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (_) => Dialog(
-                                                child: InteractiveViewer(
-                                                  child: Image.network(url),
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Image.network(
-                                              url,
-                                              width: 120,
-                                              height: 120,
-                                              fit: BoxFit.cover,
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            label,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                         ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Divider(thickness: 1),
-                        ],
-                      );
-                    }).toList(),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          flex: 1,
+                                          child:
+                                              url.isEmpty
+                                                  ? const Text(
+                                                    "User has not uploaded this requirement yet.",
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                    ),
+                                                  )
+                                                  : GestureDetector(
+                                                    onTap: () {
+                                                      showDialog(
+                                                        context: context,
+                                                        builder:
+                                                            (_) => Dialog(
+                                                              child: InteractiveViewer(
+                                                                child:
+                                                                    Image.network(
+                                                                      url,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                      );
+                                                    },
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                      child: Image.network(
+                                                        url,
+                                                        width: 120,
+                                                        height: 120,
+                                                        fit: BoxFit.cover,
+                                                      ),
+                                                    ),
+                                                  ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Divider(thickness: 1),
+                                ],
+                              );
+                            }).toList(),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -1104,7 +1204,7 @@ class HousingApplication extends StatelessWidget {
 
     final pending =
         housings
-            .where((h) => h['is_verified'] != 1)
+            .where((h) => h['is_verified'] == 0)
             .map((h) => Map<String, dynamic>.from(h))
             .toList();
 
@@ -1198,8 +1298,10 @@ class HousingApplication extends StatelessWidget {
                           ),
                         ),
                         onPressed:
-                            () =>
-                                onApproveConfirm(h['id'].toString(), 'housing'),
+                            () => onApproveConfirm(
+                              h['housing_id'].toString(),
+                              'housing',
+                            ),
 
                         child: const Text('Approve'),
                       ),
@@ -1218,7 +1320,7 @@ class HousingApplication extends StatelessWidget {
                         ),
                         onPressed:
                             () => onRejectWithReason(
-                              h['id'].toString(),
+                              h['housing_id'].toString(),
                               'housing',
                             ),
                         child: const Text(' Reject '),
