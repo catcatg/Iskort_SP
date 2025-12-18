@@ -20,6 +20,13 @@ class _FoodPageState extends State<FoodPage> {
   List<String> availableTags = [];
   double? maxBudget;
 
+  String sortOrder = "none";
+  String nameQuery = "";
+  String filterMode = "name"; 
+
+  TextEditingController? _tagAutocompleteController;
+
+
   @override
   void initState() {
     super.initState();
@@ -87,19 +94,38 @@ class _FoodPageState extends State<FoodPage> {
     }
   }
 
-  void applyFilters() {
-    setState(() {
-      filteredFoods =
-          allFoods.where((food) {
-            final matchesTag =
-                selectedTags.isEmpty ||
-                selectedTags.contains(food['classification']);
-            final matchesBudget =
-                maxBudget == null || food['price'] <= maxBudget!;
-            return matchesTag && matchesBudget;
-          }).toList();
-    });
+  void _applySort() {
+  if (sortOrder == "low") {
+    filteredFoods.sort((a, b) => a['price'].compareTo(b['price']));
+  } else if (sortOrder == "high") {
+    filteredFoods.sort((a, b) => b['price'].compareTo(a['price']));
   }
+}
+
+  void applyFilters() {
+  setState(() {
+    if (filterMode == "name") {
+      filteredFoods = allFoods.where((f) =>
+          f['name']
+              .toLowerCase()
+              .contains(nameQuery.toLowerCase())).toList();
+    } else {
+      filteredFoods = allFoods.where((food) {
+        final matchesTag =
+            selectedTags.isEmpty ||
+            selectedTags.contains(food['classification']);
+
+        final matchesBudget =
+            maxBudget == null || food['price'] <= maxBudget!;
+
+        return matchesTag && matchesBudget;
+      }).toList();
+    }
+
+    _applySort();
+  });
+}
+
 
   void _showFoodDetails(Map<String, dynamic> item) {
     showDialog(
@@ -118,7 +144,7 @@ class _FoodPageState extends State<FoodPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 40), // space for close button
+                        const SizedBox(height: 40), 
                         AspectRatio(
                           aspectRatio: 1.2,
                           child: ClipRRect(
@@ -216,6 +242,8 @@ class _FoodPageState extends State<FoodPage> {
     );
   }
 
+  final nameController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -234,44 +262,150 @@ class _FoodPageState extends State<FoodPage> {
       ),
       body: SafeArea(
         child: Column(
-          children: [_buildFilters(), Expanded(child: _buildGrid())],
+          children: [_buildSearchBars(), Expanded(child: _buildGrid())],
         ),
       ),
     );
   }
 
-  Widget _buildFilters() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+  bool get isTagModeActive => selectedTags.isNotEmpty;
+  bool get isNameModeActive => nameQuery.isNotEmpty;
+
+
+ Widget _buildSearchBars() {
+  return Padding(
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Mode selector
+        Row(
+          children: [
+            ChoiceChip(
+              label: const Text("Search by Name"),
+              selected: filterMode == "name",
+              onSelected: (_) {
+                setState(() {
+                  filterMode = "name";
+                  nameQuery = "";
+                  selectedTags.clear();
+                  maxBudget = null;
+                  applyFilters();
+                });
+              },
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text("Search by Preference"),
+              selected: filterMode == "tags",
+              onSelected: (_) {
+                setState(() {
+                  filterMode = "tags";
+                  nameQuery = "";
+                  applyFilters();
+                });
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Search by name
+        if (filterMode == "name") ...[
+          Autocomplete<String>(
+            optionsBuilder: (textEditingValue) {
+              if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+              return allFoods.map((f) => f['name'] as String).where((name) =>
+                name.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+            },
+            onSelected: (selection) {
+              setState(() {
+                nameQuery = selection;
+                applyFilters();
+              });
+            },
+            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+              return TextField(
+                controller: controller,
+                focusNode: focusNode,
+                onChanged: (val) {
+                  setState(() {
+                    nameQuery = val;
+                    applyFilters();
+                  });
+                },
+                decoration: const InputDecoration(
+                  labelText: "Search Food by Name",
+                  border: OutlineInputBorder(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight, // dropdown on the right side
+            child: DropdownButton<String>(
+              value: sortOrder,
+              items: const [
+                DropdownMenuItem(value: "none", child: Text("Sort by")),
+                DropdownMenuItem(value: "low", child: Text("Price: Low to High")),
+                DropdownMenuItem(value: "high", child: Text("Price: High to Low")),
+              ],
+              onChanged: (val) {
+                setState(() {
+                  sortOrder = val!;
+                  _applySort();
+                });
+              },
+            ),
+          ),
+        ],
+
+        // Search by preference
+        if (filterMode == "tags") ...[
+          Autocomplete<String>(
+            optionsBuilder: (textEditingValue) {
+              if (textEditingValue.text.isEmpty) {
+                return const Iterable<String>.empty();
+              }
+              return availableTags.where((tag) =>
+                tag.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+            },
+            onSelected: (selection) {
+              setState(() {
+                if (!selectedTags.contains(selection)) {
+                  selectedTags.add(selection);
+                  applyFilters();
+                }
+
+                // clear input field
+                _tagAutocompleteController?.clear();
+              });
+            },
+            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+              _tagAutocompleteController = controller;
+              return TextField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: const InputDecoration(
+                  labelText: "Search Food by Type (e.g., Alcoholic Drinks, Snacks, Desserts, etc.)",
+                  border: OutlineInputBorder(),
+                ),
+              );
+            },
+          ),
+
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                availableTags.map((tag) {
-                  final isSelected = selectedTags.contains(tag);
-                  return FilterChip(
-                    label: Text(
-                      tag,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black,
-                      ),
-                    ),
-                    selected: isSelected,
-                    selectedColor: const Color(0xFF16984F),
-                    checkmarkColor: Colors.white,
-                    onSelected: (selected) {
-                      setState(() {
-                        selected
-                            ? selectedTags.add(tag)
-                            : selectedTags.remove(tag);
-                        applyFilters();
-                      });
-                    },
-                  );
-                }).toList(),
+            spacing: 6,
+            children: selectedTags.map((tag) => Chip(
+              label: Text(tag),
+              onDeleted: () {
+                setState(() {
+                  selectedTags.remove(tag);
+                  applyFilters();
+                });
+              },
+            )).toList(),
           ),
           const SizedBox(height: 12),
           Row(
@@ -293,12 +427,28 @@ class _FoodPageState extends State<FoodPage> {
                   },
                 ),
               ),
+              const Spacer(), // pushes dropdown to the opposite side
+              DropdownButton<String>(
+                value: sortOrder,
+                items: const [
+                  DropdownMenuItem(value: "none", child: Text("Sort by")),
+                  DropdownMenuItem(value: "low", child: Text("Price: Low to High")),
+                  DropdownMenuItem(value: "high", child: Text("Price: High to Low")),
+                ],
+                onChanged: (val) {
+                  setState(() {
+                    sortOrder = val!;
+                    _applySort();
+                  });
+                },
+              ),
             ],
           ),
         ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
 
   Widget _buildGrid() {
     if (isLoading) return const Center(child: CircularProgressIndicator());
