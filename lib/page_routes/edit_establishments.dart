@@ -474,11 +474,25 @@ String getHousingStatus(Map<String, dynamic> biz) {
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () async {
-                await deleteFoodItem(item['food_id']);
-                await reload();
-              },
-            ),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text("Confirm Deletion"),
+                      content: const Text("Are you sure you want to delete this food item?"),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+                        ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete")),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    await deleteFoodItem(item['food_id']);
+                    await reload();
+                  }
+                },
+              ),
           ],
         ),
       ),
@@ -510,8 +524,22 @@ String getHousingStatus(Map<String, dynamic> biz) {
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () async {
-                await deleteFacilityItem(item['facility_id']);
-                await reload();
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text("Confirm Deletion"),
+                    content: const Text("Are you sure you want to delete this facility?"),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+                      ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete")),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  await deleteFacilityItem(item['facility_id']);
+                  await reload();
+                }
               },
             ),
           ],
