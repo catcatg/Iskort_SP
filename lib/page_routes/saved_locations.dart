@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:iskort/page_routes/map_route.dart';
+import 'package:iskort/widgets/reusables.dart';
 
 class SavedLocations extends StatefulWidget {
   final Function(LocationRecord)? onSelect;
@@ -59,7 +60,6 @@ class _SavedLocationsState extends State<SavedLocations> {
                 itemCount: savedLocations.length,
                 itemBuilder: (context, index) {
                   final record = savedLocations[index];
-
                   return Container(
                     margin: const EdgeInsets.symmetric(
                       vertical: 6,
@@ -93,19 +93,11 @@ class _SavedLocationsState extends State<SavedLocations> {
                         ),
                       ),
                       title: Text(
-                        record.name ?? 'Unknown',
+                        record.name.isNotEmpty ? record.name : 'Unknown',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                           color: Color(0xFF0A4423),
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Distance: ${record.distanceKm?.toStringAsFixed(2) ?? '0.00'} km, '
-                        'ETA: ${record.durationMin?.toStringAsFixed(0) ?? '0'} mins',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black87,
                         ),
                       ),
                       trailing: IconButton(
@@ -114,42 +106,130 @@ class _SavedLocationsState extends State<SavedLocations> {
                           color: Color(0xFF791317),
                         ),
                         onPressed: () async {
-                          final prefs = await SharedPreferences.getInstance();
-                          final savedList =
-                              prefs.getStringList('saved_locations') ?? [];
-
-                          final updatedList =
-                              savedList.where((item) {
-                                final data = jsonDecode(item);
-                                return !(data['lat'] ==
-                                        record.coordinates.latitude &&
-                                    data['lng'] ==
-                                        record.coordinates.longitude &&
-                                    data['timestamp'] ==
-                                        record.timestamp.toIso8601String());
-                              }).toList();
-
-                          await prefs.setStringList(
-                            'saved_locations',
-                            updatedList,
+                          // Show confirmation dialog with location name
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder:
+                                (context) => AlertDialog(
+                                  title: const Text("Delete Location"),
+                                  content: Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        const TextSpan(
+                                          text:
+                                              "Are you sure you want to delete ",
+                                        ),
+                                        TextSpan(
+                                          text: "'${record.name}'",
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const TextSpan(text: "?"),
+                                      ],
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed:
+                                          () => Navigator.pop(context, false),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed:
+                                          () => Navigator.pop(context, true),
+                                      child: const Text(
+                                        "Delete",
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                           );
 
-                          setState(() {
-                            savedLocations.removeAt(index);
-                          });
+                          // If user confirmed deletion
+                          if (confirm == true) {
+                            final prefs = await SharedPreferences.getInstance();
+                            final savedList =
+                                prefs.getStringList('saved_locations') ?? [];
+
+                            final updatedList =
+                                savedList.where((item) {
+                                  final data = jsonDecode(item);
+                                  return !(data['lat'] ==
+                                          record.coordinates.latitude &&
+                                      data['lng'] ==
+                                          record.coordinates.longitude);
+                                }).toList();
+
+                            await prefs.setStringList(
+                              'saved_locations',
+                              updatedList,
+                            );
+
+                            setState(() {
+                              savedLocations.removeAt(index);
+                            });
+
+                            // Show snackbar confirmation
+                            showFadingPopup(
+                              context,
+                              "Location '${record.name}' deleted.",
+                            );
+                          }
                         },
                       ),
+
                       onTap: () {
-                        if (widget.onSelect != null) {
-                          widget.onSelect!(record);
-                        } else {
-                          Navigator.pop(context, record);
-                        }
+                        if (widget.onSelect != null) widget.onSelect!(record);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (_) =>
+                                    MapRoutePage(initialLocation: record.name),
+                          ),
+                        );
                       },
                     ),
                   );
                 },
               ),
+    );
+  }
+}
+
+class LocationRecord {
+  final String name;
+  final LatLng coordinates;
+  final double distanceKm;
+  final double durationMin;
+  final DateTime timestamp;
+
+  LocationRecord({
+    required this.name,
+    required this.coordinates,
+    required this.distanceKm,
+    required this.durationMin,
+    required this.timestamp,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'lat': coordinates.latitude,
+    'lng': coordinates.longitude,
+    'distanceKm': distanceKm,
+    'durationMin': durationMin,
+    'timestamp': timestamp.toIso8601String(),
+  };
+
+  factory LocationRecord.fromMap(Map<String, dynamic> map) {
+    return LocationRecord(
+      name: map['name'] ?? '',
+      coordinates: LatLng(map['lat'], map['lng']),
+      distanceKm: (map['distanceKm'] ?? 0).toDouble(),
+      durationMin: (map['durationMin'] ?? 0).toDouble(),
+      timestamp: DateTime.parse(map['timestamp']),
     );
   }
 }
