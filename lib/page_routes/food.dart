@@ -281,33 +281,45 @@ class _FoodPageState extends State<FoodPage> {
         // Mode selector
         Row(
           children: [
-            ChoiceChip(
-              label: const Text("Search by Name"),
-              selected: filterMode == "name",
-              onSelected: (_) {
-                setState(() {
-                  filterMode = "name";
-                  nameQuery = "";
-                  selectedTags.clear();
-                  maxBudget = null;
+            Expanded(
+              child: RadioListTile<String>(
+                title: const Text("Search by Name"),
+                value: "name",
+                visualDensity: VisualDensity.compact,
+                contentPadding: EdgeInsets.zero,
+                groupValue: filterMode,
+                dense: true,
+                onChanged: (val) {
+                  if (val == null) return;
+                  setState(() {
+                    filterMode = val;
+                    nameQuery = "";
+                    selectedTags.clear();
+                    maxBudget = null;
+                  });
                   applyFilters();
-                });
-              },
+                },
+              ),
             ),
-            const SizedBox(width: 8),
-            ChoiceChip(
-              label: const Text("Search by Preference"),
-              selected: filterMode == "tags",
-              onSelected: (_) {
-                setState(() {
-                  filterMode = "tags";
-                  nameQuery = "";
+            Expanded(
+              child: RadioListTile<String>(
+                title: const Text("Search by Preference"),
+                value: "tags",
+                groupValue: filterMode,
+                dense: true,
+                onChanged: (val) {
+                  if (val == null) return;
+                  setState(() {
+                    filterMode = val;
+                    nameQuery = "";
+                  });
                   applyFilters();
-                });
-              },
+                },
+              ),
             ),
           ],
         ),
+
         const SizedBox(height: 12),
 
         // Search by name
