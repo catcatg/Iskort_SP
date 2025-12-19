@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
@@ -8,9 +9,31 @@ import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:iskort/page_routes/saved_locations.dart';
 import 'package:iskort/widgets/reusables.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
+/// ===================== CONSTANTS =====================
+class AppConstants {
+  static const double defaultZoom = 18;
+  static const double locationZoom = 19;
+  static const double arrivalThresholdMeters = 20;
+}
+
+class IloiloBounds {
+  static const minLat = 10.5;
+  static const maxLat = 11.7;
+  static const minLon = 121.9;
+  static const maxLon = 123.0;
+
+  static bool contains(double lat, double lon) {
+    return lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon;
+  }
+}
+
+/// ===================== MODEL =====================
 class LocationRecord {
   final String name;
   final LatLng coordinates;
@@ -26,17 +49,14 @@ class LocationRecord {
     required this.timestamp,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'lat': coordinates.latitude,
-      'lng': coordinates.longitude,
-      'distanceKm': distanceKm,
-      'durationMin': durationMin,
-      'timestamp': timestamp.toIso8601String(),
-    };
-  }
-
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'lat': coordinates.latitude,
+    'lng': coordinates.longitude,
+    'distanceKm': distanceKm,
+    'durationMin': durationMin,
+    'timestamp': timestamp.toIso8601String(),
+  };
   factory LocationRecord.fromMap(Map<String, dynamic> map) {
     return LocationRecord(
       name: map['name'],
@@ -48,76 +68,133 @@ class LocationRecord {
   }
 }
 
+/// ===================== PAGE =====================
 class MapRoutePage extends StatefulWidget {
   final String? initialLocation;
-
   const MapRoutePage({super.key, this.initialLocation});
 
   @override
   State<MapRoutePage> createState() => _MapRoutePageState();
 }
 
+final cacheManager = CacheManager(
+  Config(
+    'tiles',
+    stalePeriod: const Duration(days: 30),
+    maxNrOfCacheObjects: 500,
+  ),
+);
+
+class PrefetchTileProvider extends TileProvider {
+  final BaseCacheManager cacheManager;
+
+  PrefetchTileProvider(this.cacheManager);
+
+  @override
+  ImageProvider getImage(TileCoordinates coords, TileLayer tileLayer) {
+    // Replace {z}, {x}, {y} in the URL
+    String url = tileLayer.urlTemplate!
+        .replaceAll('{z}', coords.z.toString())
+        .replaceAll('{x}', coords.x.toString())
+        .replaceAll('{y}', coords.y.toString());
+
+    // Replace {s} subdomain if provided
+    if (tileLayer.subdomains != null && tileLayer.subdomains!.isNotEmpty) {
+      final subdomain =
+          tileLayer.subdomains![coords.x % tileLayer.subdomains!.length];
+      url = url.replaceAll('{s}', subdomain);
+    }
+
+    // Use try/catch to fallback if caching fails
+    try {
+      return CachedNetworkImageProvider(url, cacheManager: cacheManager);
+    } catch (e) {
+      debugPrint('Tile load failed for $url: $e');
+      return NetworkImage(url); // fallback to normal network image
+    }
+  }
+}
+
 class _MapRoutePageState extends State<MapRoutePage> {
   final MapController _mapController = MapController();
   final Location _locationService = Location();
   final TextEditingController _searchController = TextEditingController();
+  final Distance _distanceCalc = const Distance();
 
-  bool isLoading = true;
-  bool _isSearching = false;
-  String _loadingMessage = '';
-  LatLng? _userDestination;
-  LatLng? _userLocation;
-  List<LatLng> _routePoints = [];
-  bool _hasArrived = false;
-
-  // Saved locations
-  List<LocationRecord> savedLocations = [];
-  bool isSaved = false;
-  String? _destinationName;
-
-  // Autocomplete
-  List<Map<String, dynamic>> _searchSuggestions = [];
+  StreamSubscription<LocationData>? _locationSub;
   Timer? _debounce;
 
-  // Route info
+  LatLng? _userLocation;
+  LatLng? _userDestination;
+  List<LatLng> _routePoints = [];
+
   double? _distanceKm;
   double? _durationMin;
 
-  String _formatDuration(double totalMinutes) {
-    final minutes = totalMinutes.toInt();
-    if (minutes < 60) {
-      return '$minutes mins';
-    } else {
-      final hours = minutes ~/ 60; // integer division
-      final remainingMinutes = minutes % 60;
-      return '$hours hr${hours > 1 ? 's' : ''} $remainingMinutes mins';
-    }
-  }
+  bool _isLoading = false;
+  bool _hasArrived = false;
+  bool isSaved = false;
 
+  List<Map<String, dynamic>> _searchSuggestions = [];
+  String? _destinationName;
+
+  /// ===================== LIFECYCLE =====================
   @override
   void initState() {
     super.initState();
     _initLocation();
-    //_loadLastDestination();
-    _searchController.clear();
-
-    // If initialLocation is provided, auto fill search bar and fetch
-    if (widget.initialLocation != null && widget.initialLocation!.isNotEmpty) {
-      _searchController.text = widget.initialLocation!;
-      fetchCoordPoint(widget.initialLocation!);
-    }
+    _initLocationAndDestination();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _locationSub?.cancel();
     _debounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _openSavedLocationsScreen() async {
-    // Clear the card and search when navigating to other pages
+  /// ===================== HELPERS =====================
+  Future<http.Response> _get(Uri url) {
+    return http.get(
+      url,
+      headers: {"User-Agent": "IskortMap/1.0 (iskortmap@gmail.com)"},
+    );
+  }
+
+  Future<void> _initLocationAndDestination() async {
+    _showLoading();
+    try {
+      await _getUserLocation();
+
+      if (widget.initialLocation != null &&
+          widget.initialLocation!.isNotEmpty) {
+        _searchController.text = widget.initialLocation!;
+        await fetchCoordPoint(widget.initialLocation!);
+      }
+    } finally {
+      _hideLoading();
+    }
+  }
+
+  String _formatDuration(double minutes) {
+    final m = minutes.toInt();
+    if (m < 60) return '$m mins';
+    final h = m ~/ 60;
+    return '$h hr${h > 1 ? 's' : ''} ${m % 60} mins';
+  }
+
+  void _showLoading() {
     if (!mounted) return;
+    setState(() => _isLoading = true);
+  }
+
+  void _hideLoading() {
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+  }
+
+  void _clearSearchAndCard() {
     setState(() {
       _searchController.clear();
       _routePoints.clear();
@@ -127,27 +204,199 @@ class _MapRoutePageState extends State<MapRoutePage> {
       _searchSuggestions.clear();
       _destinationName = null;
       isSaved = false;
+      _hasArrived = false;
     });
+  }
 
-    final selectedRecord = await Navigator.push(
+  Future<void> _openSavedLocationsScreen() async {
+    final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const SavedLocations()),
+      MaterialPageRoute(builder: (_) => const SavedLocations()),
     );
 
-    if (selectedRecord != null && selectedRecord is LocationRecord) {
+    if (result is LocationRecord) {
       setState(() {
-        _searchController.clear();
-        _userDestination = selectedRecord.coordinates;
-        _distanceKm = selectedRecord.distanceKm;
-        _durationMin = selectedRecord.durationMin;
-        _destinationName = selectedRecord.name;
+        _userDestination = result.coordinates;
+        _distanceKm = result.distanceKm;
+        _durationMin = result.durationMin;
+        _destinationName = result.name;
         isSaved = true;
         _hasArrived = false;
       });
-
-      _mapController.move(_userDestination!, 18);
+      _mapController.move(_userDestination!, AppConstants.defaultZoom);
       await _fetchRoute();
     }
+  }
+
+  /// ===================== LOCATION =====================
+  Future<void> _initLocation() async {
+    if (!await _checkPermissions()) return;
+
+    _locationSub = _locationService.onLocationChanged.listen((data) {
+      if (data.latitude == null || data.longitude == null) return;
+
+      setState(() {
+        _userLocation = LatLng(data.latitude!, data.longitude!);
+      });
+
+      _checkArrival();
+    });
+  }
+
+  Future<bool> _checkPermissions() async {
+    if (!await _locationService.serviceEnabled() &&
+        !await _locationService.requestService()) {
+      return false;
+    }
+
+    var permission = await _locationService.hasPermission();
+    if (permission == PermissionStatus.denied) {
+      permission = await _locationService.requestPermission();
+    }
+    return permission == PermissionStatus.granted;
+  }
+
+  Future<void> _getUserLocation() async {
+    final loc = await _locationService.getLocation();
+
+    if (loc.latitude == null || loc.longitude == null) {
+      throw Exception("Location unavailable");
+    }
+
+    final pos = LatLng(loc.latitude!, loc.longitude!);
+    setState(() => _userLocation = pos);
+    _mapController.move(pos, AppConstants.locationZoom);
+  }
+
+  /// ===================== SEARCH =====================
+  Future<void> _fetchSuggestions(String query) async {
+    if (query.isEmpty) {
+      setState(() => _searchSuggestions.clear());
+      return;
+    }
+
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/search'
+      '?q=$query&format=json&limit=5'
+      '&viewbox=${IloiloBounds.minLon},${IloiloBounds.minLat},'
+      '${IloiloBounds.maxLon},${IloiloBounds.maxLat}&bounded=1',
+    );
+
+    final response = await _get(url);
+    if (response.statusCode != 200) return;
+
+    final data = json.decode(response.body) as List;
+    setState(() {
+      _searchSuggestions =
+          data
+              .where(
+                (s) => IloiloBounds.contains(
+                  double.parse(s['lat']),
+                  double.parse(s['lon']),
+                ),
+              )
+              .cast<Map<String, dynamic>>()
+              .toList();
+    });
+  }
+
+  /// ===================== ROUTING =====================
+  Future<void> fetchNearestCoord(String query) async {
+    if (query.isEmpty) return;
+    await fetchCoordPoint(query);
+  }
+
+  Future<void> fetchCoordPoint(String location) async {
+    _showLoading();
+
+    try {
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search'
+        '?q=$location&format=json&limit=1'
+        '&viewbox=${IloiloBounds.minLon},${IloiloBounds.minLat},'
+        '${IloiloBounds.maxLon},${IloiloBounds.maxLat}&bounded=1',
+      );
+
+      final response = await _get(url);
+      if (response.statusCode != 200) {
+        await showTemporaryPopup(context, "Failed to fetch location.");
+        return;
+      }
+
+      final data = json.decode(response.body);
+      if (data.isEmpty) {
+        await showTemporaryPopup(context, "Location not found in Iloilo.");
+        return;
+      }
+
+      final lat = double.parse(data[0]['lat']);
+      final lon = double.parse(data[0]['lon']);
+
+      if (!IloiloBounds.contains(lat, lon)) {
+        await showTemporaryPopup(context, "Location is outside Iloilo.");
+        return;
+      }
+
+      setState(() {
+        _userDestination = LatLng(lat, lon);
+        _destinationName = data[0]['display_name'];
+        _searchSuggestions.clear();
+        _hasArrived = false;
+      });
+
+      _mapController.move(_userDestination!, AppConstants.defaultZoom);
+      await _fetchRoute();
+      await _checkIfLocationIsSaved();
+    } catch (e) {
+      await showTemporaryPopup(context, "Something went wrong.");
+    } finally {
+      _hideLoading();
+    }
+  }
+
+  Future<void> _fetchRoute() async {
+    if (_userLocation == null || _userDestination == null) return;
+
+    final url = Uri.parse(
+      'https://router.project-osrm.org/route/v1/driving/'
+      '${_userLocation!.longitude},${_userLocation!.latitude};'
+      '${_userDestination!.longitude},${_userDestination!.latitude}'
+      '?overview=full&geometries=polyline',
+    );
+
+    final response = await _get(url);
+    if (response.statusCode != 200) return;
+
+    final data = json.decode(response.body);
+    final route = data['routes'][0];
+
+    final points =
+        PolylinePoints()
+            .decodePolyline(route['geometry'])
+            .map((p) => LatLng(p.latitude, p.longitude))
+            .toList();
+
+    setState(() {
+      _routePoints = points;
+      _distanceKm = route['distance'] / 1000;
+      _durationMin = route['duration'] / 60;
+    });
+  }
+
+  /// ===================== SAVED =====================
+  Future<void> _checkIfLocationIsSaved() async {
+    if (_userDestination == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('saved_locations') ?? [];
+
+    setState(() {
+      isSaved = saved.any((item) {
+        final d = jsonDecode(item);
+        return d['lat'] == _userDestination!.latitude &&
+            d['lng'] == _userDestination!.longitude;
+      });
+    });
   }
 
   Future<void> _toggleSaveCurrentLocation() async {
@@ -155,296 +404,39 @@ class _MapRoutePageState extends State<MapRoutePage> {
       return;
 
     final prefs = await SharedPreferences.getInstance();
-    final savedList = prefs.getStringList('saved_locations') ?? [];
-
-    final record = LocationRecord(
-      name:
-          _searchController.text.trim().isEmpty
-              ? 'Unnamed Location'
-              : _searchController.text.trim(),
-      coordinates: _userDestination!,
-      distanceKm: _distanceKm!,
-      durationMin: _durationMin!,
-      timestamp: DateTime.now(),
-    );
-
-    final recordMap = jsonEncode(record.toMap());
+    final saved = prefs.getStringList('saved_locations') ?? [];
 
     if (isSaved) {
-      savedList.remove(recordMap);
-    } else {
-      savedList.add(recordMap);
-    }
-
-    await prefs.setStringList('saved_locations', savedList);
-
-    if (!mounted) return;
-    setState(() {
-      isSaved = !isSaved;
-    });
-  }
-
-  // Future<void> _loadLastDestination() async {
-  //   final prefs = await SharedPreferences.getInstance();
-  //   final last = prefs.getString('last_destination');
-  //   if (last != null && mounted) {
-  //     _searchController.text = last;
-  //     await fetchCoordPoint(last, moveCamera: false);
-  //   }
-  // }
-
-  Future<void> fetchNearestCoord(String query) async {
-    if (_userLocation == null) {
-      await showTemporaryPopup(
-        context,
-        "User location not available. Try pressing location button on bottom right.",
-      );
-      return;
-    }
-
-    // Bounding box for Iloilo province
-    const double minLat = 10.5;
-    const double maxLat = 11.7;
-    const double minLon = 121.9;
-    const double maxLon = 123.0;
-
-    final url = Uri.parse(
-      'https://nominatim.openstreetmap.org/search'
-      '?q=$query'
-      '&format=json'
-      '&limit=5' // get multiple results to choose nearest
-      '&addressdetails=1'
-      '&viewbox=$minLon,$minLat,$maxLon,$maxLat'
-      '&bounded=1',
-    );
-
-    final response = await http.get(
-      url,
-      headers: {"User-Agent": "IskortMap/1.0"},
-    );
-
-    if (response.statusCode != 200) {
-      await showTemporaryPopup(context, "Error fetching location data.");
-      return;
-    }
-
-    final List data = json.decode(response.body);
-    if (data.isEmpty) {
-      await showTemporaryPopup(context, "Location not found in Iloilo.");
-      return;
-    }
-
-    // Compute nearest to user location
-    final Distance distance = Distance();
-    data.sort((a, b) {
-      final LatLng posA = LatLng(
-        double.parse(a['lat']),
-        double.parse(a['lon']),
-      );
-      final LatLng posB = LatLng(
-        double.parse(b['lat']),
-        double.parse(b['lon']),
-      );
-      final dA = distance(_userLocation!, posA);
-      final dB = distance(_userLocation!, posB);
-      return dA.compareTo(dB);
-    });
-
-    final nearest = data.first;
-    final lat = double.parse(nearest['lat']);
-    final lon = double.parse(nearest['lon']);
-
-    // Extra safety check
-    if (lat < minLat || lat > maxLat || lon < minLon || lon > maxLon) {
-      await showTemporaryPopup(context, "Location is outside Iloilo.");
-      return;
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _userDestination = LatLng(lat, lon);
-      _searchController.text = nearest['display_name'];
-      _searchSuggestions.clear();
-      _hasArrived = false;
-    });
-
-    _mapController.move(_userDestination!, 18);
-    await _fetchRoute();
-    await _saveLastDestination(query);
-    await _checkIfLocationIsSaved();
-  }
-
-  Future<void> _saveLastDestination(String location) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('last_destination', location);
-  }
-
-  Future<void> _initLocation() async {
-    if (!await _checkPermissions()) return;
-
-    _locationService.onLocationChanged.listen((LocationData locationData) {
-      if (locationData.latitude != null && locationData.longitude != null) {
-        if (!mounted) return;
-        setState(() {
-          _userLocation = LatLng(
-            locationData.latitude!,
-            locationData.longitude!,
-          );
-          isLoading = false;
-        });
-
-        _checkArrival(); // Check if arrived
-      }
-    });
-  }
-
-  Future<void> fetchCoordPoint(
-    String location, {
-    bool moveCamera = true,
-  }) async {
-    try {
-      // Bounding box for entire Iloilo province
-      const double minLat = 10.5;
-      const double maxLat = 11.7;
-      const double minLon = 121.9;
-      const double maxLon = 123.0;
-
-      final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search'
-        '?q=$location'
-        '&format=json'
-        '&limit=1'
-        '&viewbox=$minLon,$minLat,$maxLon,$maxLat'
-        '&bounded=1',
-      );
-
-      final response = await http.get(
-        url,
-        headers: {"User-Agent": "IskortMap/1.0 (iskortmap@gmail.com)"},
-      );
-      if (response.statusCode == 200) {
-        final List data = json.decode(response.body);
-        if (data.isNotEmpty) {
-          final lat = double.parse(data[0]['lat']);
-          final lon = double.parse(data[0]['lon']);
-
-          // Extra safety check
-          if (lat < minLat || lat > maxLat || lon < minLon || lon > maxLon) {
-            await showTemporaryPopup(context, "Location is outside Iloilo.");
-            return;
-          }
-
-          if (!mounted) return;
-          setState(() {
-            _userDestination = LatLng(lat, lon);
-            _searchSuggestions.clear();
-            _hasArrived = false;
-          });
-
-          if (moveCamera) _mapController.move(_userDestination!, 18);
-
-          await _fetchRoute();
-          _saveLastDestination(location);
-          await _checkIfLocationIsSaved();
-        } else {
-          await showTemporaryPopup(
-            context,
-            "Location not found in Iloilo province. Try removing ZIP code on address.",
-          );
-        }
-      } else {
-        await showTemporaryPopup(context, "Error fetching location data.");
-      }
-    } catch (e) {
-      if (!mounted) return;
-      await showTemporaryPopup(context, "Error $e . Try again later.");
-    }
-  }
-
-  Future<void> _checkIfLocationIsSaved() async {
-    if (_userDestination == null) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    final savedList = prefs.getStringList('saved_locations') ?? [];
-
-    final isAlreadySaved = savedList.any((item) {
-      final data = jsonDecode(item);
-      final savedLat = data['lat'];
-      final savedLng = data['lng'];
-      return savedLat == _userDestination!.latitude &&
-          savedLng == _userDestination!.longitude;
-    });
-
-    if (!mounted) return;
-    setState(() {
-      isSaved = isAlreadySaved;
-    });
-  }
-
-  Future<void> _fetchRoute() async {
-    if (_userLocation == null || _userDestination == null) return;
-
-    final url = Uri.parse(
-      'https://router.project-osrm.org/route/v1/driving/${_userLocation!.longitude},${_userLocation!.latitude};${_userDestination!.longitude},${_userDestination!.latitude}?overview=full&geometries=polyline',
-    );
-    final response = await http.get(
-      url,
-      headers: {"User-Agent": "IskortMap/1.0 (iskortmap@gmail.com)"},
-    );
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final geometry = data['routes'][0]['geometry'];
-      final distance = data['routes'][0]['distance'] / 1000;
-      final duration = data['routes'][0]['duration'] / 60;
-      _decodePolyline(geometry);
-      if (!mounted) return;
-      setState(() {
-        _distanceKm = distance;
-        _durationMin = duration;
+      saved.removeWhere((item) {
+        final d = jsonDecode(item);
+        return d['lat'] == _userDestination!.latitude &&
+            d['lng'] == _userDestination!.longitude;
       });
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error fetching route data.')),
+      final record = LocationRecord(
+        name:
+            _searchController.text.trim().isEmpty
+                ? 'Unnamed Location'
+                : _searchController.text.trim(),
+        coordinates: _userDestination!,
+        distanceKm: _distanceKm!,
+        durationMin: _durationMin!,
+        timestamp: DateTime.now(),
       );
+      saved.add(jsonEncode(record.toMap()));
     }
+
+    await prefs.setStringList('saved_locations', saved);
+    setState(() => isSaved = !isSaved);
   }
 
-  void _decodePolyline(String encodedPolyline) {
-    PolylinePoints polylinePoints = PolylinePoints();
-    List<PointLatLng> result = polylinePoints.decodePolyline(encodedPolyline);
-    if (!mounted) return;
-    setState(() {
-      _routePoints =
-          result
-              .map((point) => LatLng(point.latitude, point.longitude))
-              .toList();
-    });
-  }
-
-  void _clearSearchAndCard() {
-    if (!mounted) return;
-    setState(() {
-      _searchController.clear();
-      _routePoints.clear();
-      _userDestination = null;
-      _distanceKm = null;
-      _durationMin = null;
-      _searchSuggestions.clear();
-      _destinationName = null;
-      isSaved = false;
-      _hasArrived = false;
-    });
-  }
-
+  /// ===================== ARRIVAL =====================
   void _checkArrival() {
     if (_userLocation == null || _userDestination == null) return;
 
-    final distance = Distance();
-    final meterDistance = distance(_userLocation!, _userDestination!);
+    final meters = _distanceCalc(_userLocation!, _userDestination!);
 
-    if (meterDistance <= 20 && !_hasArrived) {
-      // 20 meters threshold
-      if (!mounted) return;
+    if (meters <= AppConstants.arrivalThresholdMeters && !_hasArrived) {
       setState(() {
         _hasArrived = true;
         _routePoints.clear();
@@ -453,144 +445,13 @@ class _MapRoutePageState extends State<MapRoutePage> {
         _userDestination = null;
       });
 
-      // Show arrival dialog
       showDialog(
         context: context,
-        builder: (context) {
-          return Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        builder:
+            (_) => const AlertDialog(
+              title: Text("Arrived"),
+              content: Text("You have arrived at your destination."),
             ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF0A4423), // dark green
-                    Color(0xFF7A1E1E), // deep red
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Icon(Icons.location_on, color: Colors.white, size: 60),
-                  const SizedBox(height: 10),
-                  const Text(
-                    "You have arrived at your destination!",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    }
-  }
-
-  Future<bool> _checkPermissions() async {
-    bool serviceEnabled = await _locationService.serviceEnabled();
-    if (!serviceEnabled) {
-      serviceEnabled = await _locationService.requestService();
-      if (!serviceEnabled) return false;
-    }
-
-    PermissionStatus permissionGranted = await _locationService.hasPermission();
-    if (permissionGranted == PermissionStatus.denied) {
-      permissionGranted = await _locationService.requestPermission();
-      if (permissionGranted != PermissionStatus.granted) return false;
-    }
-    return true;
-  }
-
-  Future<void> _getUserLocation() async {
-    try {
-      final current = await _locationService.getLocation();
-      if (current.latitude != null && current.longitude != null) {
-        final pos = LatLng(current.latitude!, current.longitude!);
-        if (!mounted) return;
-        setState(() => _userLocation = pos);
-        _mapController.move(pos, 19);
-        if (_userDestination != null) await _fetchRoute();
-      } else {
-        throw Exception("No coordinates");
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'User location not available. Try pressing location button on bottom right.',
-          ),
-        ),
-      );
-    }
-  }
-
-  Future<void> _fetchSuggestions(String query) async {
-    if (query.isEmpty) {
-      if (!mounted) return;
-      setState(() => _searchSuggestions.clear());
-      return;
-    }
-
-    // Bounding box for entire Iloilo province
-    const double minLat = 10.5;
-    const double maxLat = 11.7;
-    const double minLon = 121.9;
-    const double maxLon = 123.0;
-
-    final url = Uri.parse(
-      'https://nominatim.openstreetmap.org/search'
-      '?q=$query'
-      '&format=json'
-      '&limit=5'
-      '&addressdetails=1'
-      '&viewbox=$minLon,$minLat,$maxLon,$maxLat'
-      '&bounded=1',
-    );
-
-    final response = await http.get(
-      url,
-      headers: {"User-Agent": "IskortMap/1.0 (iskortmap@gmail.com)"},
-    );
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-
-      if (!mounted) return;
-
-      // Extra safety filter
-      final filtered =
-          (data as List).where((s) {
-            final lat = double.parse(s['lat']);
-            final lon = double.parse(s['lon']);
-            return lat >= minLat &&
-                lat <= maxLat &&
-                lon >= minLon &&
-                lon <= maxLon;
-          }).toList();
-
-      setState(
-        () => _searchSuggestions = List<Map<String, dynamic>>.from(filtered),
       );
     }
   }
@@ -630,14 +491,18 @@ class _MapRoutePageState extends State<MapRoutePage> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _userLocation ?? const LatLng(11.0, 122.5),
-              initialZoom: 18,
+              initialZoom: 16,
               minZoom: 1,
               maxZoom: 100,
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate:
+                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: ['a', 'b', 'c'],
+                tileProvider: PrefetchTileProvider(cacheManager),
               ),
+
               CurrentLocationLayer(
                 alignPositionOnUpdate: AlignOnUpdate.always,
                 style: LocationMarkerStyle(
@@ -934,6 +799,22 @@ class _MapRoutePageState extends State<MapRoutePage> {
               ],
             ),
           ),
+          if (_isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black45,
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: Colors.white),
+                      SizedBox(height: 12),
+                      Text("Loading...", style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
 
