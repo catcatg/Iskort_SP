@@ -17,6 +17,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:iskort/page_routes/estab_pin.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_map_dragmarker/flutter_map_dragmarker.dart';
+import 'package:iskort/page_routes/static_pins.dart';
 
 /// ===================== CONSTANTS =====================
 class AppConstants {
@@ -565,16 +566,21 @@ class _MapRoutePageState extends State<MapRoutePage> {
             d['lng'] == _userDestination!.longitude;
       });
     } else {
+      final String finalName =
+          _searchController.text.trim().isNotEmpty
+              ? _searchController.text.trim()
+              : (_destinationName?.trim().isNotEmpty == true
+                  ? _destinationName!
+                  : 'Pinned Location');
+
       final record = LocationRecord(
-        name:
-            _searchController.text.trim().isEmpty
-                ? 'Unnamed Location'
-                : _searchController.text.trim(),
+        name: finalName,
         coordinates: _userDestination!,
         distanceKm: _distanceKm!,
         durationMin: _durationMin!,
         timestamp: DateTime.now(),
       );
+
       saved.add(jsonEncode(record.toMap()));
     }
 
@@ -719,9 +725,13 @@ class _MapRoutePageState extends State<MapRoutePage> {
                             onPinUpdated: (_) => setState(() {}),
                             reloadPins: _loadOwnerPins,
                             navigateToPin: (coords) async {
-                              _userDestination = coords;
-                              _destinationName = pin['title'];
-                              _hasArrived = false;
+                              setState(() {
+                                _userDestination = coords;
+                                _destinationName = pin['title'];
+                                _searchController.text = pin['title'];
+                                _hasArrived = false;
+                              });
+
                               _mapController.move(
                                 coords,
                                 AppConstants.defaultZoom,
@@ -733,7 +743,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
                         child: Icon(
                           Icons.location_on,
                           size: 40,
-                          color: isOwner ? Colors.blue : Colors.red,
+                          color: isOwner ? Colors.blue : Color(0xFF7A1E1E),
                         ),
                       );
                     },
@@ -783,6 +793,53 @@ class _MapRoutePageState extends State<MapRoutePage> {
                     ),
                   ],
                 ),
+              MarkerLayer(
+                markers:
+                    staticPins.map((pin) {
+                      return Marker(
+                        point: pin.location,
+                        width: 40,
+                        height: 40,
+                        child: GestureDetector(
+                          onTap: () {
+                            EstabPin.showPinDetailsSheet(
+                              context: context,
+                              pin: {
+                                'title': pin.title,
+                                'address': pin.address,
+                                'lat': pin.location.latitude,
+                                'lng': pin.location.longitude,
+                                'ownerId': null,
+                                'type': pin.type,
+                              },
+                              currentOwnerId: widget.ownerId,
+                              onPinUpdated: (_) {},
+                              reloadPins: () async {},
+                              navigateToPin: (coords) async {
+                                setState(() {
+                                  _userDestination = coords;
+                                  _destinationName = pin.title;
+                                  _searchController.text =
+                                      pin.title; // ⭐ IMPORTANT
+                                });
+
+                                _mapController.move(
+                                  coords,
+                                  AppConstants.defaultZoom,
+                                );
+                                await _fetchRoute();
+                              },
+                            );
+                          },
+                          child: const Icon(
+                            Icons.location_on,
+                            color: Color(0xFF7A1E1E),
+                            size: 40,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+              ),
 
               if (widget.ownerId == null &&
                   _userLocation != null &&

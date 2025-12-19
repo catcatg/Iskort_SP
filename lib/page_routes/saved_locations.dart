@@ -156,10 +156,7 @@ class _SavedLocationsState extends State<SavedLocations> {
                             final updatedList =
                                 savedList.where((item) {
                                   final data = jsonDecode(item);
-                                  return !(data['lat'] ==
-                                          record.coordinates.latitude &&
-                                      data['lng'] ==
-                                          record.coordinates.longitude);
+                                  return data['name'] != record.name;
                                 }).toList();
 
                             await prefs.setStringList(
@@ -179,15 +176,18 @@ class _SavedLocationsState extends State<SavedLocations> {
                           }
                         },
                       ),
-
                       onTap: () {
                         if (widget.onSelect != null) widget.onSelect!(record);
+
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder:
-                                (_) =>
-                                    MapRoutePage(initialLocation: record.name),
+                                (_) => MapRoutePage(
+                                  initialLocation:
+                                      record
+                                          .name, // will need parsing in MapRoutePage
+                                ),
                           ),
                         );
                       },
@@ -201,35 +201,39 @@ class _SavedLocationsState extends State<SavedLocations> {
 
 class LocationRecord {
   final String name;
+  final String address;
   final LatLng coordinates;
-  final double distanceKm;
-  final double durationMin;
+  final String type;
   final DateTime timestamp;
 
   LocationRecord({
     required this.name,
+    required this.address,
     required this.coordinates,
-    required this.distanceKm,
-    required this.durationMin,
+    required this.type,
     required this.timestamp,
   });
 
-  Map<String, dynamic> toMap() => {
-    'name': name,
-    'lat': coordinates.latitude,
-    'lng': coordinates.longitude,
-    'distanceKm': distanceKm,
-    'durationMin': durationMin,
-    'timestamp': timestamp.toIso8601String(),
-  };
-
   factory LocationRecord.fromMap(Map<String, dynamic> map) {
+    final double lat =
+        map['lat'] != null ? (map['lat'] as num).toDouble() : 0.0;
+    final double lng =
+        map['lng'] != null ? (map['lng'] as num).toDouble() : 0.0;
+
     return LocationRecord(
-      name: map['name'] ?? '',
-      coordinates: LatLng(map['lat'], map['lng']),
-      distanceKm: (map['distanceKm'] ?? 0).toDouble(),
-      durationMin: (map['durationMin'] ?? 0).toDouble(),
-      timestamp: DateTime.parse(map['timestamp']),
+      name: (map['name'] ?? '').toString(),
+
+      // some records used "location" instead of "address"
+      address: (map['address'] ?? map['location'] ?? '').toString(),
+
+      type: (map['type'] ?? '').toString(),
+
+      coordinates: LatLng(lat, lng),
+
+      timestamp:
+          map['timestamp'] != null
+              ? DateTime.tryParse(map['timestamp']) ?? DateTime.now()
+              : DateTime.now(),
     );
   }
 }
