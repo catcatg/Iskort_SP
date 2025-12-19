@@ -6,18 +6,40 @@ import 'dart:convert';
 // Cloudinary config
 const String _cloudName = "iskort-system";
 const String _uploadPreset = "iskort_upload";
+// Max image size: 100 MB
+const int maxUploadSizeBytes = 20 * 1024 * 1024; // 20 MB
 
-Future<String?> uploadToCloudinary(XFile pickedFile, {String resourceType = 'image'}) async {
-  final url = Uri.parse("https://api.cloudinary.com/v1_1/$_cloudName/$resourceType/upload");
+Future<String?> uploadToCloudinary(
+  XFile pickedFile, {
+  String resourceType = 'image',
+  required BuildContext context,
+}) async {
   final bytes = await pickedFile.readAsBytes();
+
+  // Check size and notify uploader
+  if (bytes.length > maxUploadSizeBytes) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Image is too large. Maximum allowed size per upload is 20 MB."),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return null; // STOP upload
+  }
+
+  final url = Uri.parse(
+    "https://api.cloudinary.com/v1_1/$_cloudName/$resourceType/upload",
+  );
 
   final request = http.MultipartRequest("POST", url)
     ..fields['upload_preset'] = _uploadPreset
-    ..files.add(http.MultipartFile.fromBytes(
-      'file',
-      bytes,
-      filename: pickedFile.name,
-    ));
+    ..files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: pickedFile.name,
+      ),
+    );
 
   final response = await request.send();
   final resStr = await response.stream.bytesToString();
@@ -25,6 +47,12 @@ Future<String?> uploadToCloudinary(XFile pickedFile, {String resourceType = 'ima
 
   return response.statusCode == 200 ? data['secure_url'] : null;
 }
+
+
+  bool asBool(dynamic value) {
+    return value == 1 || value == true || value == "1";
+  }
+
 
 /// Safely extract an ID from int, string, or MongoDB ObjectId map
 String extractId(dynamic rawId) {
@@ -115,7 +143,10 @@ String getHousingStatus(Map<String, dynamic> biz) {
                     final picker = ImagePicker();
                     final picked = await picker.pickImage(source: ImageSource.gallery);
                     if (picked != null) {
-                      final url = await uploadToCloudinary(picked);
+                      final url = await uploadToCloudinary(
+                        picked,
+                        context: context,
+                      );
                       if (url != null) {
                         picController.text = url;
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -205,7 +236,10 @@ String getHousingStatus(Map<String, dynamic> biz) {
                         final picker = ImagePicker();
                         final picked = await picker.pickImage(source: ImageSource.gallery);
                         if (picked != null) {
-                          final url = await uploadToCloudinary(picked);
+                          final url = await uploadToCloudinary(
+                            picked,
+                            context: context,
+                          );
                           if (url != null) {
                             pic.text = url;
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -308,7 +342,10 @@ String getHousingStatus(Map<String, dynamic> biz) {
                       final picker = ImagePicker();
                       final picked = await picker.pickImage(source: ImageSource.gallery);
                       if (picked != null) {
-                        final url = await uploadToCloudinary(picked);
+                        final url = await uploadToCloudinary(
+                          picked,
+                          context: context,
+                        );
                         if (url != null) {
                           pic.text = url;
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -387,7 +424,10 @@ String getHousingStatus(Map<String, dynamic> biz) {
                         final picker = ImagePicker();
                         final picked = await picker.pickImage(source: ImageSource.gallery);
                         if (picked != null) {
-                          final url = await uploadToCloudinary(picked);
+                          final url = await uploadToCloudinary(
+                            picked,
+                            context: context,
+                          );
                           if (url != null) {
                             pic.text = url;
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -513,7 +553,13 @@ String getHousingStatus(Map<String, dynamic> biz) {
             width: 50, height: 50, fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => const Icon(Icons.home)),
         title: Text(item['name']),
-        subtitle: Text("${item['type']} • ₱${item['price']}"),
+        subtitle: Text(
+          "${item['type']} • ₱${item['price']}\n"
+          "AC: ${asBool(item['has_ac']) ? 'Yes' : 'No'} | "
+          "CR: ${asBool(item['has_cr']) ? 'Yes' : 'No'} | "
+          "Kitchen: ${asBool(item['has_kitchen']) ? 'Yes' : 'No'}",
+        ),
+
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -724,12 +770,13 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
       "housing_id": housingId,
       "facility_pic": facilityPic,
       "price": price,
-      "has_ac": hasAc,
-      "has_cr": hasCr,
-      "has_kitchen": hasKitchen,
+      "has_ac": hasAc ? 1 : 0,
+      "has_cr": hasCr ? 1 : 0,
+      "has_kitchen": hasKitchen ? 1 : 0,
       "type": type,
       "additional_info": additionalInfo,
     };
+
 
     final res = await http.post(
       Uri.parse("https://iskort-public-web.onrender.com/api/facility"),
@@ -755,9 +802,9 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
         "housing_id": housingId.toString(),
         "facility_pic": item['facility_pic'],
         "price": item['price'],
-        "has_ac": item['has_ac'],
-        "has_cr": item['has_cr'],
-        "has_kitchen": item['has_kitchen'],
+        "has_ac": asBool(item['has_ac']) ? 1 : 0,
+        "has_cr": asBool(item['has_cr']) ? 1 : 0,
+        "has_kitchen": asBool(item['has_kitchen']) ? 1 : 0,
         "type": item['type'],
         "additional_info": item['additional_info'],
       }),
