@@ -10,6 +10,7 @@ class CustomTextField extends StatefulWidget {
   final List<TextInputFormatter>? inputFormatters; // optional
   final String? errorText;
   final String? hintText;
+  final void Function(String)? onFieldSubmitted; // add this
 
   const CustomTextField({
     super.key,
@@ -21,6 +22,7 @@ class CustomTextField extends StatefulWidget {
     this.inputFormatters,
     this.errorText,
     this.hintText,
+    this.onFieldSubmitted,
   });
 
   @override
@@ -51,6 +53,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
           obscureText: _obscureText,
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters,
+          onSubmitted: widget.onFieldSubmitted,
 
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
@@ -139,49 +142,54 @@ class ProductCard extends StatelessWidget {
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 3,
+        clipBehavior: Clip.antiAlias,
         child: Column(
+          mainAxisSize: MainAxisSize.max, // fill the card
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: AspectRatio(
-                aspectRatio: 1.2,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    imagePath,
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (_, __, ___) => Container(
-                          color: Colors.grey.shade300,
-                          child: const Icon(Icons.broken_image, size: 40),
-                        ),
-                  ),
-                ),
+            AspectRatio(
+              aspectRatio: 1.2,
+              child: Image.network(
+                imagePath,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) => Container(
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.broken_image, size: 40),
+                    ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  // Make location text wrap instead of overflowing
-                  Text(
-                    location,
-                    style: const TextStyle(fontSize: 12, color: Colors.black87),
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Flexible(
+                      child: Text(
+                        location,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 2, // limit lines here too
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -323,16 +331,21 @@ class _FadingMessageState extends State<_FadingMessage> {
 
     // Fade in
     Future.delayed(const Duration(milliseconds: 50), () {
+      if (!mounted) return;
       setState(() => opacity = 1);
     });
 
-    // Stay for 2 seconds then fade out
+    // Stay then fade out
     Future.delayed(const Duration(seconds: 5), () {
+      if (!mounted) return;
       setState(() => opacity = 0);
     });
 
-    // Remove overlay after fade out
-    Future.delayed(const Duration(milliseconds: 2800), widget.onFinish);
+    // Remove overlay safely
+    Future.delayed(const Duration(milliseconds: 2800), () {
+      if (!mounted) return;
+      widget.onFinish();
+    });
   }
 
   @override
@@ -343,7 +356,7 @@ class _FadingMessageState extends State<_FadingMessage> {
       child: Material(
         elevation: 8,
         borderRadius: BorderRadius.circular(12),
-        color: Color.fromARGB(229, 11, 85, 43),
+        color: const Color.fromARGB(229, 11, 85, 43),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
           child: Text(
