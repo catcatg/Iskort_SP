@@ -6,8 +6,8 @@ import 'dart:convert';
 // Cloudinary config
 const String _cloudName = "iskort-system";
 const String _uploadPreset = "iskort_upload";
-// Max image size: 100 MB
-const int maxUploadSizeBytes = 20 * 1024 * 1024; // 20 MB
+// Max image size: 10 MB
+const int maxUploadSizeBytes = 10 * 1024 * 1024; // 10 MB
 
 Future<String?> uploadToCloudinary(
   XFile pickedFile, {
@@ -20,7 +20,7 @@ Future<String?> uploadToCloudinary(
   if (bytes.length > maxUploadSizeBytes) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("Image is too large. Maximum allowed size per upload is 20 MB."),
+        content: Text("Image is too large. Maximum allowed size per upload is 10 MB."),
         backgroundColor: Colors.red,
       ),
     );
@@ -118,7 +118,7 @@ String getHousingStatus(Map<String, dynamic> biz) {
     final classes = [
       "Pork","Chicken","Beef","Vegetables","Seafood",
       "Alcoholic Drinks","Coffee Drinks","Non-Coffee Drinks",
-      "Desserts","Snacks","Meal Set"
+      "Desserts","Snacks","Meal Set", "Vegetarian",
     ];
 
     showDialog(

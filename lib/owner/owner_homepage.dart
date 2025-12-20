@@ -667,7 +667,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                   children: [
                                     ...List.generate(5, (index) {
                                       int star = 5 - index;
-                                      int count = 0; // TODO: replace with real data
+                                      int count = 0;
                                       return Padding(
                                         padding: const EdgeInsets.symmetric(
                                           vertical: 2,
