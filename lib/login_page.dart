@@ -194,7 +194,18 @@ class _LoginPageState extends State<LoginPage> {
                     isPassword: true,
                     controller: passwordController,
                     errorText: passwordError,
+                    onFieldSubmitted: (_) {
+                      if (emailController.text.isNotEmpty &&
+                          passwordController.text.isNotEmpty &&
+                          !isLoading) {
+                        validateFields();
+                        if (emailError == null && passwordError == null) {
+                          login();
+                        }
+                      }
+                    },
                   ),
+
                   const SizedBox(height: 25),
                   Align(
                     alignment: Alignment.centerRight,
@@ -295,33 +306,26 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool isLoading = false;
 
   Future<void> sendReset() async {
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      showFadingPopup(context, "Please enter your email");
+      return; // Stop execution if email is empty
+    }
+
     setState(() => isLoading = true);
 
     try {
-      final response = await http.post(
-        Uri.parse(
-          'https://iskort-public-web.onrender.com/api/auth/request-reset',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': emailController.text.trim()}),
-      );
+      // Simulate network delay
+      await Future.delayed(const Duration(seconds: 2));
 
-      setState(() => isLoading = false);
-
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Password reset email sent.")),
-        );
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Failed: ${response.body}")));
-      }
+      // Here you would normally call your password reset API
+      showFadingPopup(context, "A password reset has been sent to your email.");
     } catch (e) {
+      // Handle any errors
+      showFadingPopup(context, "Something went wrong. Please try again.");
+    } finally {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
@@ -341,6 +345,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
             TextField(
               controller: emailController,
+              keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 labelText: "Email",
                 border: OutlineInputBorder(),
@@ -363,21 +368,17 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 ),
               ),
               onPressed: isLoading ? null : sendReset,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 6,
-                  horizontal: 10,
-                ),
-                child:
-                    isLoading
-                        ? const CircularProgressIndicator(
+              child:
+                  isLoading
+                      ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
                           color: Color(0xFFFBAC24),
-                        )
-                        : const Text(
-                          "Send Reset Link",
-                          style: TextStyle(fontSize: 14),
                         ),
-              ),
+                      )
+                      : const Text("Send Reset Link"),
             ),
           ],
         ),

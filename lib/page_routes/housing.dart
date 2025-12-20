@@ -29,7 +29,6 @@ class _HousingPageState extends State<HousingPage> {
   bool hasKitchen = false;
   bool hasAC = false;
 
-
   @override
   void initState() {
     super.initState();
@@ -101,31 +100,31 @@ class _HousingPageState extends State<HousingPage> {
 
   void applyFilters() {
     setState(() {
-      filteredFacilities = allFacilities.where((fac) {
-        if (filterMode == "name") {
-          return fac['name']
-              .toString()
-              .toLowerCase()
-              .contains(searchQuery.toLowerCase());
-        }
+      filteredFacilities =
+          allFacilities.where((fac) {
+            if (filterMode == "name") {
+              return fac['name'].toString().toLowerCase().contains(
+                searchQuery.toLowerCase(),
+              );
+            }
 
-        final matchesTag =
-            selectedTags.isEmpty ||
-            selectedTags.contains(fac['classification']);
+            final matchesTag =
+                selectedTags.isEmpty ||
+                selectedTags.contains(fac['classification']);
 
-        final matchesBudget =
-            maxBudget == null || fac['price'] <= maxBudget!;
+            final matchesBudget =
+                maxBudget == null || fac['price'] <= maxBudget!;
 
-        final matchesCR = !hasCR || fac['has_cr'] == true;
-        final matchesKitchen = !hasKitchen || fac['has_kitchen'] == true;
-        final matchesAC = !hasAC || fac['has_ac'] == true;
+            final matchesCR = !hasCR || fac['has_cr'] == true;
+            final matchesKitchen = !hasKitchen || fac['has_kitchen'] == true;
+            final matchesAC = !hasAC || fac['has_ac'] == true;
 
-        return matchesTag &&
-            matchesBudget &&
-            matchesCR &&
-            matchesKitchen &&
-            matchesAC;
-      }).toList();
+            return matchesTag &&
+                matchesBudget &&
+                matchesCR &&
+                matchesKitchen &&
+                matchesAC;
+          }).toList();
     });
   }
 
@@ -200,30 +199,6 @@ class _HousingPageState extends State<HousingPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        if (item['location'] != null && item['location'] != '')
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0A4423),
-                              minimumSize: const Size(double.infinity, 45),
-                            ),
-                            onPressed: () {
-                              Navigator.pop(context);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => MapRoutePage(
-                                        initialLocation:
-                                            item['location'].toString(),
-                                      ),
-                                ),
-                              );
-                            },
-                            child: const Text(
-                              "View Route",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -267,141 +242,40 @@ class _HousingPageState extends State<HousingPage> {
   }
 
   Widget _buildFilters() {
-  return Padding(
-    padding: const EdgeInsets.all(12),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-
-        // search by selector
-        Row(
-          children: [
-            Expanded(
-              child: RadioListTile<String>(
-                title: const Text("Search by Name"),
-                value: "name",
-                groupValue: filterMode,
-                onChanged: (val) {
-                  setState(() {
-                    filterMode = val!;
-                    searchQuery = "";
-                    selectedTags.clear();
-                    maxBudget = null;
-                    hasCR = hasKitchen = hasAC = false;
-                    applyFilters();
-                  });
-                },
-              ),
-            ),
-            Expanded(
-              child: RadioListTile<String>(
-                title: const Text("Search by Preferences"),
-                value: "filters",
-                groupValue: filterMode,
-                onChanged: (val) {
-                  setState(() {
-                    filterMode = val!;
-                    searchQuery = "";
-                    applyFilters();
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
-
-        const Divider(),
-
-        // search name
-        if (filterMode == "name")
-          TextField(
-            decoration: const InputDecoration(
-              labelText: "Search by Room Name",
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.search),
-            ),
-            onChanged: (val) {
-              setState(() {
-                searchQuery = val;
-                applyFilters();
-              });
-            },
-          ),
-
-        // search preference
-        if (filterMode == "filters") ...[
-
-          // type autocomplete
-          Autocomplete<String>(
-            optionsBuilder: (textEditingValue) {
-              if (textEditingValue.text.isEmpty) {
-                return const Iterable<String>.empty();
-              }
-              return availableTags.where(
-                (tag) => tag
-                    .toLowerCase()
-                    .contains(textEditingValue.text.toLowerCase()),
-              );
-            },
-            onSelected: (selection) {
-              setState(() {
-                if (!selectedTags.contains(selection)) {
-                  selectedTags.add(selection);
-                  applyFilters();
-                }
-                _tagAutocompleteController?.clear();
-              });
-            },
-            fieldViewBuilder: (context, controller, focusNode, _) {
-              _tagAutocompleteController = controller;
-              return TextField(
-                controller: controller,
-                focusNode: focusNode,
-                decoration: const InputDecoration(
-                  labelText: "Facility Type (Shared, Solo, etc.)",
-                  border: OutlineInputBorder(),
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: 8),
-
-          // selected tags
-          Wrap(
-            spacing: 6,
-            children: selectedTags.map((tag) {
-              return Chip(
-                label: Text(tag),
-                onDeleted: () {
-                  setState(() {
-                    selectedTags.remove(tag);
-                    applyFilters();
-                  });
-                },
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 12),
-
-          // max budget
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // search by selector
           Row(
             children: [
-              const Text('Max Budget: ₱'),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 120,
-                child: TextField(
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                    hintText: 'Enter amount',
-                  ),
+              Expanded(
+                child: RadioListTile<String>(
+                  title: const Text("Search by Name"),
+                  value: "name",
+                  groupValue: filterMode,
                   onChanged: (val) {
                     setState(() {
-                      maxBudget = val.isEmpty ? null : double.tryParse(val);
+                      filterMode = val!;
+                      searchQuery = "";
+                      selectedTags.clear();
+                      maxBudget = null;
+                      hasCR = hasKitchen = hasAC = false;
+                      applyFilters();
+                    });
+                  },
+                ),
+              ),
+              Expanded(
+                child: RadioListTile<String>(
+                  title: const Text("Search by Preferences"),
+                  value: "filters",
+                  groupValue: filterMode,
+                  onChanged: (val) {
+                    setState(() {
+                      filterMode = val!;
+                      searchQuery = "";
                       applyFilters();
                     });
                   },
@@ -410,78 +284,175 @@ class _HousingPageState extends State<HousingPage> {
             ],
           ),
 
-          const SizedBox(height: 12),
+          const Divider(),
 
-          // Amenities
-          GestureDetector(
-            onTap: () {
-              setState(() => showAmenities = !showAmenities);
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // search name
+          if (filterMode == "name")
+            TextField(
+              decoration: const InputDecoration(
+                labelText: "Search by Room Name",
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (val) {
+                setState(() {
+                  searchQuery = val;
+                  applyFilters();
+                });
+              },
+            ),
+
+          // search preference
+          if (filterMode == "filters") ...[
+            // type autocomplete
+            Autocomplete<String>(
+              optionsBuilder: (textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return const Iterable<String>.empty();
+                }
+                return availableTags.where(
+                  (tag) => tag.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase(),
+                  ),
+                );
+              },
+              onSelected: (selection) {
+                setState(() {
+                  if (!selectedTags.contains(selection)) {
+                    selectedTags.add(selection);
+                    applyFilters();
+                  }
+                  _tagAutocompleteController?.clear();
+                });
+              },
+              fieldViewBuilder: (context, controller, focusNode, _) {
+                _tagAutocompleteController = controller;
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(
+                    labelText: "Facility Type (Shared, Solo, etc.)",
+                    border: OutlineInputBorder(),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 8),
+
+            // selected tags
+            Wrap(
+              spacing: 6,
+              children:
+                  selectedTags.map((tag) {
+                    return Chip(
+                      label: Text(tag),
+                      onDeleted: () {
+                        setState(() {
+                          selectedTags.remove(tag);
+                          applyFilters();
+                        });
+                      },
+                    );
+                  }).toList(),
+            ),
+
+            const SizedBox(height: 12),
+
+            // max budget
+            Row(
               children: [
-                const Text(
-                  "Amenities",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Icon(
-                  showAmenities ? Icons.expand_less : Icons.expand_more,
+                const Text('Max Budget: ₱'),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 120,
+                  child: TextField(
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                      hintText: 'Enter amount',
+                    ),
+                    onChanged: (val) {
+                      setState(() {
+                        maxBudget = val.isEmpty ? null : double.tryParse(val);
+                        applyFilters();
+                      });
+                    },
+                  ),
                 ),
               ],
             ),
-          ),
 
-          const SizedBox(height: 6),
+            const SizedBox(height: 12),
 
-          // collapsible
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 200),
-            crossFadeState: showAmenities
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            firstChild: Column(
-              children: [
-                CheckboxListTile(
-                  title: const Text("Has CR"),
-                  value: hasCR,
-                  onChanged: (val) {
-                    setState(() {
-                      hasCR = val ?? false;
-                    });
-                    applyFilters();
-                  },
-                ),
-                CheckboxListTile(
-                  title: const Text("Has Kitchen"),
-                  value: hasKitchen,
-                  onChanged: (val) {
-                    setState(() {
-                      hasKitchen = val ?? false;
-                    });
-                    applyFilters();
-                  },
-                ),
-                CheckboxListTile(
-                  title: const Text("Has Aircon"),
-                  value: hasAC,
-                  onChanged: (val) {
-                    setState(() {
-                      hasAC = val ?? false;
-                    });
-                    applyFilters();
-                  },
-                ),
-              ],
+            // Amenities
+            GestureDetector(
+              onTap: () {
+                setState(() => showAmenities = !showAmenities);
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Amenities",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Icon(showAmenities ? Icons.expand_less : Icons.expand_more),
+                ],
+              ),
             ),
-            secondChild: const SizedBox.shrink(),
-          ),
 
+            const SizedBox(height: 6),
+
+            // collapsible
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 200),
+              crossFadeState:
+                  showAmenities
+                      ? CrossFadeState.showFirst
+                      : CrossFadeState.showSecond,
+              firstChild: Column(
+                children: [
+                  CheckboxListTile(
+                    title: const Text("Has CR"),
+                    value: hasCR,
+                    onChanged: (val) {
+                      setState(() {
+                        hasCR = val ?? false;
+                      });
+                      applyFilters();
+                    },
+                  ),
+                  CheckboxListTile(
+                    title: const Text("Has Kitchen"),
+                    value: hasKitchen,
+                    onChanged: (val) {
+                      setState(() {
+                        hasKitchen = val ?? false;
+                      });
+                      applyFilters();
+                    },
+                  ),
+                  CheckboxListTile(
+                    title: const Text("Has Aircon"),
+                    value: hasAC,
+                    onChanged: (val) {
+                      setState(() {
+                        hasAC = val ?? false;
+                      });
+                      applyFilters();
+                    },
+                  ),
+                ],
+              ),
+              secondChild: const SizedBox.shrink(),
+            ),
+          ],
         ],
-      ],
-    ),
-  );
-}
-
+      ),
+    );
+  }
 
   Widget _buildGrid() {
     if (isLoading) return const Center(child: CircularProgressIndicator());

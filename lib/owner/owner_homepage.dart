@@ -30,7 +30,8 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   List<String> get classifications {
     final tags = <String>{};
     for (var item in products) {
-      if (item['classification'] != null && item['classification'].toString().isNotEmpty) {
+      if (item['classification'] != null &&
+          item['classification'].toString().isNotEmpty) {
         tags.add(item['classification'].toString());
       }
     }
@@ -70,13 +71,15 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       final eateryData = jsonDecode(eateryResp.body);
       final housingData = jsonDecode(housingResp.body);
 
-      ownerEateries = (eateryData['eateries'] ?? [])
-          .where((e) => e['owner_id'] == ownerId)
-          .toList();
+      ownerEateries =
+          (eateryData['eateries'] ?? [])
+              .where((e) => e['owner_id'] == ownerId)
+              .toList();
 
-      ownerHousings = (housingData['housings'] ?? [])
-          .where((h) => h['owner_id'] == ownerId)
-          .toList();
+      ownerHousings =
+          (housingData['housings'] ?? [])
+              .where((h) => h['owner_id'] == ownerId)
+              .toList();
 
       // Assign the business to display on the About tab:
       // Prefer the first eatery; if none, use the first housing
@@ -94,7 +97,9 @@ class _OwnerHomePageState extends State<OwnerHomePage>
 
       for (var eatery in ownerEateries) {
         final foodResp = await http.get(
-          Uri.parse("https://iskort-public-web.onrender.com/api/food/${eatery['eatery_id']}"),
+          Uri.parse(
+            "https://iskort-public-web.onrender.com/api/food/${eatery['eatery_id']}",
+          ),
         );
         if (foodResp.statusCode == 200) {
           final foodData = jsonDecode(foodResp.body);
@@ -107,7 +112,9 @@ class _OwnerHomePageState extends State<OwnerHomePage>
 
       for (var house in ownerHousings) {
         final facResp = await http.get(
-          Uri.parse("https://iskort-public-web.onrender.com/api/facility/${house['housing_id']}"),
+          Uri.parse(
+            "https://iskort-public-web.onrender.com/api/facility/${house['housing_id']}",
+          ),
         );
         if (facResp.statusCode == 200) {
           final facData = jsonDecode(facResp.body);
@@ -159,9 +166,9 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     );
     if (res.statusCode == 200) {
       await _reloadProducts();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Food deleted")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Food deleted")));
     }
   }
 
@@ -189,13 +196,15 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   // Delete facility item (used by facilityCard)
   Future<void> _deleteFacilityItem(int facilityId) async {
     final res = await http.delete(
-      Uri.parse("https://iskort-public-web.onrender.com/api/facility/$facilityId"),
+      Uri.parse(
+        "https://iskort-public-web.onrender.com/api/facility/$facilityId",
+      ),
     );
     if (res.statusCode == 200) {
       await _reloadProducts();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Facility deleted")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Facility deleted")));
     }
   }
 
@@ -246,21 +255,22 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         widgets.add(
           GestureDetector(
             onTap: () => _showProductDetails(item),
-            child: isEateryProduct
-                ? menuCard(
-                    item,
-                    context: context,
-                    updateFoodItem: _updateFoodItem,
-                    deleteFoodItem: _deleteFoodItem,
-                    reload: _reloadProducts,
-                  )
-                : facilityCard(
-                    item,
-                    context: context,
-                    updateFacilityItem: _updateFacilityItem,
-                    deleteFacilityItem: _deleteFacilityItem,
-                    reload: _reloadProducts,
-                  ),
+            child:
+                isEateryProduct
+                    ? menuCard(
+                      item,
+                      context: context,
+                      updateFoodItem: _updateFoodItem,
+                      deleteFoodItem: _deleteFoodItem,
+                      reload: _reloadProducts,
+                    )
+                    : facilityCard(
+                      item,
+                      context: context,
+                      updateFacilityItem: _updateFacilityItem,
+                      deleteFacilityItem: _deleteFacilityItem,
+                      reload: _reloadProducts,
+                    ),
           ),
         );
       }
@@ -272,9 +282,11 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   void sortProducts() {
     if (sortMode == SortMode.globalPrice) {
       // LOWEST → HIGHEST
-      products.sort((a, b) =>
-        double.parse(a['price'].toString())
-          .compareTo(double.parse(b['price'].toString())));
+      products.sort(
+        (a, b) => double.parse(
+          a['price'].toString(),
+        ).compareTo(double.parse(b['price'].toString())),
+      );
     } else {
       products.sort((a, b) {
         // First sort by classification (only for Eatery items)
@@ -286,8 +298,9 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         // Then sort within classification
         if (sortMode == SortMode.classificationPrice) {
           // LOWEST → HIGHEST price
-          return double.parse(a['price'].toString())
-              .compareTo(double.parse(b['price'].toString()));
+          return double.parse(
+            a['price'].toString(),
+          ).compareTo(double.parse(b['price'].toString()));
         } else {
           // Sort alphabetically by name
           return (a['name'] ?? '').compareTo(b['name'] ?? '');
@@ -300,44 +313,51 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   void _showProductDetails(Map<String, dynamic> item) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(item['businessType'] == 'Eatery'
-            ? item['name'] ?? 'Food Item'
-            : item['name'] ?? 'Facility'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Image.network(
-                item['businessType'] == 'Eatery'
-                    ? item['food_pic'] ?? ''
-                    : item['facility_pic'] ?? '',
-                height: 150,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.image),
+      builder:
+          (_) => AlertDialog(
+            title: Text(
+              item['businessType'] == 'Eatery'
+                  ? item['name'] ?? 'Food Item'
+                  : item['name'] ?? 'Facility',
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Image.network(
+                    item['businessType'] == 'Eatery'
+                        ? item['food_pic'] ?? ''
+                        : item['facility_pic'] ?? '',
+                    height: 150,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                  ),
+                  const SizedBox(height: 10),
+                  if (item['businessType'] == 'Eatery') ...[
+                    Text("Classification: ${item['classification']}"),
+                    Text("Price: ₱${item['price']}"),
+                  ] else ...[
+                    Text("Type: ${item['type']}"),
+                    Text("Price: ₱${item['price']}"),
+                    Text("Aircon: ${item['has_ac'] == true ? 'Yes' : 'No'}"),
+                    Text(
+                      "Comfort Room: ${item['has_cr'] == true ? 'Yes' : 'No'}",
+                    ),
+                    Text(
+                      "Kitchen: ${item['has_kitchen'] == true ? 'Yes' : 'No'}",
+                    ),
+                    Text("Info: ${item['additional_info'] ?? ''}"),
+                  ],
+                ],
               ),
-              const SizedBox(height: 10),
-              if (item['businessType'] == 'Eatery') ...[
-                Text("Classification: ${item['classification']}"),
-                Text("Price: ₱${item['price']}"),
-              ] else ...[
-                Text("Type: ${item['type']}"),
-                Text("Price: ₱${item['price']}"),
-                Text("Aircon: ${item['has_ac'] == true ? 'Yes' : 'No'}"),
-                Text("Comfort Room: ${item['has_cr'] == true ? 'Yes' : 'No'}"),
-                Text("Kitchen: ${item['has_kitchen'] == true ? 'Yes' : 'No'}"),
-                Text("Info: ${item['additional_info'] ?? ''}"),
-              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Close"),
+              ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
-          ),
-        ],
-      ),
     );
   }
 
@@ -433,145 +453,164 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     final user = widget.currentUser;
 
     return Scaffold(
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  // Profile container
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          spreadRadius: 1,
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
+      body:
+          loading
+              ? const Center(child: CircularProgressIndicator())
+              : SafeArea(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    // Profile container
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF0A4423), Color(0xFF7A1E1E)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const SizedBox(width: 20),
-                            CircleAvatar(
-                              radius: 40,
-                              backgroundColor: Colors.white,
-                              child: const Icon(
-                                Icons.person,
-                                size: 50,
-                                color: Color(0xFF791317),
-                              ),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: const Icon(
-                                Icons.more_vert,
-                                color: Colors.white,
-                              ),
-                              onSelected: (value) {
-                                if (value == 'profile_settings') {
-                                  Navigator.pushNamed(
-                                    context,
-                                    '/profile',
-                                    arguments: user,
-                                  );
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: 'profile_settings',
-                                  child: Center(
-                                    child: Text("Profile Settings"),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          user['name'] ?? '',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            spreadRadius: 1,
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(
-                              Icons.storefront,
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const SizedBox(width: 20),
+                              CircleAvatar(
+                                radius: 40,
+                                backgroundColor: Colors.white,
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: Color(0xFF791317),
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                icon: const Icon(
+                                  Icons.more_vert,
+                                  color: Colors.white,
+                                ),
+                                onSelected: (value) {
+                                  if (value == 'profile_settings') {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/profile',
+                                      arguments: user,
+                                    );
+                                  }
+                                },
+                                itemBuilder:
+                                    (context) => [
+                                      const PopupMenuItem(
+                                        value: 'profile_settings',
+                                        child: Center(
+                                          child: Text("Profile Settings"),
+                                        ),
+                                      ),
+                                    ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            user['name'] ?? '',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
-                            SizedBox(width: 8),
-                            Text(
-                              "Business Page",
-                              style: TextStyle(
-                                fontSize: 16,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                business != null &&
+                                        business!['type'] == 'housing'
+                                    ? Icons.home
+                                    : Icons.restaurant,
                                 color: Colors.white,
                               ),
-                            ),
-                          ],
-                        ),
+
+                              const SizedBox(width: 8),
+                              Text(
+                                business != null
+                                    ? (business!['type'] == 'eatery'
+                                        ? "Eatery"
+                                        : "Housing Business")
+                                    : "Business Page",
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Tabs
+                    TabBar(
+                      controller: _tabController,
+                      labelColor: const Color(0xFF0A4423),
+                      unselectedLabelColor: Colors.black54,
+                      indicatorColor: const Color(0xFF0A4423),
+                      tabs: const [
+                        Tab(text: "Products"),
+                        Tab(text: "Reviews"),
+                        Tab(text: "About"),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Tabs
-                  TabBar(
-                    controller: _tabController,
-                    labelColor: const Color(0xFF0A4423),
-                    unselectedLabelColor: Colors.black54,
-                    indicatorColor: const Color(0xFF0A4423),
-                    tabs: const [
-                      Tab(text: "Products"),
-                      Tab(text: "Reviews"),
-                      Tab(text: "About"),
-                    ],
-                  ),
-                  // TabBarView
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        // Products Tab
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (user['role'] == 'owner')
-                                ElevatedButton.icon(
-                                  onPressed: _addProduct,
-                                  icon: const Icon(Icons.add, color: Colors.white),
-                                  label: const Text("Add Product",
-                                      style: TextStyle(color: Colors.white)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0A4423),
+                    // TabBarView
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          // Products Tab
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (user['role'] == 'owner')
+                                  ElevatedButton.icon(
+                                    onPressed: _addProduct,
+                                    icon: const Icon(
+                                      Icons.add,
+                                      color: Colors.white,
+                                    ),
+                                    label: const Text(
+                                      "Add Product",
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0A4423),
+                                    ),
                                   ),
-                                ),
-                              const SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text(
                                       "Sort Products",
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     DropdownButton<SortMode>(
                                       value: sortMode,
@@ -600,69 +639,288 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                   ],
                                 ),
                                 const SizedBox(height: 10),
-                              Expanded(
-                                child: products.isEmpty
-                                    ? const Center(child: Text("No products yet"))
-                                    : ListView(
-                                        children: _buildCategorizedProductList(),
-                                      ),
-                              ),
-                            ],
+                                Expanded(
+                                  child:
+                                      products.isEmpty
+                                          ? const Center(
+                                            child: Text("No products yet"),
+                                          )
+                                          : ListView(
+                                            children:
+                                                _buildCategorizedProductList(),
+                                          ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
 
-                        // Reviews Tab
-                        Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Sorting Row
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    "Reviews",
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0A4423),
-                                    ),
-                                  ),
-                                  DropdownButton<String>(
-                                    style: const TextStyle(
-                                      color: Color(0xFF0A4423),
-                                    ),
-                                    value: reviewSortOrder,
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: 'Newest',
-                                        child: Text('Newest'),
+                          // Reviews Tab
+                          Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Sorting Row
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      "Reviews",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0A4423),
                                       ),
-                                      DropdownMenuItem(
-                                        value: 'Oldest',
-                                        child: Text('Oldest'),
+                                    ),
+                                    DropdownButton<String>(
+                                      style: const TextStyle(
+                                        color: Color(0xFF0A4423),
+                                      ),
+                                      value: reviewSortOrder,
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'Newest',
+                                          child: Text('Newest'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'Oldest',
+                                          child: Text('Oldest'),
+                                        ),
+                                      ],
+                                      onChanged: (value) {
+                                        if (value == null) return;
+                                        setState(() {
+                                          reviewSortOrder = value;
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                // Ratings summary container (placeholder)
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      ...List.generate(5, (index) {
+                                        int star = 5 - index;
+                                        int count =
+                                            0; // TODO: replace with real data
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 2,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                "$star 🌻",
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: LinearProgressIndicator(
+                                                  value: count / 10,
+                                                  color: Colors.yellow[700],
+                                                  backgroundColor:
+                                                      Colors.grey[300],
+                                                  minHeight: 8,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(count.toString()),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: const [
+                                          Text(
+                                            "Total Rating: 4.5 🌻",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF0A4423),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
-                                    onChanged: (value) {
-                                      if (value == null) return;
-                                      setState(() {
-                                        reviewSortOrder = value;
-                                      });
-                                    },
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              // Ratings summary container (placeholder)
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade200,
-                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Column(
+                                const SizedBox(height: 15),
+                                // Reviews list
+                                Expanded(
+                                  child:
+                                      sortedReviews.isEmpty
+                                          ? const Center(
+                                            child: Text("No reviews yet"),
+                                          )
+                                          : ListView.builder(
+                                            itemCount: sortedReviews.length,
+                                            itemBuilder: (context, index) {
+                                              final review =
+                                                  sortedReviews[index];
+                                              final rating =
+                                                  review['rating'] ?? 0;
+                                              final comment =
+                                                  review['comment'] ?? '';
+                                              final reviewer =
+                                                  review['reviewer_name'] ??
+                                                  'Anonymous';
+                                              final date = review['date'] ?? '';
+                                              return Card(
+                                                margin:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 6,
+                                                    ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                elevation: 2,
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(
+                                                    10,
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          Text(
+                                                            reviewer,
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                ),
+                                                          ),
+                                                          const Spacer(),
+                                                          Row(
+                                                            children: List.generate(
+                                                              rating,
+                                                              (_) => const Icon(
+                                                                Icons
+                                                                    .local_florist,
+                                                                size: 16,
+                                                                color: Color(
+                                                                  0xFFFFD700,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        comment,
+                                                        style: const TextStyle(
+                                                          fontSize: 14,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        date,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // About Tab
+                          SingleChildScrollView(
+                            padding: const EdgeInsets.all(10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.store,
+                                            color: Color(0xFF0A4423),
+                                          ), // choose an appropriate icon
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            business?['name'] ?? '',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight:
+                                                  FontWeight
+                                                      .bold, // makes it bold
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (business != null)
+                                      ElevatedButton.icon(
+                                        onPressed: () async {
+                                          final ownerId =
+                                              widget.currentUser["owner_id"];
+                                          // Navigate to full edit screen; refresh when back
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (_) => EditEstablishmentsPage(
+                                                    business: business!,
+                                                    ownerId: ownerId,
+                                                  ),
+                                            ),
+                                          );
+                                          await fetchBusiness();
+                                        },
+                                        icon: const Icon(
+                                          Icons.edit,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                        label: const Text(
+                                          "Edit establishment",
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF0A4423,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 15),
+                                Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     ...List.generate(5, (index) {
@@ -698,247 +956,271 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                     }),
                                     const SizedBox(height: 10),
                                     Row(
-                                      children: const [
+                                      children: [
+                                        Icon(
+                                          Icons.info, // icon for status
+                                          color: const Color(0xFF0A4423),
+                                        ),
+                                        const SizedBox(width: 8),
                                         Text(
-                                          "Total Rating: 4.5 🌻",
+                                          "${_statusText(business)}",
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF0A4423),
+                                            color: _statusColor(business),
                                           ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.person,
+                                          color: Color(0xFF0A4423),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          business?['owner_name'] ?? '',
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.phone,
+                                          color: Color(0xFF0A4423),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          business?['owner_phone'] ?? '',
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.email,
+                                          color: Color(0xFF0A4423),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          business?['owner_email'] ?? '',
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.location_on,
+                                          color: Color(0xFF0A4423),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          business?['location'] ?? '',
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.money,
+                                          color: Color(0xFF0A4423),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          priceRange,
+                                          style: const TextStyle(fontSize: 16),
                                         ),
                                       ],
                                     ),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(height: 15),
-                              // Reviews list
-                              Expanded(
-                                child: sortedReviews.isEmpty
-                                    ? const Center(
-                                        child: Text("No reviews yet"),
-                                      )
-                                    : ListView.builder(
-                                        itemCount: sortedReviews.length,
-                                        itemBuilder: (context, index) {
-                                          final review = sortedReviews[index];
-                                          final rating = review['rating'] ?? 0;
-                                          final comment =
-                                              review['comment'] ?? '';
-                                          final reviewer =
-                                              review['reviewer_name'] ??
-                                                  'Anonymous';
-                                          final date = review['date'] ?? '';
-                                          return Card(
-                                            margin: const EdgeInsets.symmetric(
-                                              vertical: 6,
+
+                                if (business?['open_time'] != null &&
+                                    business?['end_time'] != null)
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.access_time,
+                                        color: Color(0xFF0A4423),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        "${business?['open_time']} - ${business?['end_time']}",
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                if (business?['curfew'] != null)
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.nightlight_round,
+                                        color: Color(0xFF0A4423),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        business?['curfew'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                const SizedBox(height: 6),
+                                Divider(color: Colors.grey[400]),
+                                const SizedBox(height: 6),
+
+                                const SizedBox(height: 10),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Divider(color: Colors.grey[400]),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            "Bio: ",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          Text(
+                                            business?['about_desc'] ??
+                                                'Write something about your business',
+                                            style: const TextStyle(
+                                              fontSize: 14,
                                             ),
-                                            elevation: 2,
-                                            child: Padding(
-                                              padding: const EdgeInsets.all(10),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      Text(
-                                                        reviewer,
-                                                        style: const TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                      const Spacer(),
-                                                      Row(
-                                                        children: List.generate(
-                                                          rating,
-                                                          (_) => const Icon(
-                                                            Icons.local_florist,
-                                                            size: 16,
-                                                            color: Color(0xFFFFD700),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit,
+                                        color: Color(0xFF0A4423),
+                                      ),
+                                      onPressed: () {
+                                        if (business == null) return;
+                                        final controller =
+                                            TextEditingController(
+                                              text:
+                                                  business?['about_desc'] ?? '',
+                                            );
+                                        showDialog(
+                                          context: context,
+                                          builder:
+                                              (_) => AlertDialog(
+                                                title: const Text("Edit About"),
+                                                content: TextField(
+                                                  controller: controller,
+                                                  maxLines: 4,
+                                                  decoration: const InputDecoration(
+                                                    border:
+                                                        OutlineInputBorder(),
+                                                    hintText:
+                                                        "Describe your business",
                                                   ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    comment,
-                                                    style: const TextStyle(fontSize: 14),
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed:
+                                                        () => Navigator.pop(
+                                                          context,
+                                                        ),
+                                                    child: const Text("Cancel"),
                                                   ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    date,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                    ),
+                                                  ElevatedButton(
+                                                    onPressed: () async {
+                                                      final id =
+                                                          business?['eatery_id'] ??
+                                                          business?['housing_id'];
+                                                      final endpoint =
+                                                          business?['eatery_id'] !=
+                                                                  null
+                                                              ? "https://iskort-public-web.onrender.com/api/eatery/$id"
+                                                              : "https://iskort-public-web.onrender.com/api/housing/$id";
+
+                                                      final body = {
+                                                        "about_desc":
+                                                            controller.text
+                                                                .trim(),
+                                                      };
+                                                      await http.put(
+                                                        Uri.parse(endpoint),
+                                                        headers: {
+                                                          "Content-Type":
+                                                              "application/json",
+                                                        },
+                                                        body: jsonEncode(body),
+                                                      );
+                                                      Navigator.pop(context);
+                                                      await fetchBusiness(); // reload with updated about_desc
+                                                    },
+                                                    child: const Text("Save"),
                                                   ),
                                                 ],
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // About Tab
-                        SingleChildScrollView(
-                          padding: const EdgeInsets.all(10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      "Name: ${business?['name'] ?? ''}",
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  ),
-                                  if (business != null)
-                                    ElevatedButton.icon(
-                                      onPressed: () async {
-                                        // Navigate to full edit screen; refresh when back
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => EditEstablishmentsPage(
-                                              business: business!,
-                                            ),
-                                          ),
                                         );
-                                        await fetchBusiness();
                                       },
-                                      icon: const Icon(Icons.edit, size: 16, color: Colors.white),
-                                      label: const Text("Edit establishment", style: TextStyle(color: Colors.white)),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF0A4423),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      ),
                                     ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text("Owner: ${business?['owner_name'] ?? ''}", style: const TextStyle(fontSize: 16)),
-                              Text("Contact: ${business?['owner_phone'] ?? ''}", style: const TextStyle(fontSize: 16)),
-                              Text("Email: ${business?['owner_email'] ?? ''}", style: const TextStyle(fontSize: 16)),
-                              Text("Location: ${business?['location'] ?? ''}", style: const TextStyle(fontSize: 16)),
-                              Text("Price Range: $priceRange", style: const TextStyle(fontSize: 16)),
-
-                              if (business?['open_time'] != null && business?['end_time'] != null)
+                                  ],
+                                ),
+                                Divider(color: Colors.grey[400]),
+                                const SizedBox(height: 10),
                                 Text(
-                                  "Hours: ${business?['open_time']} - ${business?['end_time']}",
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-
-                              if (business?['curfew'] != null)
-                                Text("Curfew: ${business?['curfew']}", style: const TextStyle(fontSize: 16)),
-
-                              const SizedBox(height: 6),
-                              Text(
-                                // Auto Open/Closed for eateries; manual status string for housing
-                                "Status: ${_statusText(business)}",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: _statusColor(business),
-                                ),
-                              ),
-
-                              const SizedBox(height: 10),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      business?['about_desc'] ?? 'Write something about your business',
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
+                                  "Tags:",
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, color: Color(0xFF0A4423)),
-                                    onPressed: () {
-                                      if (business == null) return;
-                                      final controller = TextEditingController(text: business?['about_desc'] ?? '');
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => AlertDialog(
-                                          title: const Text("Edit About"),
-                                          content: TextField(
-                                            controller: controller,
-                                            maxLines: 4,
-                                            decoration: const InputDecoration(
-                                              border: OutlineInputBorder(),
-                                              hintText: "Describe your business",
-                                            ),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context),
-                                              child: const Text("Cancel"),
-                                            ),
-                                            ElevatedButton(
-                                              onPressed: () async {
-                                                final id = business?['eatery_id'] ?? business?['housing_id'];
-                                                final endpoint = business?['eatery_id'] != null
-                                                    ? "https://iskort-public-web.onrender.com/api/eatery/$id"
-                                                    : "https://iskort-public-web.onrender.com/api/housing/$id";
-
-                                                final body = {"about_desc": controller.text.trim()};
-                                                await http.put(
-                                                  Uri.parse(endpoint),
-                                                  headers: {"Content-Type": "application/json"},
-                                                  body: jsonEncode(body),
-                                                );
-                                                Navigator.pop(context);
-                                                await fetchBusiness(); // reload with updated about_desc
-                                              },
-                                              child: const Text("Save"),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 10),
-                              Text("Tags:", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                children: classifications.isEmpty
-                                    ? [const Text("No tags yet")]
-                                    : classifications.map((c) => Chip(
-                                          label: Text(c),
-                                          backgroundColor: const Color(0xFFE0F2F1),
-                                        )).toList(),
-                              ),
-                            ],
+                                ),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children:
+                                      classifications.isEmpty
+                                          ? [const Text("No tags yet")]
+                                          : classifications
+                                              .map(
+                                                (c) => Chip(
+                                                  label: Text(c),
+                                                  backgroundColor: const Color(
+                                                    0xFFE0F2F1,
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
     );
   }
 
   String get priceRange {
     if (products.isEmpty) return "N/A";
-    final prices = products
-        .map((p) => double.tryParse(p['price'].toString()) ?? 0)
-        .toList();
+    final prices =
+        products
+            .map((p) => double.tryParse(p['price'].toString()) ?? 0)
+            .toList();
     final min = prices.reduce((a, b) => a < b ? a : b);
     final max = prices.reduce((a, b) => a > b ? a : b);
     final formatter = NumberFormat("#,###");
@@ -952,7 +1234,9 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     if (isEatery) {
       return getBusinessStatus(biz);
     } else {
-      return (biz['status']?.toString().isNotEmpty == true) ? biz['status'] : "Open for tenants";
+      return (biz['status']?.toString().isNotEmpty == true)
+          ? biz['status']
+          : "Open for tenants";
     }
   }
 
@@ -960,7 +1244,9 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     final status = _statusText(biz);
     if (status == "Open" || status == "Open for tenants") {
       return Colors.green;
-    } else if (status == "Closed" || status == "No longer accepting" || status == "Fully occupied") {
+    } else if (status == "Closed" ||
+        status == "No longer accepting" ||
+        status == "Fully occupied") {
       return Colors.red;
     }
     return Colors.grey[700]!;
@@ -976,13 +1262,20 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     final openParts = open.split(":");
     final closeParts = close.split(":");
 
-    final openTime = TimeOfDay(hour: int.parse(openParts[0]), minute: int.parse(openParts[1]));
-    final closeTime = TimeOfDay(hour: int.parse(closeParts[0]), minute: int.parse(closeParts[1]));
+    final openTime = TimeOfDay(
+      hour: int.parse(openParts[0]),
+      minute: int.parse(openParts[1]),
+    );
+    final closeTime = TimeOfDay(
+      hour: int.parse(closeParts[0]),
+      minute: int.parse(closeParts[1]),
+    );
 
-    bool isOpen = (now.hour > openTime.hour ||
-                  (now.hour == openTime.hour && now.minute >= openTime.minute)) &&
-                  (now.hour < closeTime.hour ||
-                  (now.hour == closeTime.hour && now.minute <= closeTime.minute));
+    bool isOpen =
+        (now.hour > openTime.hour ||
+            (now.hour == openTime.hour && now.minute >= openTime.minute)) &&
+        (now.hour < closeTime.hour ||
+            (now.hour == closeTime.hour && now.minute <= closeTime.minute));
 
     return isOpen ? "Open" : "Closed";
   }

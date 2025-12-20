@@ -14,11 +14,15 @@ import 'package:iskort/page_routes/saved_locations.dart';
 import 'package:iskort/widgets/reusables.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:iskort/page_routes/estab_pin.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_map_dragmarker/flutter_map_dragmarker.dart';
+import 'package:iskort/page_routes/static_pins.dart';
 
 /// ===================== CONSTANTS =====================
 class AppConstants {
-  static const double defaultZoom = 18;
-  static const double locationZoom = 19;
+  static const double defaultZoom = 16;
+  static const double locationZoom = 17;
   static const double arrivalThresholdMeters = 20;
 }
 
@@ -71,7 +75,8 @@ class LocationRecord {
 /// ===================== PAGE =====================
 class MapRoutePage extends StatefulWidget {
   final String? initialLocation;
-  const MapRoutePage({super.key, this.initialLocation});
+  final dynamic ownerId;
+  const MapRoutePage({super.key, this.initialLocation, this.ownerId});
 
   @override
   State<MapRoutePage> createState() => _MapRoutePageState();
@@ -116,6 +121,7 @@ class PrefetchTileProvider extends TileProvider {
 }
 
 class _MapRoutePageState extends State<MapRoutePage> {
+  int? _ownerId;
   final MapController _mapController = MapController();
   final Location _locationService = Location();
   final TextEditingController _searchController = TextEditingController();
@@ -137,6 +143,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
 
   List<Map<String, dynamic>> _searchSuggestions = [];
   String? _destinationName;
+  List<Map<String, dynamic>> ownerPinsList = [];
 
   /// ===================== LIFECYCLE =====================
   @override
@@ -144,6 +151,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
     super.initState();
     _initLocation();
     _initLocationAndDestination();
+    _loadOwnerPins();
   }
 
   @override
@@ -154,7 +162,115 @@ class _MapRoutePageState extends State<MapRoutePage> {
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    print('Owner ID from edit: ${widget.ownerId}');
+
+    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+    if (args != null) {
+      _ownerId = args['owner_id'];
+    }
+  }
+
   /// ===================== HELPERS =====================
+  ///
+
+  void _onOwnerLongPress(LatLng latlng) async {
+    if (widget.ownerId == null) return;
+
+    // Optional: limit pins to Iloilo bounds
+    if (!IloiloBounds.contains(latlng.latitude, latlng.longitude)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Pin must be inside Iloilo")),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Add establishment pin here?",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Lat: ${latlng.latitude.toStringAsFixed(6)}\n"
+                  "Lng: ${latlng.longitude.toStringAsFixed(6)}",
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0A4423),
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.location_on),
+                  label: const Text("Add Pin"),
+                  onPressed: () async {
+                    Navigator.pop(context);
+
+                    EstabPin(
+                      ownerId: widget.ownerId!,
+                      userLocation: latlng,
+                      mapController: _mapController,
+                      onPinAdded: (_) async {
+                        await _loadOwnerPins();
+                        if (mounted) setState(() {});
+                      },
+                    ).showAddPinSheet(context);
+                  },
+                ),
+                SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _loadOwnerPins() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pins = prefs.getStringList('owner_pins') ?? [];
+    ownerPinsList =
+        pins.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
+
+    // If in edit mode, place pin at owner's saved location
+    if (widget.ownerId != null) {
+      final ownerPin = ownerPinsList.firstWhere(
+        (p) => p['ownerId'] == widget.ownerId,
+        orElse: () => {},
+      );
+
+      if (ownerPin.isNotEmpty) {
+        setState(() {
+          _userDestination = LatLng(ownerPin['lat'], ownerPin['lng']);
+          _destinationName = ownerPin['title'] ?? 'Owner Pin';
+          _routePoints.clear(); // ensure polyline is not drawn
+        });
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _mapController.move(_userDestination!, AppConstants.defaultZoom);
+        });
+      }
+    }
+
+    setState(() {}); // refresh pins
+  }
+
+  Map<String, dynamic> evalStringMap(String str) {
+    // crude way to parse stringified map, or store as JSON instead
+    return jsonDecode(str.replaceAll("'", '"'));
+  }
+
   Future<http.Response> _get(Uri url) {
     return http.get(
       url,
@@ -182,6 +298,38 @@ class _MapRoutePageState extends State<MapRoutePage> {
     if (m < 60) return '$m mins';
     final h = m ~/ 60;
     return '$h hr${h > 1 ? 's' : ''} ${m % 60} mins';
+  }
+
+  void _showPinCard(BuildContext context, Map pin) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                pin['title'],
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(pin['address']),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () {
+                  // set as destination and fetch route
+                },
+                child: const Text("Navigate"),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showLoading() {
@@ -244,6 +392,8 @@ class _MapRoutePageState extends State<MapRoutePage> {
   }
 
   Future<bool> _checkPermissions() async {
+    if (kIsWeb) return true; // skip permissions on web
+
     if (!await _locationService.serviceEnabled() &&
         !await _locationService.requestService()) {
       return false;
@@ -265,7 +415,10 @@ class _MapRoutePageState extends State<MapRoutePage> {
 
     final pos = LatLng(loc.latitude!, loc.longitude!);
     setState(() => _userLocation = pos);
-    _mapController.move(pos, AppConstants.locationZoom);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mapController.move(pos, AppConstants.locationZoom);
+    });
   }
 
   /// ===================== SEARCH =====================
@@ -413,16 +566,21 @@ class _MapRoutePageState extends State<MapRoutePage> {
             d['lng'] == _userDestination!.longitude;
       });
     } else {
+      final String finalName =
+          _searchController.text.trim().isNotEmpty
+              ? _searchController.text.trim()
+              : (_destinationName?.trim().isNotEmpty == true
+                  ? _destinationName!
+                  : 'Pinned Location');
+
       final record = LocationRecord(
-        name:
-            _searchController.text.trim().isEmpty
-                ? 'Unnamed Location'
-                : _searchController.text.trim(),
+        name: finalName,
         coordinates: _userDestination!,
         distanceKm: _distanceKm!,
         durationMin: _durationMin!,
         timestamp: DateTime.now(),
       );
+
       saved.add(jsonEncode(record.toMap()));
     }
 
@@ -470,18 +628,22 @@ class _MapRoutePageState extends State<MapRoutePage> {
         ),
 
         foregroundColor: Colors.white,
-        title: const Text("Iskort Map"),
-        titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w500,
+        title: Text(
+          widget.ownerId != null ? "Pin your location" : "Iskort Map",
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         backgroundColor: const Color.fromARGB(255, 150, 29, 20),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.book, color: Colors.white),
-            onPressed: _openSavedLocationsScreen,
-          ),
+          if (widget.ownerId == null) ...[
+            IconButton(
+              icon: const Icon(Icons.book, color: Colors.white),
+              onPressed: _openSavedLocationsScreen,
+            ),
+          ],
         ],
       ),
 
@@ -494,7 +656,15 @@ class _MapRoutePageState extends State<MapRoutePage> {
               initialZoom: 16,
               minZoom: 1,
               maxZoom: 100,
+
+              // 👇 OWNER LONG PRESS
+              onLongPress: (tapPosition, latlng) {
+                if (widget.ownerId != null) {
+                  _onOwnerLongPress(latlng);
+                }
+              },
             ),
+
             children: [
               TileLayer(
                 urlTemplate:
@@ -504,7 +674,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
               ),
 
               CurrentLocationLayer(
-                alignPositionOnUpdate: AlignOnUpdate.always,
+                //alignPositionOnUpdate: AlignOnUpdate.always,
                 style: LocationMarkerStyle(
                   markerSize: Size(40, 40), // size of the whole marker
                   markerDirection: MarkerDirection.heading,
@@ -536,6 +706,77 @@ class _MapRoutePageState extends State<MapRoutePage> {
                   ),
                 ),
               ),
+              if (ownerPinsList.isNotEmpty)
+                ...ownerPinsList.map((pin) {
+                  final bool isOwner =
+                      widget.ownerId != null &&
+                      pin['ownerId'] == widget.ownerId;
+
+                  final dragMarker = DragMarker(
+                    point: LatLng(pin['lat'], pin['lng']),
+                    size: const Size(40, 40),
+                    builder: (ctx, mapState, draggable) {
+                      return GestureDetector(
+                        onTap: () {
+                          EstabPin.showPinDetailsSheet(
+                            context: context,
+                            pin: pin,
+                            currentOwnerId: widget.ownerId,
+                            onPinUpdated: (_) => setState(() {}),
+                            reloadPins: _loadOwnerPins,
+                            navigateToPin: (coords) async {
+                              setState(() {
+                                _userDestination = coords;
+                                _destinationName = pin['title'];
+                                _searchController.text = pin['title'];
+                                _hasArrived = false;
+                              });
+
+                              _mapController.move(
+                                coords,
+                                AppConstants.defaultZoom,
+                              );
+                              await _fetchRoute();
+                            },
+                          );
+                        },
+                        child: Icon(
+                          Icons.location_on,
+                          size: 40,
+                          color: isOwner ? Colors.blue : Color(0xFF7A1E1E),
+                        ),
+                      );
+                    },
+                    disableDrag: !isOwner,
+                    onDragEnd: (details, newPosition) async {
+                      if (!isOwner) return;
+
+                      setState(() {
+                        pin['lat'] = newPosition.latitude;
+                        pin['lng'] = newPosition.longitude;
+                      });
+
+                      await EstabPin.updatePin(
+                        oldPin: pin,
+                        newTitle: pin['title'],
+                        newAddress: pin['address'],
+                        newCoords: newPosition,
+                      );
+                    },
+                  );
+
+                  // Wrap DragMarkerWidget in Builder to safely access MapCamera
+                  return Builder(
+                    builder: (context) {
+                      final mapCamera = MapCamera.of(context);
+                      return DragMarkerWidget(
+                        marker: dragMarker,
+                        mapController: _mapController,
+                        mapCamera: mapCamera, // required parameter
+                      );
+                    },
+                  );
+                }),
 
               if (_userDestination != null)
                 MarkerLayer(
@@ -552,7 +793,57 @@ class _MapRoutePageState extends State<MapRoutePage> {
                     ),
                   ],
                 ),
-              if (_userLocation != null && _routePoints.isNotEmpty)
+              MarkerLayer(
+                markers:
+                    staticPins.map((pin) {
+                      return Marker(
+                        point: pin.location,
+                        width: 40,
+                        height: 40,
+                        child: GestureDetector(
+                          onTap: () {
+                            EstabPin.showPinDetailsSheet(
+                              context: context,
+                              pin: {
+                                'title': pin.title,
+                                'address': pin.address,
+                                'lat': pin.location.latitude,
+                                'lng': pin.location.longitude,
+                                'ownerId': null,
+                                'type': pin.type,
+                              },
+                              currentOwnerId: widget.ownerId,
+                              onPinUpdated: (_) {},
+                              reloadPins: () async {},
+                              navigateToPin: (coords) async {
+                                setState(() {
+                                  _userDestination = coords;
+                                  _destinationName = pin.title;
+                                  _searchController.text =
+                                      pin.title; // ⭐ IMPORTANT
+                                });
+
+                                _mapController.move(
+                                  coords,
+                                  AppConstants.defaultZoom,
+                                );
+                                await _fetchRoute();
+                              },
+                            );
+                          },
+                          child: const Icon(
+                            Icons.location_on,
+                            color: Color(0xFF7A1E1E),
+                            size: 40,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+              ),
+
+              if (widget.ownerId == null &&
+                  _userLocation != null &&
+                  _routePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
                     Polyline(
@@ -632,86 +923,90 @@ class _MapRoutePageState extends State<MapRoutePage> {
                           ),
 
                         // ETA and Distance
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                margin: const EdgeInsets.only(right: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color.fromARGB(
-                                    180,
-                                    255,
-                                    255,
-                                    255,
+                        if (widget.ownerId == null) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  margin: const EdgeInsets.only(right: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color.fromARGB(
+                                      180,
+                                      255,
+                                      255,
+                                      255,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'ETA: ${_formatDuration(_durationMin!)}',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
+                                  child: Center(
+                                    child: Text(
+                                      'ETA: ${_formatDuration(_durationMin!)}',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                margin: const EdgeInsets.only(left: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color.fromARGB(
-                                    180,
-                                    255,
-                                    255,
-                                    255,
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  margin: const EdgeInsets.only(left: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color.fromARGB(
+                                      180,
+                                      255,
+                                      255,
+                                      255,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'Distance: ${_distanceKm!.toStringAsFixed(2)} km',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black,
+                                  child: Center(
+                                    child: Text(
+                                      'Distance: ${_distanceKm!.toStringAsFixed(2)} km',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                        ],
 
                         const SizedBox(height: 12),
 
                         // Save location button
-                        ElevatedButton.icon(
-                          onPressed: _toggleSaveCurrentLocation,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFFFBAC24),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        if (widget.ownerId == null) ...[
+                          ElevatedButton.icon(
+                            onPressed: _toggleSaveCurrentLocation,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFFFBAC24),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          icon: Icon(
-                            isSaved ? Icons.bookmark : Icons.bookmark_border,
-                            color: const Color.fromARGB(255, 0, 0, 0),
-                          ),
-                          label: Text(
-                            isSaved ? "Saved" : "Save Location",
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color.fromARGB(255, 0, 0, 0),
+                            icon: Icon(
+                              isSaved ? Icons.bookmark : Icons.bookmark_border,
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                            ),
+                            label: Text(
+                              isSaved ? "Saved" : "Save Location",
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color.fromARGB(255, 0, 0, 0),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -818,10 +1113,18 @@ class _MapRoutePageState extends State<MapRoutePage> {
         ],
       ),
 
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color.fromARGB(255, 150, 29, 20),
-        onPressed: _getUserLocation,
-        child: const Icon(Icons.my_location, color: Colors.white),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 15),
+          FloatingActionButton(
+            heroTag: 'my_location',
+            backgroundColor: const Color.fromARGB(255, 150, 29, 20),
+            onPressed: _getUserLocation,
+            child: const Icon(Icons.my_location, color: Colors.white),
+          ),
+          const SizedBox(height: 15),
+        ],
       ),
     );
   }

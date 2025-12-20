@@ -7,6 +7,7 @@ import 'page_routes/preference_popup.dart';
 import 'page_routes/view_estab_profile.dart';
 import 'page_routes/map_route.dart';
 import 'page_routes/search_results_page.dart';
+import 'package:iskort/page_routes/all_establishments.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -87,42 +88,46 @@ class _HomePageState extends State<HomePage> {
       final eateryResp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/eatery'),
       );
+
       if (eateryResp.statusCode == 200) {
         final data = jsonDecode(eateryResp.body);
-        final verifiedEateries =
-            (data['eateries'] ?? [])
-                .where((e) => e['is_verified'] == 1)
-                .toList();
-        for (var eatery in verifiedEateries) {
-          eatery['type'] = 'Eatery';
-          eatery['photo'] = eatery['eatery_photo'] ?? '';
-          entries.add(eatery);
+        final verified = (data['eateries'] ?? []).where(
+          (e) => e['is_verified'] == 1,
+        );
+
+        for (var e in verified) {
+          e['type'] = 'Eatery';
+          e['photo'] = e['eatery_photo'] ?? '';
+          e['tags'] = await _fetchEateryTags(e['eatery_id']);
+          entries.add(e);
         }
       }
 
       final housingResp = await http.get(
         Uri.parse('https://iskort-public-web.onrender.com/api/housing'),
       );
+
       if (housingResp.statusCode == 200) {
         final data = jsonDecode(housingResp.body);
-        final verifiedHousing =
-            (data['housings'] ?? [])
-                .where((h) => h['is_verified'] == 1)
-                .toList();
-        for (var house in verifiedHousing) {
-          house['type'] = 'Housing';
-          house['photo'] = house['housing_photo'] ?? '';
-          entries.add(house);
+        final verified = (data['housings'] ?? []).where(
+          (h) => h['is_verified'] == 1,
+        );
+
+        for (var h in verified) {
+          h['type'] = 'Housing';
+          h['photo'] = h['housing_photo'] ?? '';
+          h['tags'] = await _fetchHousingTags(h['housing_id']);
+          entries.add(h);
         }
       }
+
+      await loadPreferences();
+      await checkFirstTimeUser();
 
       setState(() {
         allEntries = entries;
         isLoading = false;
       });
-
-      await loadPreferences();
-      await checkFirstTimeUser();
     } catch (e) {
       print("Error fetching entries: $e");
       setState(() => isLoading = false);
@@ -180,7 +185,7 @@ class _HomePageState extends State<HomePage> {
                       card['route']?.toString() ?? '/',
                     ),
                 child: Container(
-                  height: 90,
+                  height: 70,
                   margin: const EdgeInsets.symmetric(horizontal: 5),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
@@ -223,8 +228,82 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void showEntryDetails(Map entry) {
-    bool isLiked = false;
+  Future<bool> isEntrySaved(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('saved_locations') ?? [];
+
+    return saved.any((item) {
+      final decoded = jsonDecode(item);
+      return decoded['name'] == name;
+    });
+  }
+
+  // fetch eatery tags for ueer recommendation
+  Future<List<String>> _fetchEateryTags(int eateryId) async {
+    final res = await http.get(
+      Uri.parse('https://iskort-public-web.onrender.com/api/food/$eateryId'),
+    );
+
+    if (res.statusCode != 200) return [];
+
+    final data = jsonDecode(res.body);
+    final tags = <String>{};
+
+    for (var food in data['foods'] ?? []) {
+      final c = food['classification'];
+      if (c != null && c.toString().isNotEmpty) {
+        tags.add(c.toString());
+      }
+    }
+
+    return tags.toList();
+  }
+
+  // fetch housing tags for user recommendation
+  Future<List<String>> _fetchHousingTags(int housingId) async {
+    final res = await http.get(
+      Uri.parse(
+        'https://iskort-public-web.onrender.com/api/facility/$housingId',
+      ),
+    );
+
+    if (res.statusCode != 200) return [];
+
+    final data = jsonDecode(res.body);
+    final tags = <String>{};
+
+    for (var fac in data['facilities'] ?? []) {
+      final t = fac['type'];
+      if (t != null && t.toString().isNotEmpty) {
+        tags.add(t.toString());
+      }
+    }
+
+    return tags.toList();
+  }
+
+  List<Map<String, dynamic>> _filterByPrefs(String type, List<String> prefs) {
+    final matched =
+        allEntries
+            .where((e) => e['type'] == type)
+            .where((e) {
+              final tags = List<String>.from(e['tags'] ?? []);
+              return tags.any((t) => prefs.contains(t));
+            })
+            .cast<Map<String, dynamic>>()
+            .toList();
+
+    // fallback if no matches
+    return (matched.isNotEmpty
+            ? matched
+            : allEntries.where((e) => e['type'] == type))
+        .take(3)
+        .cast<Map<String, dynamic>>()
+        .toList();
+  }
+
+  void showEntryDetails(Map entry) async {
+    bool isLiked = await isEntrySaved(entry['name']);
 
     showDialog(
       context: context,
@@ -236,19 +315,41 @@ class _HomePageState extends State<HomePage> {
             ),
             child: StatefulBuilder(
               builder: (context, setState) {
-                void toggleFavorite() {
+                void toggleFavorite() async {
                   setState(() => isLiked = !isLiked);
-                  ScaffoldMessenger.of(context).removeCurrentSnackBar();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isLiked
-                            ? 'Added to favorites!'
-                            : 'Removed from favorites!',
-                      ),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
+
+                  final prefs = await SharedPreferences.getInstance();
+                  List<String> savedList =
+                      prefs.getStringList('saved_locations') ?? [];
+
+                  Map<String, dynamic> record = {
+                    'name': entry['name'] ?? '',
+                    'address': entry['location'] ?? '',
+                    'type': entry['type'] ?? '',
+                    'timestamp': DateTime.now().toIso8601String(),
+                  };
+
+                  String recordJson = jsonEncode(record);
+
+                  if (isLiked) {
+                    savedList.removeWhere((item) {
+                      final decoded = jsonDecode(item);
+                      return decoded['name'] == entry['name'];
+                    });
+
+                    savedList.add(recordJson);
+                    await prefs.setStringList('saved_locations', savedList);
+
+                    showFadingPopup(context, "Location added to favorites!");
+                  } else {
+                    savedList.removeWhere((item) {
+                      final decoded = jsonDecode(item);
+                      return decoded['name'] == entry['name'];
+                    });
+
+                    await prefs.setStringList('saved_locations', savedList);
+                    showFadingPopup(context, "Removed from favorites.");
+                  }
                 }
 
                 return Stack(
@@ -259,6 +360,7 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            SizedBox(height: 20),
                             AspectRatio(
                               aspectRatio: 1.2,
                               child: ClipRRect(
@@ -432,6 +534,7 @@ class _HomePageState extends State<HomePage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SizedBox(height: 20),
                   Text(
                     "Hello, ${user['name'] ?? 'Isko!'}!",
                     style: const TextStyle(
@@ -452,9 +555,9 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
-            const SizedBox(height: 25),
+            const SizedBox(height: 15),
             GeneralSearchBar(),
-            const SizedBox(height: 30),
+            const SizedBox(height: 20),
             _buildNavCardsRow(),
             const SizedBox(height: 15),
 
@@ -507,7 +610,16 @@ class _HomePageState extends State<HomePage> {
                   ),
                   TextButton(
                     onPressed: () {
-                      Navigator.pushNamed(context, '/housing');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => const AllEstablishmentsPage(
+                                establishmentType: 'Housing',
+                              ),
+                          settings: RouteSettings(arguments: allEntries),
+                        ),
+                      );
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -535,22 +647,17 @@ class _HomePageState extends State<HomePage> {
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
+                crossAxisCount: 3,
                 childAspectRatio: 3 / 4,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
                 children:
-                    allEntries
-                        .where((e) => e['type'] == 'Housing')
-                        .take(6)
+                    _filterByPrefs('Housing', currentHousingPrefs)
                         .map(
                           (entry) => ProductCard(
                             title: entry['name'] ?? '',
-                            // subtitle: "Tap to view details",
                             location: entry['location'] ?? '',
-                            imagePath:
-                                entry['photo'] ??
-                                "assets/images/placeholder.png",
+                            imagePath: entry['photo'] ?? '',
                             onTap: () => showEntryDetails(entry),
                           ),
                         )
@@ -574,7 +681,16 @@ class _HomePageState extends State<HomePage> {
                   ),
                   TextButton(
                     onPressed: () {
-                      Navigator.pushNamed(context, '/food');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => const AllEstablishmentsPage(
+                                establishmentType: 'Eatery',
+                              ),
+                          settings: RouteSettings(arguments: allEntries),
+                        ),
+                      );
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -602,22 +718,17 @@ class _HomePageState extends State<HomePage> {
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
+                crossAxisCount: 3,
                 childAspectRatio: 3 / 4,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
                 children:
-                    allEntries
-                        .where((e) => e['type'] == 'Eatery')
-                        .take(6)
+                    _filterByPrefs('Eatery', currentFoodPrefs)
                         .map(
                           (entry) => ProductCard(
                             title: entry['name'] ?? '',
-                            // subtitle: "Tap to view details",
                             location: entry['location'] ?? '',
-                            imagePath:
-                                entry['photo'] ??
-                                "assets/images/placeholder.png",
+                            imagePath: entry['photo'] ?? '',
                             onTap: () => showEntryDetails(entry),
                           ),
                         )
@@ -629,11 +740,11 @@ class _HomePageState extends State<HomePage> {
       ),
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: 0,
-        onTap: (index) {
+        onTap: (index) async {
           if (index == 1) {
             Navigator.pushNamed(context, '/route');
           } else if (index == 2 && user.isNotEmpty) {
-            Navigator.pushNamed(
+            final changed = await Navigator.pushNamed(
               context,
               '/profile',
               arguments: {
@@ -644,6 +755,10 @@ class _HomePageState extends State<HomePage> {
                 'notifPreference': user['notif_preference'] ?? '',
               },
             );
+
+            if (changed == true) {
+              fetchEntries();
+            }
           }
         },
       ),

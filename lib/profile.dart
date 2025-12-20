@@ -111,26 +111,27 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         ),
 
                         const SizedBox(height: 20),
-
-                        _buildMenuItem(Icons.bookmark, "Saved Locations", () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => SavedLocations(
-                                    onSelect: (record) {
-                                      Navigator.pushNamed(
-                                        context,
-                                        '/map_route',
-                                        arguments: {
-                                          'destination': record.coordinates,
-                                        },
-                                      );
-                                    },
-                                  ),
-                            ),
-                          );
-                        }),
+                        if (role.toLowerCase() != "owner") ...[
+                          _buildMenuItem(Icons.bookmark, "Saved Locations", () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => SavedLocations(
+                                      onSelect: (record) {
+                                        Navigator.pushNamed(
+                                          context,
+                                          '/saved_loc',
+                                          arguments: {
+                                            'destination': record.coordinates,
+                                          },
+                                        );
+                                      },
+                                    ),
+                              ),
+                            );
+                          }),
+                        ],
 
                         _buildMenuItem(
                           Icons.notifications,
@@ -140,19 +141,28 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           },
                         ),
 
-                        _buildMenuItem(Icons.settings, "Profile Settings", () {
-                          Navigator.pushNamed(
-                            context,
-                            '/profile_settings',
-                            arguments: {
-                              'name': _name,
-                              'email': _email,
-                              'role': _role,
-                              'phone': _phone,
-                              'notifPreference': _notifPreference,
-                            },
-                          );
-                        }),
+                        _buildMenuItem(
+                          Icons.settings,
+                          "Profile Settings",
+                          () async {
+                            final changed = await Navigator.pushNamed(
+                              context,
+                              '/profile_settings',
+                              arguments: {
+                                'name': _name,
+                                'email': _email,
+                                'role': _role,
+                                'phone': _phone,
+                                'notifPreference': _notifPreference,
+                              },
+                            );
+
+                            if (changed == true) {
+                              Navigator.pop(context, true);
+                            }
+                          },
+                        ),
+
                         _buildMenuItem(Icons.help, "Help", () {
                           _showHelpDialog(context);
                         }, iconColor: const Color(0xFF7A1E1E)),
@@ -185,7 +195,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 );
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
+                                backgroundColor: Color(0xFFFBAC24),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
                                 ),
@@ -195,35 +205,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               ),
                               child: const Text(
                                 "Set up your business",
-                                style: TextStyle(color: Colors.white),
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ),
                         ],
 
                         const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0A4423),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: const Text(
-                              'Back to Homepage',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ),
+
                         const SizedBox(height: 10),
                         SizedBox(
                           width: double.infinity,
