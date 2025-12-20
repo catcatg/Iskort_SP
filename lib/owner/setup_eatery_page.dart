@@ -55,6 +55,8 @@ class _SetupEateryPage extends State<SetupEateryPage> {
   // Cloudinary config (replace with your actual values)
   static const String _cloudName = "iskort-system";
   static const String _uploadPreset = "iskort_upload";
+  static const int _maxUploadSizeBytes = 10 * 1024 * 1024; // 10 MB
+
 
   @override
   void initState() {
@@ -83,34 +85,56 @@ class _SetupEateryPage extends State<SetupEateryPage> {
   }
 
   // Upload file to Cloudinary and return secure_url
-  Future<String?> uploadToCloudinary(XFile pickedFile, {String resourceType = 'image'}) async {
-    final url = Uri.parse("https://api.cloudinary.com/v1_1/$_cloudName/$resourceType/upload");
+  Future<String?> uploadToCloudinary(
+  XFile pickedFile, {
+  String resourceType = 'image',
+}) async {
+  // 🔒 READ FILE BYTES
+  final bytes = await pickedFile.readAsBytes();
 
-    // Read bytes directly from XFile (works in web + mobile)
-    final bytes = await pickedFile.readAsBytes();
+  // 🚫 SIZE CHECK (10 MB)
+  if (bytes.length > _maxUploadSizeBytes) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Upload failed: File size exceeds 10 MB limit.',
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return null;
+  }
 
-    final request = http.MultipartRequest("POST", url)
-      ..fields['upload_preset'] = _uploadPreset
-      ..files.add(http.MultipartFile.fromBytes(
+  final url =
+      Uri.parse("https://api.cloudinary.com/v1_1/$_cloudName/$resourceType/upload");
+
+  final request = http.MultipartRequest("POST", url)
+    ..fields['upload_preset'] = _uploadPreset
+    ..files.add(
+      http.MultipartFile.fromBytes(
         'file',
         bytes,
-        filename: pickedFile.name, // safe for web
-      ));
+        filename: pickedFile.name,
+      ),
+    );
 
-    final response = await request.send();
-    final resStr = await response.stream.bytesToString();
-    print("Cloudinary raw response: $resStr");
+  final response = await request.send();
+  final resStr = await response.stream.bytesToString();
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(resStr);
-      return data['secure_url'];
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Upload failed: ${response.statusCode}")),
-      );
-      return null;
-    }
+  if (response.statusCode == 200) {
+    final data = jsonDecode(resStr);
+    return data['secure_url'];
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Upload failed (${response.statusCode})"),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return null;
   }
+}
+
 
   // pick file (image or doc) and upload, then set controller
   Future<void> pickAndUpload(TextEditingController controller, String label,
