@@ -1,3 +1,5 @@
+import 'dart:ui_web';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -21,7 +23,9 @@ Future<String?> uploadToCloudinary(
   if (bytes.length > maxUploadSizeBytes) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("Image is too large. Maximum allowed size per upload is 10 MB."),
+        content: Text(
+          "Image is too large. Maximum allowed size per upload is 10 MB.",
+        ),
         backgroundColor: Colors.red,
       ),
     );
@@ -74,6 +78,7 @@ Widget input(TextEditingController controller, {String? hint}) {
     controller: controller,
     decoration: InputDecoration(
       hintText: hint,
+      labelText: hint,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
     ),
   );
@@ -132,11 +137,20 @@ void openAddFoodDialog(
   final priceController = TextEditingController();
   String? selectedTag;
 
-    final classes = [
-      "Pork","Chicken","Beef","Vegetables","Seafood",
-      "Alcoholic Drinks","Coffee Drinks","Non-Coffee Drinks",
-      "Desserts","Snacks","Meal Set", "Vegetarian",
-    ];
+  final classes = [
+    "Pork",
+    "Chicken",
+    "Beef",
+    "Vegetables",
+    "Seafood",
+    "Alcoholic Drinks",
+    "Coffee Drinks",
+    "Non-Coffee Drinks",
+    "Desserts",
+    "Snacks",
+    "Meal Set",
+    "Vegetarian",
+  ];
 
   showDialog(
     context: context,
@@ -236,6 +250,8 @@ void openAddFacilityDialog(
     required bool hasKitchen,
     required String type,
     required String additionalInfo,
+    required int availability,
+    required int availRoom,
   })
   saveFacilityToServer,
 ) {
@@ -247,6 +263,8 @@ void openAddFacilityDialog(
   bool hasCr = false;
   bool hasKitchen = false;
   String? type;
+  int availability = 0; // 0 = Available, 1 = Not Available
+  final availRoom = TextEditingController(text: "0");
 
   showDialog(
     context: context,
@@ -259,7 +277,9 @@ void openAddFacilityDialog(
               child: Column(
                 children: [
                   input(name, hint: "Facility Name"),
+                  const SizedBox(height: 10),
                   input(price, hint: "Price"),
+                  const SizedBox(height: 10),
                   TextFormField(
                     controller: pic,
                     decoration: const InputDecoration(
@@ -280,7 +300,7 @@ void openAddFacilityDialog(
                           context: context,
                         );
                         if (url != null) {
-                          pic.text = url;
+                          setState(() => pic.text = url);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text("Image uploaded successfully"),
@@ -289,11 +309,12 @@ void openAddFacilityDialog(
                         }
                       }
                     },
-                    child: const Text("Upload Food Image"),
+                    child: const Text("Upload Facility Image"),
                   ),
+                  const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: type,
-                    hint: const Text("Type"),
+                    hint: const Text("Room Type"),
                     items:
                         ["Solo", "Shared"]
                             .map(
@@ -302,6 +323,7 @@ void openAddFacilityDialog(
                             .toList(),
                     onChanged: (val) => setState(() => type = val),
                   ),
+                  const SizedBox(height: 10),
                   CheckboxListTile(
                     title: const Text("Airconditioned"),
                     value: hasAc,
@@ -318,6 +340,43 @@ void openAddFacilityDialog(
                     onChanged:
                         (val) => setState(() => hasKitchen = val ?? false),
                   ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "Room Availability",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<int>(
+                          title: const Text("Available"),
+                          value: 0,
+                          groupValue: availability,
+                          onChanged: (val) {
+                            setState(() {
+                              availability = val!;
+                            });
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: RadioListTile<int>(
+                          title: const Text("Not Available"),
+                          value: 1,
+                          groupValue: availability,
+                          onChanged: (val) {
+                            setState(() {
+                              availability = val!;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (availability == 0) ...[
+                    input(availRoom, hint: "Number of available bedspace"),
+                  ],
+                  const SizedBox(height: 10),
                   input(info, hint: "Additional Info"),
                 ],
               ),
@@ -339,6 +398,8 @@ void openAddFacilityDialog(
                     hasKitchen: hasKitchen,
                     type: type ?? "Solo",
                     additionalInfo: info.text.trim(),
+                    availability: availability,
+                    availRoom: int.tryParse(availRoom.text.trim()) ?? 0,
                   );
                   Navigator.pop(context);
                 },
@@ -387,7 +448,9 @@ void openEditFoodDialog(
               mainAxisSize: MainAxisSize.min,
               children: [
                 input(name, hint: "Food Name"),
+                SizedBox(height: 10),
                 input(price, hint: "Price"),
+                SizedBox(height: 10),
                 TextFormField(
                   controller: pic,
                   decoration: const InputDecoration(
@@ -456,6 +519,7 @@ void openEditFoodDialog(
   );
 }
 
+// POP UP AT HOMEPAGE EDIT (PEN ICON)
 void openEditFacilityDialog(
   BuildContext context,
   Map<String, dynamic> item,
@@ -471,6 +535,11 @@ void openEditFacilityDialog(
   bool hasKitchen = item['has_kitchen'] == 1 || item['has_kitchen'] == true;
   String? type =
       ["Solo", "Shared"].contains(item['type']) ? item['type'] : null;
+  int availability =
+      item['availability'] ?? 0; // 0 = available, 1 = not available
+  final availRoom = TextEditingController(
+    text: item['avail_room']?.toString() ?? '0',
+  );
 
   showDialog(
     context: context,
@@ -478,82 +547,232 @@ void openEditFacilityDialog(
       return StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text("Edit Facility"),
+            title: const Text(
+              "Edit Facility",
+              style: TextStyle(
+                color: Color(0xFF0A4423),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
             content: SingleChildScrollView(
-              child: Column(
-                children: [
-                  input(name, hint: "Facility Name"),
-                  input(price, hint: "Price"),
-                  TextFormField(
-                    controller: pic,
-                    decoration: const InputDecoration(
-                      labelText: "Facility Image URL",
-                      hintText: "Auto-filled after upload",
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final picker = ImagePicker();
-                      final picked = await picker.pickImage(
-                        source: ImageSource.gallery,
-                      );
-                      if (picked != null) {
-                        final url = await uploadToCloudinary(
-                          picked,
-                          context: context,
-                        );
-                        if (url != null) {
-                          pic.text = url;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                "Facility image uploaded successfully",
-                              ),
-                            ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: 300,
+                  maxWidth: MediaQuery.of(context).size.width * 0.8,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 20),
+                      // Facility Name & Price
+                      input(name, hint: "Facility Name"),
+                      const SizedBox(height: 12),
+                      input(price, hint: "Price"),
+                      const SizedBox(height: 12),
+
+                      // Image Preview
+                      Center(
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            maxWidth: 200,
+                            maxHeight: 200,
+                          ),
+                          child:
+                              pic.text.isNotEmpty
+                                  ? Image.network(pic.text, fit: BoxFit.cover)
+                                  : Container(
+                                    color: Colors.grey[200],
+                                    child: const Icon(Icons.image, size: 50),
+                                  ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      ElevatedButton(
+                        onPressed: () async {
+                          final picker = ImagePicker();
+                          final picked = await picker.pickImage(
+                            source: ImageSource.gallery,
                           );
-                        }
-                      }
-                    },
-                    child: const Text("Upload Facility Image"),
+                          if (picked != null) {
+                            final url = await uploadToCloudinary(
+                              picked,
+                              context: context,
+                            );
+                            if (url != null) {
+                              setState(() {
+                                pic.text = url;
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    "Facility image uploaded successfully",
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text("Update Facility Image"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(
+                            0xFF0A4423,
+                          ), // custom green color
+                          foregroundColor: Colors.white, // text color
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Room Type Dropdown
+                      DropdownButtonFormField<String>(
+                        value: type,
+                        decoration: const InputDecoration(
+                          labelText: "Room Type",
+                          helperText:
+                              "Select whether the room is solo or shared",
+                        ),
+                        items:
+                            ["Solo", "Shared"]
+                                .map(
+                                  (c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c),
+                                  ),
+                                )
+                                .toList(),
+                        onChanged: (val) => setState(() => type = val),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Amenities
+                      const Text(
+                        "Amenities",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 6,
+                        children: [
+                          CheckboxListTile(
+                            title: const Text("Airconditioned"),
+                            value: hasAc,
+                            onChanged:
+                                (val) => setState(() => hasAc = val ?? false),
+                          ),
+                          CheckboxListTile(
+                            title: const Text("Comfort Room"),
+                            value: hasCr,
+                            onChanged:
+                                (val) => setState(() => hasCr = val ?? false),
+                          ),
+                          CheckboxListTile(
+                            title: const Text("Kitchen"),
+                            value: hasKitchen,
+                            onChanged:
+                                (val) =>
+                                    setState(() => hasKitchen = val ?? false),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Room Availability",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Radio buttons for availability
+                      Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<int>(
+                              title: const Text(
+                                "Available",
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              value: 0,
+                              groupValue: availability,
+                              onChanged: (val) {
+                                setState(() {
+                                  availability = val!;
+                                });
+                              },
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<int>(
+                              title: const Text(
+                                "Not Available",
+                                style: TextStyle(fontSize: 14),
+                              ),
+                              value: 1,
+                              groupValue: availability,
+                              onChanged: (val) {
+                                setState(() {
+                                  availability = val!;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Input for number of available rooms
+                      if (availability == 0) ...[
+                        const SizedBox(height: 12),
+                        input(availRoom, hint: "Number of available bedspace"),
+                      ],
+                      const SizedBox(height: 6),
+                      Divider(color: Colors.grey[400]),
+                      const SizedBox(height: 6),
+                      // Additional Info
+                      const Text(
+                        "Additional Info",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      SizedBox(height: 15),
+                      input(info, hint: "Additional Info"),
+                    ],
                   ),
-                  DropdownButtonFormField<String>(
-                    value: type,
-                    items:
-                        ["Solo", "Shared"]
-                            .map(
-                              (c) => DropdownMenuItem(value: c, child: Text(c)),
-                            )
-                            .toList(),
-                    onChanged: (val) => setState(() => type = val),
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Airconditioned"),
-                    value: hasAc,
-                    onChanged: (val) => setState(() => hasAc = val ?? false),
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Comfort Room"),
-                    value: hasCr,
-                    onChanged: (val) => setState(() => hasCr = val ?? false),
-                  ),
-                  CheckboxListTile(
-                    title: const Text("Kitchen"),
-                    value: hasKitchen,
-                    onChanged:
-                        (val) => setState(() => hasKitchen = val ?? false),
-                  ),
-                  input(info, hint: "Additional Info"),
-                ],
+                ),
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text("Cancel"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(
+                    158,
+                    177,
+                    177,
+                    177,
+                  ), // custom green color
+                  foregroundColor: const Color.fromARGB(255, 76, 76, 76),
+                ),
               ),
               ElevatedButton(
                 child: const Text("Save"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0A4423),
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () async {
                   item['name'] = name.text.trim();
                   item['price'] = price.text.trim();
@@ -563,6 +782,9 @@ void openEditFacilityDialog(
                   item['has_cr'] = hasCr;
                   item['has_kitchen'] = hasKitchen;
                   item['type'] = type ?? "Solo";
+                  item['availability'] = availability;
+                  item['avail_room'] = int.tryParse(availRoom.text.trim()) ?? 0;
+
                   await updateFacilityItem(item);
                   Navigator.pop(context);
                   await reload();
@@ -647,29 +869,80 @@ Widget facilityCard(
   required Future<void> Function(int) deleteFacilityItem,
   required Future<void> Function() reload,
 }) {
-  return Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: ListTile(
-      leading: Image.network(
-        item['facility_pic'] ?? "",
-        width: 50,
-        height: 50,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const Icon(Icons.home),
-      ),
-      title: Text(item['name']),
-      subtitle: Text(
-        "${item['type']} • ₱${item['price']}\n"
-        "AC: ${asBool(item['has_ac']) ? 'Yes' : 'No'} | "
-        "CR: ${asBool(item['has_cr']) ? 'Yes' : 'No'} | "
-        "Kitchen: ${asBool(item['has_kitchen']) ? 'Yes' : 'No'}",
-      ),
+  final availRoom = item['avail_room'] ?? 0;
+  // Facility is available only if availability == 0 AND availRoom > 0
+  final isAvailable = item['availability'] == 0 && availRoom > 0;
 
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 3,
+    shadowColor: const Color.fromARGB(255, 124, 124, 124).withOpacity(0.3),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          item['facility_pic'] ?? "",
+          width: 60,
+          height: 60,
+          fit: BoxFit.cover,
+          errorBuilder:
+              (_, __, ___) => Container(
+                width: 60,
+                height: 60,
+                color: Colors.grey[200],
+                child: const Icon(Icons.home, color: Colors.grey),
+              ),
+        ),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item['name'],
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+          // Tag for unavailable facility
+          if (!isAvailable)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                "Not Available",
+                style: TextStyle(color: Colors.white, fontSize: 11),
+              ),
+            ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "${item['type']} • ₱${item['price']}\n"
+            "AC: ${asBool(item['has_ac']) ? 'Yes' : 'No'} | "
+            "CR: ${asBool(item['has_cr']) ? 'Yes' : 'No'} | "
+            "Kitchen: ${asBool(item['has_kitchen']) ? 'Yes' : 'No'}",
+            style: const TextStyle(fontSize: 13, color: Colors.black87),
+          ),
+          const SizedBox(height: 4),
+          // Show number of available rooms if available
+          if (isAvailable)
+            Text(
+              "Available Rooms: $availRoom",
+              style: const TextStyle(fontSize: 13, color: Colors.green),
+            ),
+        ],
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            icon: const Icon(Icons.edit, color: Colors.blue),
+            icon: const Icon(Icons.edit, color: Color(0xFF0A4423)),
             onPressed:
                 () => openEditFacilityDialog(
                   context,
@@ -677,7 +950,9 @@ Widget facilityCard(
                   updateFacilityItem,
                   reload,
                 ),
+            tooltip: "Edit Facility",
           ),
+          const SizedBox(width: 10),
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
             onPressed: () async {
@@ -695,6 +970,9 @@ Widget facilityCard(
                           child: const Text("Cancel"),
                         ),
                         ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
                           onPressed: () => Navigator.pop(ctx, true),
                           child: const Text("Delete"),
                         ),
@@ -707,6 +985,7 @@ Widget facilityCard(
                 await reload();
               }
             },
+            tooltip: "Delete Facility",
           ),
         ],
       ),
@@ -913,6 +1192,8 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
     required bool hasKitchen,
     required String type,
     required String additionalInfo,
+    required int availability,
+    required int availRoom,
   }) async {
     final housingId = extractId(
       widget.business['housing_id'] ?? widget.business['id'],
@@ -927,6 +1208,8 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
       "has_kitchen": hasKitchen ? 1 : 0,
       "type": type,
       "additional_info": additionalInfo,
+      "availability": availability,
+      "avail_room": availRoom,
     };
 
     final res = await http.post(
@@ -964,6 +1247,8 @@ class _EditEstablishmentsPageState extends State<EditEstablishmentsPage> {
         "has_kitchen": asBool(item['has_kitchen']) ? 1 : 0,
         "type": item['type'],
         "additional_info": item['additional_info'],
+        "availability": item['availability'],
+        "avail_room": item['avail_room'],
       }),
     );
   }

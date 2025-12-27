@@ -188,6 +188,8 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         "has_cr": item['has_cr'],
         "has_kitchen": item['has_kitchen'],
         "type": item['type'],
+        "availability": item['availability'],
+        "avail_room": item['avail_room'],
         "additional_info": item['additional_info'],
       }),
     );
@@ -314,50 +316,131 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     showDialog(
       context: context,
       builder:
-          (_) => AlertDialog(
-            title: Text(
-              item['businessType'] == 'Eatery'
-                  ? item['name'] ?? 'Food Item'
-                  : item['name'] ?? 'Facility',
+          (_) => Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Image.network(
-                    item['businessType'] == 'Eatery'
-                        ? item['food_pic'] ?? ''
-                        : item['facility_pic'] ?? '',
-                    height: 150,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.image),
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title
+                        Text(
+                          item['businessType'] == 'Eatery'
+                              ? item['name'] ?? 'Food Item'
+                              : item['name'] ?? 'Facility',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Image
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            item['businessType'] == 'Eatery'
+                                ? item['food_pic'] ?? ''
+                                : item['facility_pic'] ?? '',
+                            height: 150,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (_, __, ___) =>
+                                    const Icon(Icons.image, size: 50),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Details
+                        ..._buildDetails(item),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  if (item['businessType'] == 'Eatery') ...[
-                    Text("Classification: ${item['classification']}"),
-                    Text("Price: ₱${item['price']}"),
-                  ] else ...[
-                    Text("Type: ${item['type']}"),
-                    Text("Price: ₱${item['price']}"),
-                    Text("Aircon: ${item['has_ac'] == true ? 'Yes' : 'No'}"),
-                    Text(
-                      "Comfort Room: ${item['has_cr'] == true ? 'Yes' : 'No'}",
-                    ),
-                    Text(
-                      "Kitchen: ${item['has_kitchen'] == true ? 'Yes' : 'No'}",
-                    ),
-                    Text("Info: ${item['additional_info'] ?? ''}"),
-                  ],
-                ],
-              ),
+                ),
+
+                // Close button top-right
+                Positioned(
+                  right: 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.close),
+                    color: const Color(0xFF0A4423),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Close"),
-              ),
-            ],
           ),
+    );
+  }
+
+  /// Build a list of details with icons when possible, fallback to label-only
+  List<Widget> _buildDetails(Map<String, dynamic> item) {
+    final details = <Widget>[];
+
+    if (item['businessType'] == 'Eatery') {
+      details.add(
+        _detailRow(Icons.category, "Classification", item['classification']),
+      );
+      details.add(const SizedBox(height: 6));
+      details.add(_detailRow(Icons.attach_money, "Price", "₱${item['price']}"));
+    } else {
+      details.add(_detailRow(Icons.room_preferences, "Type", item['type']));
+      details.add(const SizedBox(height: 6));
+      details.add(_detailRow(Icons.money, "Price", "₱${item['price']}"));
+      details.add(const SizedBox(height: 6));
+      details.add(
+        _detailRow(
+          Icons.ac_unit,
+          "Aircon",
+          item['has_ac'] == true ? 'Yes' : 'No',
+        ),
+      );
+      details.add(const SizedBox(height: 6));
+      details.add(
+        _detailRow(
+          Icons.bathtub,
+          "Comfort Room",
+          item['has_cr'] == true ? 'Yes' : 'No',
+        ),
+      );
+      details.add(const SizedBox(height: 6));
+      details.add(
+        _detailRow(
+          Icons.kitchen,
+          "Kitchen",
+          item['has_kitchen'] == true ? 'Yes' : 'No',
+        ),
+      );
+      details.add(const SizedBox(height: 6));
+      // If no icon exists, just show label
+      details.add(
+        _detailRow(null, "Additional Info", item['additional_info'] ?? ''),
+      );
+    }
+
+    return details;
+  }
+
+  /// Helper: icon + label + value row; if icon is null, just show label + value
+  Widget _detailRow(IconData? icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, color: const Color(0xFF0A4423), size: 20),
+          const SizedBox(width: 6),
+        ],
+        Expanded(
+          child: Text("$label: $value", style: const TextStyle(fontSize: 14)),
+        ),
+      ],
     );
   }
 
@@ -388,6 +471,10 @@ class _OwnerHomePageState extends State<OwnerHomePage>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Food added successfully")),
           );
+        } else {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("Failed to add food")));
         }
       });
     } else if (ownerHousings.isNotEmpty) {
@@ -401,17 +488,21 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         required bool hasKitchen,
         required String type,
         required String additionalInfo,
+        required int availability,
+        required int availRoom,
       }) async {
         final body = {
           "name": name,
           "housing_id": housingId.toString(),
           "facility_pic": facilityPic,
           "price": price,
-          "has_ac": hasAc,
-          "has_cr": hasCr,
-          "has_kitchen": hasKitchen,
+          "has_ac": hasAc ? 1 : 0,
+          "has_cr": hasCr ? 1 : 0,
+          "has_kitchen": hasKitchen ? 1 : 0,
           "type": type,
           "additional_info": additionalInfo,
+          "availability": availability,
+          "avail_room": availRoom,
         };
         final res = await http.post(
           Uri.parse("https://iskort-public-web.onrender.com/api/facility"),
@@ -422,6 +513,10 @@ class _OwnerHomePageState extends State<OwnerHomePage>
           await _reloadProducts();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Facility added successfully")),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to add facility")),
           );
         }
       });
@@ -586,58 +681,60 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 if (user['role'] == 'owner')
-                                  ElevatedButton.icon(
-                                    onPressed: _addProduct,
-                                    icon: const Icon(
-                                      Icons.add,
-                                      color: Colors.white,
-                                    ),
-                                    label: const Text(
-                                      "Add Product",
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF0A4423),
-                                    ),
-                                  ),
-                                const SizedBox(height: 10),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      "Sort Products",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                  Row(
+                                    children: [
+                                      ElevatedButton.icon(
+                                        onPressed: _addProduct,
+                                        icon: const Icon(
+                                          Icons.add,
+                                          color: Colors.white,
+                                        ),
+                                        label: const Text(
+                                          "Add Product",
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF0A4423,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                    DropdownButton<SortMode>(
-                                      value: sortMode,
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: SortMode.classificationName,
-                                          child: Text("By Category (A-Z)"),
+                                      const Spacer(), // pushes the dropdown to the right
+                                      SizedBox(
+                                        width:
+                                            200, // optional fixed width for dropdown
+                                        child: DropdownButton<SortMode>(
+                                          isExpanded: true,
+                                          value: sortMode,
+                                          items: const [
+                                            DropdownMenuItem(
+                                              value:
+                                                  SortMode.classificationName,
+                                              child: Text("By Category (A-Z)"),
+                                            ),
+                                            DropdownMenuItem(
+                                              value:
+                                                  SortMode.classificationPrice,
+                                              child: Text(
+                                                "By Category (Price)",
+                                              ),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: SortMode.globalPrice,
+                                              child: Text("All by Price"),
+                                            ),
+                                          ],
+                                          onChanged: (mode) {
+                                            if (mode == null) return;
+                                            setState(() {
+                                              sortMode = mode;
+                                              sortProducts();
+                                            });
+                                          },
                                         ),
-                                        DropdownMenuItem(
-                                          value: SortMode.classificationPrice,
-                                          child: Text("By Category (Price)"),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: SortMode.globalPrice,
-                                          child: Text("All by Price"),
-                                        ),
-                                      ],
-                                      onChanged: (mode) {
-                                        if (mode == null) return;
-                                        setState(() {
-                                          sortMode = mode;
-                                          sortProducts();
-                                        });
-                                      },
-                                    ),
-                                  ],
-                                ),
+                                      ),
+                                    ],
+                                  ),
                                 const SizedBox(height: 10),
                                 Expanded(
                                   child:
@@ -919,41 +1016,9 @@ class _OwnerHomePageState extends State<OwnerHomePage>
                                   ],
                                 ),
 
-                                const SizedBox(height: 15),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    ...List.generate(5, (index) {
-                                      int star = 5 - index;
-                                      int count = 0;
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 2,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Text(
-                                              "$star 🌻",
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: LinearProgressIndicator(
-                                                value: count / 10,
-                                                color: Colors.yellow[700],
-                                                backgroundColor:
-                                                    Colors.grey[300],
-                                                minHeight: 8,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(count.toString()),
-                                          ],
-                                        ),
-                                      );
-                                    }),
                                     const SizedBox(height: 10),
                                     Row(
                                       children: [
