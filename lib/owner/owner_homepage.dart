@@ -155,6 +155,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         "classification": item['classification'],
         "price": item['price'],
         "food_pic": item['food_pic'],
+        "availability": item['availability'], 
       }),
     );
   }
@@ -390,6 +391,8 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       );
       details.add(const SizedBox(height: 6));
       details.add(_detailRow(Icons.attach_money, "Price", "₱${item['price']}"));
+      details.add(_detailRow(Icons.check_circle, "Availability",
+      item['availability'] == 1 ? "Available" : "Not Available"));
     } else {
       details.add(_detailRow(Icons.room_preferences, "Type", item['type']));
       details.add(const SizedBox(height: 6));
@@ -420,6 +423,11 @@ class _OwnerHomePageState extends State<OwnerHomePage>
       );
       details.add(const SizedBox(height: 6));
       // If no icon exists, just show label
+      details.add(_detailRow(Icons.check_circle, "Availability",
+      item['availability'] == 1 ? "Available" : "Not Available"));
+      details.add(const SizedBox(height: 6));
+      details.add(_detailRow(Icons.meeting_room, "Available Rooms",
+          item['avail_room']?.toString() ?? "0"));
       details.add(
         _detailRow(null, "Additional Info", item['additional_info'] ?? ''),
       );
@@ -445,83 +453,90 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   }
 
   // Add Product button logic (simplified: first eatery or housing)
-  void _addProduct() {
-    if (ownerEateries.isNotEmpty) {
-      final eateryId = ownerEateries.first['eatery_id'];
-      openAddFoodDialog(context, ({
-        required String food_pic,
-        required String name,
-        required String classification,
-        required String price,
-      }) async {
-        final body = {
-          "name": name,
-          "eatery_id": eateryId.toString(),
-          "classification": classification,
-          "price": price,
-          "food_pic": food_pic,
-        };
-        final res = await http.post(
-          Uri.parse("https://iskort-public-web.onrender.com/api/food"),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode(body),
+void _addProduct() {
+  if (ownerEateries.isNotEmpty) {
+    final eateryId = ownerEateries.first['eatery_id'];
+    openAddFoodDialog(context, ({
+      required String food_pic,
+      required String name,
+      required String classification,
+      required String price,
+      required int availability,
+    }) async {
+      final body = {
+        "name": name,
+        "eatery_id": eateryId.toString(),
+        "classification": classification,
+        "price": price,
+        "food_pic": food_pic,
+        "availability": availability,
+      };
+
+      print(jsonEncode(body)); 
+      final res = await http.post(
+        Uri.parse("https://iskort-public-web.onrender.com/api/food"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      );
+      if (res.statusCode == 200) {
+        await _reloadProducts();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Food added successfully")),
         );
-        if (res.statusCode == 200) {
-          await _reloadProducts();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Food added successfully")),
-          );
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Failed to add food")));
-        }
-      });
-    } else if (ownerHousings.isNotEmpty) {
-      final housingId = ownerHousings.first['housing_id'];
-      openAddFacilityDialog(context, ({
-        required String name,
-        required String facilityPic,
-        required String price,
-        required bool hasAc,
-        required bool hasCr,
-        required bool hasKitchen,
-        required String type,
-        required String additionalInfo,
-        required int availability,
-        required int availRoom,
-      }) async {
-        final body = {
-          "name": name,
-          "housing_id": housingId.toString(),
-          "facility_pic": facilityPic,
-          "price": price,
-          "has_ac": hasAc ? 1 : 0,
-          "has_cr": hasCr ? 1 : 0,
-          "has_kitchen": hasKitchen ? 1 : 0,
-          "type": type,
-          "additional_info": additionalInfo,
-          "availability": availability,
-          "avail_room": availRoom,
-        };
-        final res = await http.post(
-          Uri.parse("https://iskort-public-web.onrender.com/api/facility"),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode(body),
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to add food")),
         );
-        if (res.statusCode == 200) {
-          await _reloadProducts();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Facility added successfully")),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to add facility")),
-          );
-        }
-      });
-    }
+      }
+    });
+  } else if (ownerHousings.isNotEmpty) {
+    final housingId = ownerHousings.first['housing_id'];
+    openAddFacilityDialog(context, ({
+      required String name,
+      required String facilityPic,
+      required String price,
+      required bool hasAc,
+      required bool hasCr,
+      required bool hasKitchen,
+      required String type,
+      required String additionalInfo,
+      required int availability, 
+      required int availRoom,    
+    }) async {
+      final body = {
+        "name": name,
+        "housing_id": housingId.toString(),
+        "facility_pic": facilityPic,
+        "price": price,
+        "has_ac": hasAc ? 1 : 0,
+        "has_cr": hasCr ? 1 : 0,
+        "has_kitchen": hasKitchen ? 1 : 0,
+        "type": type,
+        "additional_info": additionalInfo,
+        "availability": availability,
+        "avail_room": availRoom,     
+      };
+
+      print(jsonEncode(body)); 
+
+      final res = await http.post(
+        Uri.parse("https://iskort-public-web.onrender.com/api/facility"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      );
+      if (res.statusCode == 200) {
+        await _reloadProducts();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Facility added successfully")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to add facility")),
+        );
+      }
+    });
   }
+}
 
   // Computed sorted reviews based on dropdown selection
   List<Map<String, dynamic>> get sortedReviews {

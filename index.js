@@ -1,49 +1,44 @@
+console.log("✅ Using unified yehey /api/admin/register route");
+// ===== Imports & Config =====
 const dotenv = require('dotenv');
-dotenv.config({ path: __dirname + '/.env' });  // force load from root
-console.log("EMAIL_FROM raw:", process.env.EMAIL_FROM);
+dotenv.config({ path: __dirname + '/.env' });
 
 const express = require('express');
 const mysql = require('mysql2');
-
 const sgMail = require('@sendgrid/mail');
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-console.log("SENDGRID KEY EXISTS:", process.env.SENDGRID_API_KEY ? "YES" : "NO");
-console.log("EMAIL_FROM:", process.env.EMAIL_FROM);
-
 const axios = require('axios');
-
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
+const crypto = require('crypto');
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+console.log("SENDGRID KEY EXISTS:", process.env.SENDGRID_API_KEY ? "YES" : "NO");
+console.log("EMAIL_FROM:", process.env.EMAIL_FROM);
 
 const app = express();
-
 app.use(cors());
 app.use(bodyParser.json());
 
-// Serve static images
+// Static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Multer setup for file uploads
+// Multer setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + path.extname(file.originalname)),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
 });
 const upload = multer({ storage });
 
-// MySQL connection (Railway)
+// ===== MySQL connection (Railway) =====
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-  ssl: {
-    // Railway requires SSL, but self-signed certs need this flag
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false }
 });
 
 db.connect((err) => {
@@ -53,6 +48,34 @@ db.connect((err) => {
     console.log('Connected to Railway MySQL successfully!');
   }
 });
+
+// ===== Notification Helpers =====
+const sendEmail = async ({ to, subject, html }) => {
+  const msg = { to, from: process.env.EMAIL_FROM, subject, html };
+  try {
+    await sgMail.send(msg);
+    console.log('Email sent to', to, subject);
+  } catch (err) {
+    console.error('Error sending email:', err);
+  }
+};
+
+const sendSMS = async ({ number, message, sendername = "Iskort" }) => {
+  if (!number) return;
+  try {
+    const res = await axios.post('https://api.semaphore.co/api/v4/messages', null, {
+      params: {
+        apikey: process.env.SEMAPHORE_API_KEY,
+        number,
+        message,
+        sendername,
+      }
+    });
+    console.log('SMS sent to', number, res.data);
+  } catch (err) {
+    console.error('Error sending SMS:', err.response?.data || err.message);
+  }
+};
 
 // ===== BUSINESS VERIFICATION NOTIFICATIONS =====
 const sendBusinessVerificationEmail = async (email, ownerName, businessName, type) => {
@@ -74,100 +97,303 @@ const sendBusinessVerificationEmail = async (email, ownerName, businessName, typ
 
 // ===== REGISTER (All roles register under admin first) =====
 app.post('/api/admin/register', (req, res) => {
+  console.log('🔥 NEW REGISTER ENDPOINT HIT 🔥');
   const { name, email, password, role, phone_num, notif_preference } = req.body;
 
-  db.query('SELECT * FROM admin WHERE email = ?', [email], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length > 0)
-      return res.status(409).json({ success: false, message: 'Email already exists' });
-
-    db.query(
-      `INSERT INTO admin 
-       (name, email, password, role, is_verified, phone_num, notif_preference, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
-      [name, email, password, role, 0, phone_num, notif_preference || 'email'],
-      (err2) => {
-        if (err2) return res.status(500).json({ success: false, error: err2.message });
-        res.status(201).json({
-          success: true,
-          message: 'Registration successful. Waiting for admin verification.',
-        });
-      }
-    );
-  });
-});
-
-
-// ===== LOGIN (Auto Role Detection) =====
-app.post('/api/admin/login', (req, res) => {
-  const { email, password } = req.body;
+  if (!role) {
+    return res.status(400).json({ success: false, message: 'Role is required' });
+  }
 
   db.query(
-    'SELECT * FROM admin WHERE email = ? AND password = ?',
-    [email, password],
+    'SELECT admin_id FROM admin WHERE email = ?',
+    [email],
+    async (err, dup) => {
+      if (err) return res.status(500).json({ success: false, error: err.message });
+      if (dup.length > 0) {
+        return res.status(409).json({ success: false, message: 'Email already exists' });
+      }
+
+      const normalizedRole = role.toLowerCase();
+      const status =
+        normalizedRole === 'user' ? 'pending_email' : 'pending_admin';
+
+      db.query(
+        `INSERT INTO admin 
+         (name, email, password, role, phone_num, notif_preference, status, is_verified, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW())`,
+        [name, email, password, normalizedRole, phone_num, notif_preference || 'email', status],
+        async (err2, result) => {
+          if (err2) {
+            return res.status(500).json({ success: false, error: err2.message });
+          }
+
+          // USER → self email verification
+          if (normalizedRole === 'user') {
+            const token = require('crypto').randomBytes(32).toString('hex');
+            const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+            db.query(
+              `UPDATE admin 
+               SET email_verification_token = ?, email_verification_expires = ?
+               WHERE admin_id = ?`,
+              [token, expires, result.insertId]
+            );
+
+            const link = `${process.env.FRONTEND_URL}/verify-email/${token}`;
+
+            await sgMail.send({
+              to: email,
+              from: process.env.EMAIL_FROM,
+              subject: 'Verify your Iskort account',
+              html: `<p>Hi ${name},</p>
+                     <p>Click <a href="${link}">here</a> to verify your account.</p>
+                     <p>This link expires in 24 hours.</p>`
+            });
+
+            console.log('REGISTER FLOW → email_verification');
+            return res.json({
+              success: true,
+              flow: 'email_verification'
+            });
+          }
+
+          // OWNER / ADMIN → admin approval
+          console.log('REGISTER FLOW → admin_approval');
+          return res.json({
+            success: true,
+            flow: 'admin_approval'
+          });
+        }
+      );
+    }
+  );
+});
+
+// Email token for users
+app.get('/api/admin/verify-email/:token', (req, res) => {
+  const { token } = req.params;
+
+  db.query(
+    `SELECT * FROM admin 
+     WHERE email_verification_token = ?
+     AND email_verification_expires > NOW()
+     AND role = 'user'`,
+    [token],
     (err, results) => {
-      if (err) 
-        return res.status(500).json({ success: false, error: err.message });
+      if (err) return res.status(500).send('Server error');
+      if (results.length === 0) {
+        return res.status(400).send('Invalid or expired verification link.');
+      }
 
-      if (results.length === 0)
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      const u = results[0];
 
-      const user = results[0];
+      db.query(
+        `UPDATE admin 
+         SET is_verified = 1,
+             status = 'verified',
+             email_verification_token = NULL,
+             email_verification_expires = NULL
+         WHERE admin_id = ?`,
+        [u.admin_id],
+        (err2) => {
+          if (err2) return res.status(500).send('Verification failed');
 
-      if (!user.is_verified)
-        return res.status(403).json({
-          success: false,
-          message: 'Your account is not verified yet by admin.',
-        });
-
-      return res.json({
-        success: true,
-        message: 'Login successful',
-        user: {
-          admin_id: user.admin_id,
-          name: user.name,
-          email: user.email,
-          role: user.role,       // IMPORTANT
-          phone_num: user.phone_num,
-        },
-      });
+          db.query(
+            `INSERT INTO user
+             (name, email, password, role, status, is_verified, notif_preference, created_at)
+             VALUES (?, ?, ?, 'user', 'verified', 1, ?, NOW())`,
+            [u.name, u.email, u.password, u.notif_preference],
+            (err3) => {
+              if (err3) return res.status(500).send('User creation failed');
+              res.send('Email verified. You may now log in.');
+            }
+          );
+        }
+      );
     }
   );
 });
 
 
-// ===== GET ALL USERS =====
+app.post('/api/admin/send-verification', (req, res) => {
+  const { email } = req.body;
+
+  db.query('SELECT * FROM admin WHERE email=? AND role="user"', [email], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const user = results[0];
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    db.query(
+      `UPDATE admin SET email_verification_token=?, email_verification_expires=? WHERE admin_id=?`,
+      [token, expires, user.admin_id],
+      async (err2) => {
+        if (err2) return res.status(500).json({ success: false, error: err2.message });
+
+        const link = `${process.env.FRONTEND_URL}/verify-email/${token}`;
+
+        await sendEmail({
+          to: email,
+          subject: 'Verify your Iskort account',
+          html: `<p>Hi ${user.name},</p>
+                 <p>Click <a href="${link}">this link</a> to verify your account. It expires in 24 hours.</p>`
+        });
+
+        res.json({ success: true, message: 'Verification email sent' });
+      }
+    );
+  });
+});
+
+// ===== Admin: Get all users for dashboard (no action buttons for user) =====
 app.get('/api/admin/users', (req, res) => {
   const query = `
-    SELECT admin_id AS id, name, email, phone_num, notif_preference,
-           COALESCE(role, 'admin') AS role,
-           COALESCE(status, 'pending') AS status,
-           COALESCE(is_verified, 0) AS is_verified,
-           created_at,
-           'admin' AS table_name
-    FROM admin
+    SELECT owner_id AS id, name, email, phone_num, notif_preference,
+           'owner' AS role, COALESCE(status, 'pending') AS status,
+           COALESCE(is_verified, 0) AS is_verified, created_at,
+           'owner' AS table_name
+    FROM owner
     UNION ALL
-    SELECT user_id AS id, name, email, phone_num, notif_preference,
-           COALESCE(role, 'user') AS role,
-           COALESCE(status, 'pending') AS status,
-           COALESCE(is_verified, 0) AS is_verified,
-           created_at,
+    SELECT user_id AS id, name, email, NULL AS phone_num, 'email' AS notif_preference,
+           'user' AS role, COALESCE(status, 'pending') AS status,
+           COALESCE(is_verified, 0) AS is_verified, created_at,
            'user' AS table_name
     FROM user
     UNION ALL
-    SELECT owner_id AS id, name, email, phone_num, notif_preference,
-           COALESCE(role, 'owner') AS role,
-           COALESCE(status, 'pending') AS status,
-           COALESCE(is_verified, 0) AS is_verified,
-           created_at,
-           'owner' AS table_name
-    FROM owner
+    SELECT admin_id AS id, name, email, phone_num, notif_preference,
+           COALESCE(role, 'admin') AS role, COALESCE(status, 'pending') AS status,
+           COALESCE(is_verified, 0) AS is_verified, created_at,
+           'admin' AS table_name
+    FROM admin
   `;
-
   db.query(query, (err, results) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, users: results });
   });
+});
+
+// ===== Admin: Verify Owner (send notifications per preference) =====
+app.put('/api/admin/verify/owner/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.query('SELECT * FROM admin WHERE admin_id = ? AND role = "owner"', [id], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (results.length === 0) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const owner = results[0];
+
+    db.query(
+      `UPDATE admin SET is_verified = 1, status = 'verified' WHERE admin_id = ?`,
+      [id],
+      (err2) => {
+        if (err2) return res.status(500).json({ success: false, error: err2.message });
+
+        // Copy to owner table
+        db.query(
+          `INSERT INTO owner (name, email, password, role, phone_num, notif_preference, status, is_verified, created_at)
+           VALUES (?, ?, ?, 'owner', ?, ?, 'verified', 1, NOW())`,
+          [owner.name, owner.email, owner.password, owner.phone_num, owner.notif_preference],
+          async (err3) => {
+            if (err3) return res.status(500).json({ success: false, error: err3.message });
+
+            // Send notifications
+            if (owner.notif_preference === 'email') {
+              await sendEmail({ to: owner.email, subject: 'Your Iskort Owner Account is Verified!', html: `<p>Hi ${owner.name},</p><p>Your owner account has been verified by the admin.</p>` });
+            } else if (owner.notif_preference === 'sms') {
+              await sendSMS({ number: owner.phone_num, message: 'Your owner account has been verified. You can now log in.' });
+            } else if (owner.notif_preference === 'both') {
+              await sendEmail({ to: owner.email, subject: 'Your Iskort Owner Account is Verified!', html: `<p>Hi ${owner.name},</p><p>Your owner account has been verified by the admin.</p>` });
+              await sendSMS({ number: owner.phone_num, message: 'Your owner account has been verified. You can now log in.' });
+            }
+
+            res.json({ success: true, message: 'Owner verified and notifications sent' });
+          }
+        );
+      }
+    );
+  });
+});
+
+// ===== Admin: Reject Owner (notify via email) =====
+app.delete('/api/admin/reject/owner/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.query('SELECT * FROM owner WHERE owner_id = ?', [id], async (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (results.length === 0) return res.status(404).json({ success: false, message: 'Owner not found' });
+
+    const owner = results[0];
+
+    db.query('DELETE FROM owner WHERE owner_id = ?', [id], async (err2) => {
+      if (err2) return res.status(500).json({ success: false, error: err2.message });
+
+      await sendEmail({
+        to: owner.email,
+        subject: 'Your Iskort Owner Registration',
+        html: `<p>Hi ${owner.name},</p><p>Your owner registration was rejected by the admin.</p>`
+      });
+
+      res.json({ success: true, message: 'Owner rejected, deleted, and email sent' });
+    });
+  });
+});
+
+// ===== Admin Login (optional, keep your existing if needed) =====
+app.post('/api/admin/login', (req, res) => {
+  const { email, password } = req.body;
+  db.query('SELECT * FROM admin WHERE email = ? AND password = ?', [email, password], (err, results) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    if (results.length === 0) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+    const admin = results[0];
+    if (!admin.is_verified) {
+      return res.status(403).json({ success: false, message: 'Your account is not verified yet by admin.' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      user: {
+        admin_id: admin.admin_id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        phone_num: admin.phone_num,
+      },
+    });
+  });
+});
+
+// ===== User Login (requires email verification) =====
+app.post('/api/user/login', (req, res) => {
+  const { email, password } = req.body;
+
+  db.query(
+    'SELECT * FROM user WHERE email = ? AND password = ?',
+    [email, password],
+    (err, results) => {
+      if (err) return res.status(500).json({ success: false, error: err.message });
+      if (results.length === 0) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+      const user = results[0];
+      if (!user.is_verified) {
+        return res.status(403).json({ success: false, message: 'Please verify your email to log in.' });
+      }
+
+      res.json({
+        success: true,
+        message: 'Login successful',
+        user: {
+          user_id: user.user_id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        }
+      });
+    }
+  );
 });
 
 // ===== SEND VERIFICATION SMS =====
@@ -191,146 +417,6 @@ const sendVerificationSMS = async (phoneNum, name) => {
   }
 };
 
-// ===== VERIFY ACCOUNT WITH EMAIL + SMS (Based on notif_preference) =====
-app.put('/api/admin/verify/:id', (req, res) => {
-  const { id } = req.params;
-
-  db.query(`UPDATE admin SET is_verified = TRUE, status = 'verified' WHERE admin_id = ?`, [id], (err) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-
-    db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err2, results) => {
-      if (err2) return res.status(500).json({ success: false, error: err2.message });
-      if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
-
-      const user = results[0];
-
-      // EMAIL FUNCTION (unchanged)
-      const sendVerificationEmail = async (email, name) => {
-        const msg = {
-          to: email,
-          from: process.env.EMAIL_FROM,
-          subject: 'Your Iskort Account is Verified!',
-          html: `<p>Hi ${name},</p><p>Your account has been successfully verified by the admin. You can now log in and start using Iskort!</p>`
-        };
-        try { await sgMail.send(msg); console.log('Verification email sent to', email); }
-        catch (err) { console.error('Error sending verification email:', err); }
-      };
-
-      // If USER or OWNER → copy to their table
-      if (user.role === 'owner' || user.role === 'user') {
-        const table = user.role;
-
-        db.query(
-          `INSERT INTO ${table} (name, email, password, role, phone_num, is_verified, status, notif_preference, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            user.name,
-            user.email,
-            user.password,
-            user.role,
-            user.phone_num,
-            1,
-            'verified',
-            user.notif_preference,
-            user.created_at
-          ],
-          async (err3) => {
-            if (err3) return res.status(500).json({ success: false, error: err3.message });
-
-            // 🔥 SEND NOTIFICATIONS BASED ON PREFERENCE
-            if (user.notif_preference === 'sms') {
-              await sendVerificationSMS(user.phone_num, user.name);
-            } else if (user.notif_preference === 'email') {
-              await sendVerificationEmail(user.email, user.name);
-            } else if (user.notif_preference === 'both') {
-              await sendVerificationEmail(user.email, user.name);
-              await sendVerificationSMS(user.phone_num, user.name);
-            }
-
-            return res.json({
-              success: true,
-              message: `${user.role} verified, copied, and notifications sent`
-            });
-          }
-        );
-      } else {
-        // ADMIN
-        (async () => {
-          if (user.notif_preference === 'sms') {
-            await sendVerificationSMS(user.phone_num, user.name);
-          } else if (user.notif_preference === 'email') {
-            await sendVerificationEmail(user.email, user.name);
-          } else if (user.notif_preference === 'both') {
-            await sendVerificationEmail(user.email, user.name);
-            await sendVerificationSMS(user.phone_num, user.name);
-          }
-
-          return res.json({
-            success: true,
-            message: `Admin verified and notifications sent`
-          });
-        })();
-      }
-    });
-  });
-});
-
-// ===== TEST EMAIL =====
-app.get('/api/test-email', async (req, res) => {
-  try {
-  const msg = {
-  to: process.env.EMAIL_FROM, // send to yourself for testing
-  from: process.env.EMAIL_FROM,
-  subject: 'Test Email from Iskort',
-  text: 'Hello! This is a test email from your Iskort backend.',
-  html: '<b>Hello! This is a test email from your Iskort backend.</b>',
-  };
-
-  await sgMail.send(msg);
-  console.log('Test email sent to', process.env.EMAIL_FROM);
-  res.json({ success: true, message: 'Test email sent' });
-
-  } catch (err) {
-  console.error('Test email error: ', err);
-  res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ===== REJECT ACCOUNT WITH EMAIL NOTIFICATION =====
-app.delete('/api/admin/reject/:id', (req, res) => {
-const { id } = req.params;
-
-
-db.query('SELECT * FROM admin WHERE admin_id = ?', [id], (err, results) => {
-if (err) return res.status(500).json({ success: false, error: err.message });
-if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
-
-
-    const user = results[0];
-
-    const sendRejectionEmail = async (email, name) => {
-    const msg = {
-    to: email,
-    from: process.env.EMAIL_FROM,
-    subject: 'Your Iskort Account Registration',
-    html: `<p>Hi ${name},</p><p>We’re sorry to inform you that your account registration has been rejected by the admin.</p>`
-    };
-    try { await sgMail.send(msg); console.log('Rejection email sent to', email); }
-    catch (err) { console.error('Error sending rejection email:', err); }
-    };
-
-
-    db.query('DELETE FROM admin WHERE admin_id = ?', [id], (err2) => {
-    if (err2) return res.status(500).json({ success: false, error: err2.message });
-
-
-    (async () => {
-      await sendRejectionEmail(user.email, user.name);
-        res.json({ success: true, message: `${user.role} rejected, deleted, and email sent` });
-        })();
-        });
-      });
-});
 
 // ===== EATERY ROUTE =====
 app.post('/api/eatery', (req, res) => {
@@ -821,9 +907,9 @@ app.delete('/api/admin/reject/housing/:id', (req, res) => {
 
 // ===== FOOD ROUTES =====
 app.post('/api/food', (req, res) => {
-  const { name, eatery_id, classification, price, food_pic } = req.body;
-  const sql = `INSERT INTO food (name, eatery_id, classification, price, food_pic) VALUES (?, ?, ?, ?, ?)`; 
-  db.query(sql, [name, eatery_id, classification, price, food_pic], (err, result) => {
+  const { name, eatery_id, classification, price, food_pic, availability } = req.body;
+  const sql = `INSERT INTO food (name, eatery_id, classification, price, food_pic, availability) VALUES (?, ?, ?, ?, ?, ?)`; 
+  db.query(sql, [name, eatery_id, classification, price, food_pic, availability], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, food_id: result.insertId });
   });
@@ -840,7 +926,7 @@ app.get('/api/food/:eatery_id', (req, res) => {
 
 app.put('/api/food/:food_id', (req, res) => {
   const { food_id } = req.params;
-  const { name, eatery_id, classification, price, food_pic } = req.body;
+  const { name, eatery_id, classification, price, food_pic, availability } = req.body;
 
   if (!eatery_id) {
     return res.status(400).json({ success: false, message: 'eatery_id is required' });
@@ -848,11 +934,11 @@ app.put('/api/food/:food_id', (req, res) => {
 
   const sql = `
     UPDATE food
-    SET name = ?, eatery_id = ?, classification = ?, price = ?, food_pic = ?
+    SET name = ?, eatery_id = ?, classification = ?, price = ?, food_pic = ?, availability = ?
     WHERE food_id = ?
   `;
 
-  db.query(sql, [name, eatery_id, classification, price, food_pic, food_id], (err, result) => {
+  db.query(sql, [name, eatery_id, classification, price, food_pic, availability, food_id], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Food not found' });
@@ -895,7 +981,6 @@ app.delete('/api/food/:food_id', (req, res) => {
 
 
 // ===== FACILITY ROUTES =====
-// Create facility
 app.post('/api/facility', (req, res) => {
   const {
     name,
@@ -906,15 +991,17 @@ app.post('/api/facility', (req, res) => {
     has_cr,
     type,
     has_kitchen,
-    additional_info
+    additional_info,
+    availability, avail_room
   } = req.body;
 
   const sql = `
     INSERT INTO facility 
-    (name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info, availability, avail_room)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
-  db.query(sql, [name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info], (err, result) => {
+
+  db.query(sql, [name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info, availability, avail_room], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, facility_id: result.insertId });
   });
@@ -942,15 +1029,17 @@ app.put('/api/facility/:facility_id', (req, res) => {
     has_cr,
     type,
     has_kitchen,
-    additional_info
+    additional_info, 
+    availability, 
+    avail_room
   } = req.body;
 
   const sql = `
     UPDATE facility
-    SET name=?, housing_id=?, facility_pic=?, price=?, has_ac=?, has_cr=?, type=?, has_kitchen=?, additional_info=?
+    SET name=?, housing_id=?, facility_pic=?, price=?, has_ac=?, has_cr=?, type=?, has_kitchen=?, additional_info=?, availability=?, avail_room=?
     WHERE facility_id=?
   `;
-  db.query(sql, [name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info, facility_id], (err, result) => {
+  db.query(sql, [name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info, availability, avail_room, facility_id], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Facility not found' });
     res.json({ success: true, message: 'Facility updated successfully' });
@@ -1165,11 +1254,26 @@ app.get('/api/housing_reviews/:housingId', (req, res) => {
   });
 });
 
-// ===== BASE ROUTE =====
+// ===== Test Email =====
+app.get('/api/test-email', async (req, res) => {
+  try {
+    await sendEmail({
+      to: process.env.EMAIL_FROM,
+      subject: 'Test Email from Iskort',
+      html: '<b>Hello! This is a test email from your Iskort backend.</b>'
+    });
+    res.json({ success: true, message: 'Test email sent' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ===== Base Route =====
 app.get('/', (req, res) => {
   res.send('Iskort API is live and ready for use!');
 });
 
+// ===== Listen =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
