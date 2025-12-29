@@ -189,7 +189,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         "has_cr": item['has_cr'],
         "has_kitchen": item['has_kitchen'],
         "type": item['type'],
-        "availability": item['availability'],
+        "availability": item['availability'] == true ? 1 : 0,
         "avail_room": item['avail_room'],
         "additional_info": item['additional_info'],
       }),
