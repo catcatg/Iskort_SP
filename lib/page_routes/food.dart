@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:iskort/page_routes/map_route.dart';
 import 'package:iskort/page_routes/view_estab_profile.dart';
+import 'package:flutter/services.dart'; // <-- needed for input formatters
 
 class FoodPage extends StatefulWidget {
   const FoodPage({super.key});
@@ -103,27 +104,31 @@ class _FoodPageState extends State<FoodPage> {
 
   void applyFilters() {
     setState(() {
-      if (filterMode == "name") {
-        filteredFoods =
-            allFoods
-                .where(
-                  (f) =>
-                      f['name'].toLowerCase().contains(nameQuery.toLowerCase()),
-                )
-                .toList();
-      } else {
-        filteredFoods =
-            allFoods.where((food) {
-              final matchesTag =
-                  selectedTags.isEmpty ||
-                  selectedTags.contains(food['classification']);
+      filteredFoods =
+          allFoods.where((food) {
+            // Name, classification, or eatery name search
+            final searchMatch =
+                nameQuery.isEmpty ||
+                food['name'].toLowerCase().contains(nameQuery.toLowerCase()) ||
+                food['classification'].toLowerCase().contains(
+                  nameQuery.toLowerCase(),
+                ) ||
+                food['eateryName'].toLowerCase().contains(
+                  nameQuery.toLowerCase(),
+                );
 
-              final matchesBudget =
-                  maxBudget == null || food['price'] <= maxBudget!;
+            // Tags filter
+            final tagsMatch =
+                selectedTags.isEmpty ||
+                selectedTags.contains('All') || // "All" bypasses tag filtering
+                selectedTags.contains(food['classification']);
 
-              return matchesTag && matchesBudget;
-            }).toList();
-      }
+            // Max budget filter
+            final budgetMatch =
+                maxBudget == null || food['price'] <= maxBudget!;
+
+            return searchMatch && tagsMatch && budgetMatch;
+          }).toList();
 
       _applySort();
     });
@@ -249,229 +254,270 @@ class _FoodPageState extends State<FoodPage> {
   bool get isTagModeActive => selectedTags.isNotEmpty;
   bool get isNameModeActive => nameQuery.isNotEmpty;
 
+  TextEditingController _searchController = TextEditingController();
+  bool tagsExpanded = false;
+
   Widget _buildSearchBars() {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Mode selector
+          // Row 1: Search bar + Tags button
           Row(
             children: [
-              Expanded(
-                child: RadioListTile<String>(
-                  title: const Text("Search by Name"),
-                  value: "name",
-                  visualDensity: VisualDensity.compact,
-                  contentPadding: EdgeInsets.zero,
-                  groupValue: filterMode,
-                  dense: true,
-                  onChanged: (val) {
-                    if (val == null) return;
-                    setState(() {
-                      filterMode = val;
-                      nameQuery = "";
-                      selectedTags.clear();
-                      maxBudget = null;
-                    });
-                    applyFilters();
-                  },
-                ),
+              Expanded(child: generalSearchBar()),
+              const SizedBox(width: 8),
+              tagsTrigger(),
+            ],
+          ),
+
+          // Expanded tags list
+          tagsList(),
+
+          // Display selected tags as chips
+          selectedTagsDisplay(),
+
+          const SizedBox(height: 12),
+
+          // Row 2: Max budget + sort
+          Row(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Amount ₱',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(width: 5),
+                  SizedBox(
+                    width: 120,
+                    height: 40,
+                    child: TextField(
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      style: const TextStyle(fontSize: 14),
+                      textAlignVertical: TextAlignVertical.center,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          borderSide: BorderSide(
+                            color: Color(0xFF0A4423),
+                            width: 1.5,
+                          ),
+                        ),
+                        hintText: 'Enter amount',
+                      ),
+                      onChanged: (val) {
+                        setState(() {
+                          maxBudget = double.tryParse(val);
+                          applyFilters();
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
-              Expanded(
-                child: RadioListTile<String>(
-                  title: const Text("Search by Preference"),
-                  value: "tags",
-                  groupValue: filterMode,
-                  dense: true,
-                  onChanged: (val) {
-                    if (val == null) return;
-                    setState(() {
-                      filterMode = val;
-                      nameQuery = "";
-                    });
-                    applyFilters();
-                  },
+
+              Spacer(),
+              Container(
+                width: 160, // fixed width
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: const Color(0xFF0A4423),
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: sortOrder,
+                    isExpanded: true, // now safe because width is fixed
+                    items: [
+                      DropdownMenuItem(
+                        value: "none",
+                        child: Text(
+                          "Sort by",
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: "low",
+                        child: Text(
+                          "Price: Low to High",
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: "high",
+                        child: Text(
+                          "Price: High to Low",
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        sortOrder = val!;
+                        _applySort();
+                      });
+                    },
+                  ),
                 ),
               ),
             ],
           ),
+          Divider(),
+        ],
+      ),
+    );
+  }
 
-          const SizedBox(height: 12),
+  Widget generalSearchBar() {
+    return Container(
+      height: 45,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFF0A4423), width: 1.5),
+      ),
+      child: TextField(
+        controller: _searchController,
+        decoration: const InputDecoration(
+          hintText: 'Search',
+          border: InputBorder.none,
+          suffixIcon: Icon(Icons.search, color: Color(0xFF0A4423)),
+          contentPadding: EdgeInsets.all(12),
+        ),
+        onChanged: (query) {
+          setState(() {
+            nameQuery = query;
+            applyFilters();
+          });
+        },
+      ),
+    );
+  }
 
-          // Search by name
-          if (filterMode == "name") ...[
-            Autocomplete<String>(
-              optionsBuilder: (textEditingValue) {
-                if (textEditingValue.text.isEmpty)
-                  return const Iterable<String>.empty();
-                return allFoods
-                    .map((f) => f['name'] as String)
-                    .where(
-                      (name) => name.toLowerCase().contains(
-                        textEditingValue.text.toLowerCase(),
-                      ),
-                    );
-              },
-              onSelected: (selection) {
-                setState(() {
-                  nameQuery = selection;
-                  applyFilters();
-                });
-              },
-              fieldViewBuilder: (
-                context,
-                controller,
-                focusNode,
-                onFieldSubmitted,
-              ) {
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onChanged: (val) {
-                    setState(() {
-                      nameQuery = val;
-                      applyFilters();
-                    });
-                  },
-                  decoration: const InputDecoration(
-                    labelText: "Search Food by Name",
-                    border: OutlineInputBorder(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight, // dropdown on the right side
-              child: DropdownButton<String>(
-                value: sortOrder,
-                items: const [
-                  DropdownMenuItem(value: "none", child: Text("Sort by")),
-                  DropdownMenuItem(
-                    value: "low",
-                    child: Text("Price: Low to High"),
-                  ),
-                  DropdownMenuItem(
-                    value: "high",
-                    child: Text("Price: High to Low"),
-                  ),
-                ],
-                onChanged: (val) {
-                  setState(() {
-                    sortOrder = val!;
-                    _applySort();
-                  });
-                },
+  Widget tagsTrigger() {
+    return GestureDetector(
+      onTap: () => setState(() => tagsExpanded = !tagsExpanded),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: const Color(0xFF0A4423), width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Tags",
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF0A4423),
               ),
             ),
+            const SizedBox(width: 4),
+            Icon(
+              tagsExpanded ? Icons.expand_less : Icons.expand_more,
+              size: 20,
+              color: const Color(0xFF0A4423),
+            ),
           ],
+        ),
+      ),
+    );
+  }
 
-          // Search by preference
-          if (filterMode == "tags") ...[
-            Autocomplete<String>(
-              optionsBuilder: (textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return const Iterable<String>.empty();
-                }
-                return availableTags.where(
-                  (tag) => tag.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase(),
-                  ),
-                );
-              },
-              onSelected: (selection) {
-                setState(() {
-                  if (!selectedTags.contains(selection)) {
-                    selectedTags.add(selection);
+  Widget tagsList() {
+    if (!tagsExpanded) return const SizedBox.shrink();
+
+    final displayTags = ['All', ...availableTags];
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF0A4423), width: 1),
+      ),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children:
+            displayTags.map((tag) {
+              final isSelected = selectedTags.contains(tag);
+              return FilterChip(
+                label: Text(tag),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (tag == 'All') {
+                      selectedTags = ['All'];
+                    } else {
+                      selectedTags.remove('All');
+                      if (isSelected) {
+                        selectedTags.remove(tag);
+                      } else {
+                        selectedTags.add(tag);
+                      }
+                    }
                     applyFilters();
-                  }
+                  });
+                },
+                selectedColor: const Color(0xFF0A4423),
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : Colors.black,
+                  fontWeight: FontWeight.w500,
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
 
-                  // clear input field
-                  _tagAutocompleteController?.clear();
-                });
-              },
-              fieldViewBuilder: (
-                context,
-                controller,
-                focusNode,
-                onFieldSubmitted,
-              ) {
-                _tagAutocompleteController = controller;
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  decoration: const InputDecoration(
-                    labelText:
-                        "Search Food by Type (e.g., Alcoholic Drinks, Snacks, Desserts, etc.)",
-                    border: OutlineInputBorder(),
-                  ),
-                );
-              },
-            ),
+  Widget selectedTagsDisplay() {
+    // Don't show anything if no tags selected or "All" is selected
+    if (selectedTags.isEmpty || selectedTags.contains('All'))
+      return const SizedBox.shrink();
 
-            Wrap(
-              spacing: 6,
-              children:
-                  selectedTags
-                      .map(
-                        (tag) => Chip(
-                          label: Text(tag),
-                          onDeleted: () {
-                            setState(() {
-                              selectedTags.remove(tag);
-                              applyFilters();
-                            });
-                          },
-                        ),
-                      )
-                      .toList(),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Text('Max Budget: ₱'),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 120,
-                  child: TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                      hintText: 'Enter amount',
-                    ),
-                    onChanged: (val) {
-                      maxBudget = double.tryParse(val);
-                      applyFilters();
-                    },
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children:
+            selectedTags.map((tag) {
+              return Chip(
+                label: Text(
+                  tag,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const Spacer(), // pushes dropdown to the opposite side
-                DropdownButton<String>(
-                  value: sortOrder,
-                  items: const [
-                    DropdownMenuItem(value: "none", child: Text("Sort by")),
-                    DropdownMenuItem(
-                      value: "low",
-                      child: Text("Price: Low to High"),
-                    ),
-                    DropdownMenuItem(
-                      value: "high",
-                      child: Text("Price: High to Low"),
-                    ),
-                  ],
-                  onChanged: (val) {
-                    setState(() {
-                      sortOrder = val!;
-                      _applySort();
-                    });
-                  },
-                ),
-              ],
-            ),
-          ],
-        ],
+                backgroundColor: const Color(0xFF0A4423),
+                deleteIconColor: Colors.white, // <-- make "×" white
+                onDeleted: () {
+                  setState(() {
+                    selectedTags.remove(tag);
+                    applyFilters();
+                  });
+                },
+              );
+            }).toList(),
       ),
     );
   }
@@ -539,14 +585,17 @@ class _FoodCard extends StatelessWidget {
                   const SizedBox(height: 4),
 
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        food['name'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      // Food name (can wrap)
+                      Expanded(
+                        child: Text(
+                          food['name'],
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
+                      const SizedBox(width: 8),
+                      // Price container stays at top
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -563,10 +612,16 @@ class _FoodCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  SizedBox(height: 15),
                   Text(
                     food['eateryName'],
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Color(0xFF0A4423),
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Spacer(),
                   Text(
