@@ -907,13 +907,47 @@ app.delete('/api/admin/reject/housing/:id', (req, res) => {
 
 // ===== FOOD ROUTES =====
 app.post('/api/food', (req, res) => {
-  const { name, eatery_id, classification, price, food_pic, availability } = req.body;
-  const sql = `INSERT INTO food (name, eatery_id, classification, price, food_pic, availability) VALUES (?, ?, ?, ?, ?, ?)`; 
-  db.query(sql, [name, eatery_id, classification, price, food_pic, availability], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, food_id: result.insertId });
-  });
+  const {
+    name,
+    eatery_id,
+    classification,
+    price,
+    food_pic,
+    availability
+  } = req.body;
+
+  if (!name || !eatery_id || !classification || !price) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields"
+    });
+  }
+
+  const sql = `
+    INSERT INTO food
+    (name, eatery_id, classification, price, food_pic, availability)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
+
+  db.query(
+    sql,
+    [name, eatery_id, classification, price, food_pic, availability],
+    (err, result) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          error: err.message
+        });
+      }
+
+      res.status(201).json({
+        success: true,
+        food_id: result.insertId
+      });
+    }
+  );
 });
+
 
 app.get('/api/food/:eatery_id', (req, res) => {
   const { eatery_id } = req.params;
@@ -926,26 +960,57 @@ app.get('/api/food/:eatery_id', (req, res) => {
 
 app.put('/api/food/:food_id', (req, res) => {
   const { food_id } = req.params;
-  const { name, eatery_id, classification, price, food_pic, availability } = req.body;
+  const {
+    name,
+    classification,
+    price,
+    food_pic,
+    availability
+  } = req.body;
 
-  if (!eatery_id) {
-    return res.status(400).json({ success: false, message: 'eatery_id is required' });
+  if (!name || !classification || !price) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields"
+    });
   }
 
   const sql = `
     UPDATE food
-    SET name = ?, eatery_id = ?, classification = ?, price = ?, food_pic = ?, availability = ?
+    SET name = ?,
+        classification = ?,
+        price = ?,
+        food_pic = ?,
+        availability = ?
     WHERE food_id = ?
   `;
 
-  db.query(sql, [name, eatery_id, classification, price, food_pic, availability, food_id], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: 'Food not found' });
+  db.query(
+    sql,
+    [name, classification, price, food_pic, availability, food_id],
+    (err, result) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          error: err.message
+        });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Food not found"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Food updated successfully"
+      });
     }
-    res.json({ success: true, message: 'Food updated successfully' });
-  });
+  );
 });
+
 
 // Delete food
 app.delete('/api/food/:food_id', (req, res) => {
@@ -982,7 +1047,7 @@ app.delete('/api/food/:food_id', (req, res) => {
 
 // ===== FACILITY ROUTES =====
 app.post('/api/facility', (req, res) => {
-  const {
+  let {
     name,
     housing_id,
     facility_pic,
@@ -992,20 +1057,59 @@ app.post('/api/facility', (req, res) => {
     type,
     has_kitchen,
     additional_info,
-    availability, avail_room
+    availability,
+    avail_room
   } = req.body;
 
+  if (!name || !housing_id || !facility_pic || !price || !type) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields"
+    });
+  }
+
+  // enforce business rule
+  if (availability !== 1 || type !== "Shared") {
+    avail_room = 0;
+  }
+
   const sql = `
-    INSERT INTO facility 
+    INSERT INTO facility
     (name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info, availability, avail_room)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  db.query(sql, [name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info, availability, avail_room], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, facility_id: result.insertId });
-  });
+  db.query(
+    sql,
+    [
+      name,
+      housing_id,
+      facility_pic,
+      price,
+      has_ac,
+      has_cr,
+      type,
+      has_kitchen,
+      additional_info,
+      availability,
+      avail_room
+    ],
+    (err, result) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          error: err.message
+        });
+      }
+
+      res.status(201).json({
+        success: true,
+        facility_id: result.insertId
+      });
+    }
+  );
 });
+
 
 // Get facilities by housing_id
 app.get('/api/facility/:housing_id', (req, res) => {
@@ -1020,31 +1124,85 @@ app.get('/api/facility/:housing_id', (req, res) => {
 // Update facility
 app.put('/api/facility/:facility_id', (req, res) => {
   const { facility_id } = req.params;
-  const {
+
+  let {
     name,
-    housing_id,
     facility_pic,
     price,
     has_ac,
     has_cr,
     type,
     has_kitchen,
-    additional_info, 
-    availability, 
+    additional_info,
+    availability,
     avail_room
   } = req.body;
 
+  if (!name || !facility_pic || !price || !type) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields"
+    });
+  }
+
+  // enforce business rule
+  if (availability !== 1 || type !== "Shared") {
+    avail_room = 0;
+  }
+
   const sql = `
     UPDATE facility
-    SET name=?, housing_id=?, facility_pic=?, price=?, has_ac=?, has_cr=?, type=?, has_kitchen=?, additional_info=?, availability=?, avail_room=?
-    WHERE facility_id=?
+    SET name = ?,
+        facility_pic = ?,
+        price = ?,
+        has_ac = ?,
+        has_cr = ?,
+        type = ?,
+        has_kitchen = ?,
+        additional_info = ?,
+        availability = ?,
+        avail_room = ?
+    WHERE facility_id = ?
   `;
-  db.query(sql, [name, housing_id, facility_pic, price, has_ac, has_cr, type, has_kitchen, additional_info, availability, avail_room, facility_id], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Facility not found' });
-    res.json({ success: true, message: 'Facility updated successfully' });
-  });
+
+  db.query(
+    sql,
+    [
+      name,
+      facility_pic,
+      price,
+      has_ac,
+      has_cr,
+      type,
+      has_kitchen,
+      additional_info,
+      availability,
+      avail_room,
+      facility_id
+    ],
+    (err, result) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          error: err.message
+        });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Facility not found"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Facility updated successfully"
+      });
+    }
+  );
 });
+
 
 // Delete facility
 app.delete('/api/facility/:facility_id', (req, res) => {
