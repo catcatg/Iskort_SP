@@ -146,6 +146,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   Future<void> _updateFoodItem(Map<String, dynamic> item) async {
     final foodId = item['food_id'];
     final eateryId = item['eatery_id'];
+
     await http.put(
       Uri.parse("https://iskort-public-web.onrender.com/api/food/$foodId"),
       headers: {"Content-Type": "application/json"},
@@ -155,7 +156,8 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         "classification": item['classification'],
         "price": item['price'],
         "food_pic": item['food_pic'],
-        "availability": item['availability'], 
+      
+        "availability": (item['availability'] == true || item['availability'] == 1) ? 1 : 0,
       }),
     );
   }
@@ -177,6 +179,7 @@ class _OwnerHomePageState extends State<OwnerHomePage>
   Future<void> _updateFacilityItem(Map<String, dynamic> item) async {
     final facId = item['facility_id'];
     final housingId = item['housing_id'];
+
     await http.put(
       Uri.parse("https://iskort-public-web.onrender.com/api/facility/$facId"),
       headers: {"Content-Type": "application/json"},
@@ -185,11 +188,13 @@ class _OwnerHomePageState extends State<OwnerHomePage>
         "housing_id": housingId.toString(),
         "facility_pic": item['facility_pic'],
         "price": item['price'],
-        "has_ac": item['has_ac'],
-        "has_cr": item['has_cr'],
-        "has_kitchen": item['has_kitchen'],
+       
+        "has_ac": (item['has_ac'] == true || item['has_ac'] == 1) ? 1 : 0,
+        "has_cr": (item['has_cr'] == true || item['has_cr'] == 1) ? 1 : 0,
+        "has_kitchen": (item['has_kitchen'] == true || item['has_kitchen'] == 1) ? 1 : 0,
         "type": item['type'],
-        "availability": item['availability'] == true ? 1 : 0,
+        
+        "availability": (item['availability'] == true || item['availability'] == 1) ? 1 : 0,
         "avail_room": item['avail_room'],
         "additional_info": item['additional_info'],
       }),
@@ -386,51 +391,21 @@ class _OwnerHomePageState extends State<OwnerHomePage>
     final details = <Widget>[];
 
     if (item['businessType'] == 'Eatery') {
-      details.add(
-        _detailRow(Icons.category, "Classification", item['classification']),
-      );
-      details.add(const SizedBox(height: 6));
+      details.add(_detailRow(Icons.category, "Classification", item['classification']));
       details.add(_detailRow(Icons.attach_money, "Price", "₱${item['price']}"));
       details.add(_detailRow(Icons.check_circle, "Availability",
-      item['availability'] == 1 ? "Available" : "Not Available"));
+          (item['availability'] == 1) ? "Available" : "Not Available"));
     } else {
       details.add(_detailRow(Icons.room_preferences, "Type", item['type']));
-      details.add(const SizedBox(height: 6));
       details.add(_detailRow(Icons.money, "Price", "₱${item['price']}"));
-      details.add(const SizedBox(height: 6));
-      details.add(
-        _detailRow(
-          Icons.ac_unit,
-          "Aircon",
-          item['has_ac'] == true ? 'Yes' : 'No',
-        ),
-      );
-      details.add(const SizedBox(height: 6));
-      details.add(
-        _detailRow(
-          Icons.bathtub,
-          "Comfort Room",
-          item['has_cr'] == true ? 'Yes' : 'No',
-        ),
-      );
-      details.add(const SizedBox(height: 6));
-      details.add(
-        _detailRow(
-          Icons.kitchen,
-          "Kitchen",
-          item['has_kitchen'] == true ? 'Yes' : 'No',
-        ),
-      );
-      details.add(const SizedBox(height: 6));
-      // If no icon exists, just show label
+      details.add(_detailRow(Icons.ac_unit, "Aircon", item['has_ac'] == 1 ? 'Yes' : 'No'));
+      details.add(_detailRow(Icons.bathtub, "Comfort Room", item['has_cr'] == 1 ? 'Yes' : 'No'));
+      details.add(_detailRow(Icons.kitchen, "Kitchen", item['has_kitchen'] == 1 ? 'Yes' : 'No'));
       details.add(_detailRow(Icons.check_circle, "Availability",
-      item['availability'] == 1 ? "Available" : "Not Available"));
-      details.add(const SizedBox(height: 6));
+          (item['availability'] == 1) ? "Available" : "Not Available"));
       details.add(_detailRow(Icons.meeting_room, "Available Rooms",
           item['avail_room']?.toString() ?? "0"));
-      details.add(
-        _detailRow(null, "Additional Info", item['additional_info'] ?? ''),
-      );
+      details.add(_detailRow(null, "Additional Info", item['additional_info'] ?? ''));
     }
 
     return details;
@@ -1359,8 +1334,8 @@ void _addProduct() {
 
     return isOpen ? "Open" : "Closed";
   }
-
+/*
   // Stub methods for About tab actions
   void _editBioDialog() {}
-  void _openTagEditor() {}
+  void _openTagEditor() {}*/
 }

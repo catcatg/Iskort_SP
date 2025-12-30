@@ -739,7 +739,10 @@ app.put('/api/housing/:housing_id', (req, res) => {
         "curfew",
         "status",
         "housing_photo",
-        "price_range"
+        "price_range",
+        "has_ac",     
+        "has_cr",       
+        "has_kitchen"   
       ];
 
       const fields = [];

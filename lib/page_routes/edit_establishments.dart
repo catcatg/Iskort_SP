@@ -509,8 +509,7 @@ Future<void> openAddFacilityDialog(
   );
 }
 
-
-void openEditFoodDialog(
+Future<void> openEditFoodDialog(
   BuildContext context,
   Map<String, dynamic> item,
   Future<void> Function(Map<String, dynamic>) updateFoodItem,
@@ -521,18 +520,9 @@ void openEditFoodDialog(
   final pic = TextEditingController(text: item['food_pic']);
 
   final classes = [
-    "Pork",
-    "Chicken",
-    "Beef",
-    "Vegetables",
-    "Seafood",
-    "Alcoholic Drinks",
-    "Coffee Drinks",
-    "Non-Coffee Drinks",
-    "Desserts",
-    "Snacks",
-    "Meal Set",
-    "Vegetarian",
+    "Pork","Chicken","Beef","Vegetables","Seafood",
+    "Alcoholic Drinks","Coffee Drinks","Non-Coffee Drinks",
+    "Desserts","Snacks","Meal Set","Vegetarian",
   ];
 
   String? classification =
@@ -541,9 +531,9 @@ void openEditFoodDialog(
     text: !classes.contains(item['classification']) ? item['classification'] : "",
   );
   bool isOther = classification == "Other";
-  bool availability = item['availability'] == 1 || item['availability'] == true;
+  bool availability = item['availability'] == 1;
 
-  showDialog(
+  return showDialog<void>(
     context: context,
     builder: (context) {
       return StatefulBuilder(
@@ -560,20 +550,17 @@ void openEditFoodDialog(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  input(name, hint: "Food Name"),
+                  TextField(controller: name, decoration: const InputDecoration(labelText: "Food Name")),
                   const SizedBox(height: 10),
-                  input(price, hint: "Price"),
-
+                  TextField(controller: price, decoration: const InputDecoration(labelText: "Price")),
                   const SizedBox(height: 12),
+
                   Center(
                     child: Container(
                       constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
                       child: pic.text.isNotEmpty
                           ? Image.network(pic.text, fit: BoxFit.cover)
-                          : Container(
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.fastfood, size: 50),
-                            ),
+                          : Container(color: Colors.grey[200], child: const Icon(Icons.fastfood, size: 50)),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -652,17 +639,13 @@ void openEditFoodDialog(
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
-                  String finalClassification;
-                  if (isOther && otherController.text.isNotEmpty) {
-                    finalClassification = otherController.text.trim();
-                    finalClassification = finalClassification[0].toUpperCase() +
-                        finalClassification.substring(1);
-                  } else {
-                    finalClassification = classification ?? "Misc";
-                  }
+                  final finalClassification = isOther && otherController.text.isNotEmpty
+                      ? otherController.text.trim()
+                      : classification ?? "Misc";
 
                   final updatedItem = {
                     "food_id": item['food_id'],
+                    "eatery_id": item['eatery_id'],
                     "name": name.text.trim(),
                     "price": price.text.trim(),
                     "food_pic": pic.text.trim(),
@@ -696,100 +679,110 @@ Future<void> openEditFacilityDialog(
   final availRoomController =
       TextEditingController(text: item['avail_room']?.toString() ?? "0");
 
-  bool hasAc = item['has_ac'] == 1;
-  bool hasCr = item['has_cr'] == 1;
-  bool hasKitchen = item['has_kitchen'] == 1;
+  bool hasAc = item['has_ac'] == 1 || item['has_ac'] == true;
+  bool hasCr = item['has_cr'] == 1 || item['has_cr'] == true;
+  bool hasKitchen = item['has_kitchen'] == 1 || item['has_kitchen'] == true;
   String? type = item['type'];
-  bool availabilityBool = item['availability'] == 1;
+  bool availabilityBool = item['availability'] == 1 || item['availability'] == true;
 
-  await showDialog(
+  await showDialog<void>(
     context: context,
     builder: (context) {
-      return StatefulBuilder( 
+      return StatefulBuilder(
         builder: (context, setState) {
-          final bool enableAvailRoom =
-              availabilityBool && type == "Shared";
+          final enableAvailRoom = availabilityBool && type == "Shared";
 
           return AlertDialog(
-            title: const Text(
-              "Edit Facility",
-              style: TextStyle(
-                color: Color(0xFF0A4423),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            title: const Text("Edit Facility"),
             content: SingleChildScrollView(
               child: Column(
                 children: [
-                  TextField(
-                      controller: name,
-                      decoration: const InputDecoration(labelText: "Name")),
-                  TextField(
-                      controller: pic,
-                      decoration:
-                          const InputDecoration(labelText: "Facility Image URL")),
-                  TextField(
-                      controller: price,
-                      decoration: const InputDecoration(labelText: "Price")),
-                  TextField(
-                      controller: info,
-                      decoration:
-                          const InputDecoration(labelText: "Additional Info")),
+                  input(name, hint: "Name"),
 
-                  // avail room conditional
+                  // Image preview
+                  Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
+                      child: pic.text.isNotEmpty
+                          ? Image.network(pic.text, fit: BoxFit.cover)
+                          : Container(
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.home, size: 50),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextField(
+                    controller: pic,
+                    decoration: const InputDecoration(
+                      labelText: "Facility Image URL",
+                      hintText: "Auto-filled after upload",
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  ElevatedButton(
+                    onPressed: () async {
+                      final picker = ImagePicker();
+                      final picked = await picker.pickImage(source: ImageSource.gallery);
+                      if (picked != null) {
+                        final url = await uploadToCloudinary(picked, context: context);
+                        if (url != null) {
+                          setState(() => pic.text = url);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Facility image uploaded successfully")),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text("Update Facility Image"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A4423),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+                  input(price, hint: "Price"),
+                  input(info, hint: "Additional Info"),
+
                   TextField(
                     controller: availRoomController,
                     enabled: enableAvailRoom,
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: "Available Rooms",
-                      hintText: enableAvailRoom
-                          ? "Enter number"
-                          : "Only for shared & available",
-                    ),
+                    decoration: const InputDecoration(labelText: "Available Rooms"),
                   ),
 
                   CheckboxListTile(
                     title: const Text("AC"),
                     value: hasAc,
-                    onChanged: (v) =>
-                        setState(() => hasAc = v ?? false),
+                    onChanged: (v) => setState(() => hasAc = v ?? false),
                   ),
                   CheckboxListTile(
                     title: const Text("CR"),
                     value: hasCr,
-                    onChanged: (v) =>
-                        setState(() => hasCr = v ?? false),
+                    onChanged: (v) => setState(() => hasCr = v ?? false),
                   ),
                   CheckboxListTile(
                     title: const Text("Kitchen"),
                     value: hasKitchen,
-                    onChanged: (v) =>
-                        setState(() => hasKitchen = v ?? false),
+                    onChanged: (v) => setState(() => hasKitchen = v ?? false),
                   ),
 
                   DropdownButtonFormField<String>(
                     value: type,
                     hint: const Text("Select Room Type"),
                     items: ["Solo", "Shared"]
-                        .map((t) =>
-                            DropdownMenuItem(value: t, child: Text(t)))
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                         .toList(),
                     onChanged: (v) => setState(() => type = v),
                   ),
 
                   SwitchListTile(
-                    title: Text(
-                      availabilityBool ? "Available" : "Not Available",
-                      style: TextStyle(
-                        color:
-                            availabilityBool ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    title: Text(availabilityBool ? "Available" : "Not Available"),
                     value: availabilityBool,
-                    onChanged: (v) =>
-                        setState(() => availabilityBool = v),
+                    onChanged: (v) => setState(() => availabilityBool = v),
                   ),
                 ],
               ),
@@ -808,6 +801,7 @@ Future<void> openEditFacilityDialog(
                 onPressed: () async {
                   final updatedItem = {
                     "facility_id": item['facility_id'],
+                    "housing_id": item['housing_id'],
                     "name": name.text.trim(),
                     "facility_pic": pic.text.trim(),
                     "price": price.text.trim(),
@@ -815,20 +809,16 @@ Future<void> openEditFacilityDialog(
                     "has_cr": hasCr ? 1 : 0,
                     "has_kitchen": hasKitchen ? 1 : 0,
                     "type": type ?? "Solo",
-                    "additional_info": info.text.trim(),
                     "availability": availabilityBool ? 1 : 0,
-
-                    // send avail_room when valid
                     "avail_room": enableAvailRoom
-                        ? int.tryParse(
-                                availRoomController.text.trim()) ??
-                            0
+                        ? int.tryParse(availRoomController.text.trim()) ?? 0
                         : 0,
+                    "additional_info": info.text.trim(),
                   };
 
                   await updateFacilityItem(updatedItem);
-                  await reload();
                   Navigator.pop(context);
+                  await reload();
                 },
               ),
             ],
@@ -838,7 +828,6 @@ Future<void> openEditFacilityDialog(
     },
   );
 }
-
 
 // ===== Global Cards =====
 Widget menuCard(
@@ -924,19 +913,6 @@ Widget facilityCard(
   final bool isAvailable = item['availability'] == 1;
   final availabilityText = isAvailable ? "Available" : "Not Available";
 
-  Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-      Text("₱${item['price']} • ${item['type']}"),
-      Text("Rooms: ${item['avail_room'] ?? 0}"),
-      Text(
-        availabilityText,
-        style: TextStyle(color: isAvailable ? Colors.green : Colors.red),
-      ),
-    ],
-  );
-
   return Card(
     margin: const EdgeInsets.only(bottom: 12),
     child: ListTile(
@@ -960,7 +936,7 @@ Widget facilityCard(
               Text(
                 availabilityText,
                 style: TextStyle(
-                  color: isAvailable ? Colors.green : Colors.red, 
+                  color: isAvailable ? Colors.green : Colors.red,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -968,12 +944,17 @@ Widget facilityCard(
                 Padding(
                   padding: const EdgeInsets.only(left: 8.0),
                   child: Text(
-                    "Rooms: ${item['avail_room']}", 
+                    "Rooms: ${item['avail_room']}",
                     style: const TextStyle(color: Colors.black87),
                   ),
                 ),
             ],
           ),
+          const SizedBox(height: 4),
+          // ✅ Show has_ac, has_cr, has_kitchen
+          Text("Aircon: ${item['has_ac'] == 1 ? "Yes" : "No"}"),
+          Text("Comfort Room: ${item['has_cr'] == 1 ? "Yes" : "No"}"),
+          Text("Kitchen: ${item['has_kitchen'] == 1 ? "Yes" : "No"}"),
         ],
       ),
       trailing: Row(
