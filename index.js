@@ -1,4 +1,3 @@
-console.log("✅ Using unified yehey /api/admin/register route");
 // ===== Imports & Config =====
 const dotenv = require('dotenv');
 dotenv.config({ path: __dirname + '/.env' });
@@ -96,116 +95,192 @@ const sendBusinessVerificationEmail = async (email, ownerName, businessName, typ
 };
 
 // ===== REGISTER (All roles register under admin first) =====
-app.post('/api/admin/register', (req, res) => {
-  console.log('🔥 NEW REGISTER ENDPOINT HIT 🔥');
+app.post('/api/admin/register', async (req, res) => {
   const { name, email, password, role, phone_num, notif_preference } = req.body;
 
-  if (!role) {
-    return res.status(400).json({ success: false, message: 'Role is required' });
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required fields',
+    });
   }
 
-  db.query(
-    'SELECT admin_id FROM admin WHERE email = ?',
-    [email],
-    async (err, dup) => {
-      if (err) return res.status(500).json({ success: false, error: err.message });
-      if (dup.length > 0) {
-        return res.status(409).json({ success: false, message: 'Email already exists' });
-      }
+  const normalizedRole = role.toLowerCase();
+  const status = 'pending';
 
-      const normalizedRole = role.toLowerCase();
-      const status =
-        normalizedRole === 'user' ? 'pending_email' : 'pending_admin';
+  try {
+    const [dup] = await db.promise().query(
+      'SELECT admin_id FROM admin WHERE email = ?',
+      [email]
+    );
 
-      db.query(
-        `INSERT INTO admin 
-         (name, email, password, role, phone_num, notif_preference, status, is_verified, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW())`,
-        [name, email, password, normalizedRole, phone_num, notif_preference || 'email', status],
-        async (err2, result) => {
-          if (err2) {
-            return res.status(500).json({ success: false, error: err2.message });
-          }
-
-          // USER → self email verification
-          if (normalizedRole === 'user') {
-            const token = require('crypto').randomBytes(32).toString('hex');
-            const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-            db.query(
-              `UPDATE admin 
-               SET email_verification_token = ?, email_verification_expires = ?
-               WHERE admin_id = ?`,
-              [token, expires, result.insertId]
-            );
-
-            const link = `${process.env.FRONTEND_URL}/verify-email/${token}`;
-
-            await sgMail.send({
-              to: email,
-              from: process.env.EMAIL_FROM,
-              subject: 'Verify your Iskort account',
-              html: `<p>Hi ${name},</p>
-                     <p>Click <a href="${link}">here</a> to verify your account.</p>
-                     <p>This link expires in 24 hours.</p>`
-            });
-
-            console.log('REGISTER FLOW → email_verification');
-            return res.json({
-              success: true,
-              flow: 'email_verification'
-            });
-          }
-
-          // OWNER / ADMIN → admin approval
-          console.log('REGISTER FLOW → admin_approval');
-          return res.json({
-            success: true,
-            flow: 'admin_approval'
-          });
-        }
-      );
+    if (dup.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email already exists',
+      });
     }
-  );
+
+    const [result] = await db.promise().query(
+      `
+      INSERT INTO admin
+      (name, email, password, role, phone_num, notif_preference, status, is_verified, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW())
+      `,
+      [
+        name,
+        password, 
+        normalizedRole,
+        phone_num || null,
+        notif_preference || 'email',
+        status,
+      ]
+    );
+
+    // ================================
+    // USER → EMAIL VERIFICATION FLOW
+    // ================================
+    if (normalizedRole === 'user') {
+      const token = require('crypto').randomBytes(32).toString('hex');
+      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      await db.promise().query(
+        `
+        UPDATE admin
+        SET email_verification_token = ?, email_verification_expires = ?
+        WHERE admin_id = ?
+        `,
+        [token, expires, result.insertId]
+      );
+
+      const link = `https://iskort-public-web.onrender.com/api/admin/verify-email/${token}`;
+
+      try {
+        await sgMail.send({
+          to: email,
+          from: process.env.EMAIL_FROM,
+          subject: 'Verify your Iskort account',
+          html: `
+            <p>Hi ${name},</p>
+            <p>Click the link below to verify your account:</p>
+            <p><a href="${link}">${link}</a></p>
+            <p>This link expires in 24 hours.</p>
+          `,
+        });
+
+        console.log('REGISTER FLOW → email_verification');
+
+        return res.json({
+          success: true,
+          flow: 'email_verification',
+          token: token,
+        });
+      } catch (mailErr) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to send verification email',
+        });
+      }
+    }
+
+    // =================================
+    // OWNER / ADMIN → ADMIN APPROVAL
+    // =================================
+    console.log('REGISTER FLOW → admin_approval');
+
+    return res.json({
+      success: true,
+      flow: 'admin_approval',
+    });
+  } catch (err) {
+    console.error('REGISTER ERROR:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-// Email token for users
+
+
+// ===== VERIFY EMAIL (User self-verification) =====
 app.get('/api/admin/verify-email/:token', (req, res) => {
   const { token } = req.params;
 
+  // 🔍 DEBUG LOG (ADD THIS)
+  console.log('VERIFY TOKEN:', token);
+
+  if (!token) {
+    return res.status(400).json({
+      success: false,
+      message: 'Verification token missing',
+    });
+  }
+
   db.query(
-    `SELECT * FROM admin 
-     WHERE email_verification_token = ?
-     AND email_verification_expires > NOW()
-     AND role = 'user'`,
+    `
+    SELECT * FROM admin
+    WHERE email_verification_token = ?
+      AND email_verification_expires > NOW()
+      AND role = 'user'
+    `,
     [token],
     (err, results) => {
-      if (err) return res.status(500).send('Server error');
-      if (results.length === 0) {
-        return res.status(400).send('Invalid or expired verification link.');
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: 'Server error',
+        });
       }
 
-      const u = results[0];
+      if (results.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired verification link.',
+        });
+      }
+
+      const user = results[0];
 
       db.query(
-        `UPDATE admin 
-         SET is_verified = 1,
-             status = 'verified',
-             email_verification_token = NULL,
-             email_verification_expires = NULL
-         WHERE admin_id = ?`,
-        [u.admin_id],
+        `
+        UPDATE admin
+        SET is_verified = 1,
+            status = 'verified',
+            email_verification_token = NULL,
+            email_verification_expires = NULL
+        WHERE admin_id = ?
+        `,
+        [user.admin_id],
         (err2) => {
-          if (err2) return res.status(500).send('Verification failed');
+          if (err2) {
+            return res.status(500).json({
+              success: false,
+              message: 'Verification failed',
+            });
+          }
 
           db.query(
-            `INSERT INTO user
-             (name, email, password, role, status, is_verified, notif_preference, created_at)
-             VALUES (?, ?, ?, 'user', 'verified', 1, ?, NOW())`,
-            [u.name, u.email, u.password, u.notif_preference],
+            `
+            INSERT INTO user
+            (name, email, password, role, status, is_verified, notif_preference, created_at)
+            VALUES (?, ?, ?, 'user', 'verified', 1, ?, NOW())
+            `,
+            [
+              user.name,
+              user.email,
+              user.password,
+              user.notif_preference,
+            ],
             (err3) => {
-              if (err3) return res.status(500).send('User creation failed');
-              res.send('Email verified. You may now log in.');
+              if (err3) {
+                return res.status(500).json({
+                  success: false,
+                  message: 'User creation failed',
+                });
+              }
+
+              return res.json({
+                success: true,
+                message: 'Email verified. You may now log in.',
+              });
             }
           );
         }
@@ -215,36 +290,84 @@ app.get('/api/admin/verify-email/:token', (req, res) => {
 });
 
 
-app.post('/api/admin/send-verification', (req, res) => {
+// ===== RESEND EMAIL VERIFICATION =====
+app.post('/api/admin/send-verification', async (req, res) => {
   const { email } = req.body;
 
-  db.query('SELECT * FROM admin WHERE email=? AND role="user"', [email], (err, results) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (results.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email is required',
+    });
+  }
 
-    const user = results[0];
-    const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    db.query(
-      `UPDATE admin SET email_verification_token=?, email_verification_expires=? WHERE admin_id=?`,
-      [token, expires, user.admin_id],
-      async (err2) => {
-        if (err2) return res.status(500).json({ success: false, error: err2.message });
-
-        const link = `${process.env.FRONTEND_URL}/verify-email/${token}`;
-
-        await sendEmail({
-          to: email,
-          subject: 'Verify your Iskort account',
-          html: `<p>Hi ${user.name},</p>
-                 <p>Click <a href="${link}">this link</a> to verify your account. It expires in 24 hours.</p>`
-        });
-
-        res.json({ success: true, message: 'Verification email sent' });
-      }
+  try {
+    const [users] = await db.promise().query(
+      `
+      SELECT * FROM admin
+      WHERE email = ?
+        AND role = 'user'
+      `,
+      [email]
     );
-  });
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const user = users[0];
+
+    if (user.is_verified === 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account is already verified',
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await db.promise().query(
+      `
+      UPDATE admin
+      SET email_verification_token = ?,
+          email_verification_expires = ?
+      WHERE admin_id = ?
+      `,
+      [token, expires, user.admin_id]
+    );
+
+    const link = `https://iskort-public-web.onrender.com/api/admin/verify-email/${token}`;
+
+    await sgMail.send({
+      to: email,
+      from: process.env.EMAIL_FROM,
+      subject: 'Verify your Iskort account',
+      html: `
+        <p>Hi ${user.name},</p>
+        <p>Click the link below to verify your account:</p>
+        <p><a href="${link}">${link}</a></p>
+        <p>This link expires in 24 hours.</p>
+      `,
+    });
+
+    console.log('VERIFICATION EMAIL SENT →', email);
+
+    return res.json({
+      success: true,
+      message: 'Verification email sent',
+      token: token, // optional (useful for mobile deep-linking)
+    });
+  } catch (err) {
+    console.error('SEND VERIFICATION ERROR:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send verification email',
+    });
+  }
 });
 
 // ===== Admin: Get all users for dashboard (no action buttons for user) =====
@@ -516,7 +639,6 @@ app.put('/api/eatery/:eatery_id', (req, res) => {
 
       values.push(eatery_id);
 
-      // 3. Perform update
       db.query(
         `UPDATE eatery SET ${fields.join(", ")} WHERE eatery_id = ?`,
         values,
@@ -557,7 +679,7 @@ app.put('/api/admin/verify/eatery/:id', (req, res) => {
       const notifPref = eatery.notif_preference;
       const businessName = eatery.name;
 
-      // 🔹 Email function scoped inside the route
+      // Email function scoped inside the route
       const sendEateryVerificationEmail = async () => {
         const msg = {
           to: ownerEmail,
@@ -571,7 +693,7 @@ app.put('/api/admin/verify/eatery/:id', (req, res) => {
         catch (err) { console.error('Error sending eatery verification email:', err); }
       };
 
-      // 🔹 SMS function scoped inside the route
+      // SMS function scoped inside the route
       const sendEateryVerificationSMS = async () => {
         if (!ownerPhone) return;
         const message = `Hi ${ownerName}, your eatery "${businessName}" has been verified. Edit details in Profile → Edit Business.`;
@@ -585,7 +707,7 @@ app.put('/api/admin/verify/eatery/:id', (req, res) => {
         }
       };
 
-      // 🔹 Send based on preference
+      // Send based on preference
       if (notifPref === 'sms') {
         await sendEateryVerificationSMS();
       } else if (notifPref === 'email') {
@@ -621,7 +743,7 @@ app.delete('/api/admin/reject/eatery/:id', (req, res) => {
     const notifPref = eatery.notif_preference;
     const businessName = eatery.name;
 
-    // 🔹 Email function scoped inside
+    // Email function scoped inside
     const sendEateryRejectionEmail = async () => {
       const msg = {
         to: ownerEmail,
@@ -635,7 +757,7 @@ app.delete('/api/admin/reject/eatery/:id', (req, res) => {
       catch (err) { console.error('Error sending eatery rejection email:', err); }
     };
 
-    // 🔹 SMS function scoped inside
+    // SMS function scoped inside
     const sendEateryRejectionSMS = async () => {
       if (!ownerPhone) return;
       const message = `Hi ${ownerName}, your eatery "${businessName}" was rejected by admin.`;
@@ -649,7 +771,7 @@ app.delete('/api/admin/reject/eatery/:id', (req, res) => {
       }
     };
 
-    // 🔹 Send based on preference
+    // Send based on preference
     if (notifPref === 'sms') {
       await sendEateryRejectionSMS();
     } else if (notifPref === 'email') {
@@ -695,7 +817,7 @@ app.post('/api/housing', (req, res) => {
   });
 });
 
-// 🔹 UPDATED GET HOUSINGS WITH OWNER INFO
+// UPDATED GET HOUSINGS WITH OWNER INFO
 app.get('/api/housing', (req, res) => {
   const sql = `
     SELECT h.*, o.name AS owner_name, o.email AS owner_email, o.phone_num AS owner_phone
@@ -1259,17 +1381,33 @@ app.get('/api/owner/:id', (req, res) => {
   });
 });
 
+// Add an eatery review
 app.post('/api/eatery_reviews', (req, res) => {
   const { user_id, eatery_id, rating, comment } = req.body;
-  const sql = `INSERT INTO eatery_reviews (user_id, eatery_id, rating, comment, created_at)
-               VALUES (?, ?, ?, ?, NOW())`;
+  const sql = `
+    INSERT INTO eatery_reviews (user_id, eatery_id, rating, comment, created_at)
+    VALUES (?, ?, ?, ?, NOW())
+  `;
   db.query(sql, [user_id, eatery_id, rating, comment], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
     res.json({ success: true, review_id: result.insertId });
   });
 });
 
-// Getting reviews from user
+// Add a housing review
+app.post('/api/housing_reviews', (req, res) => {
+  const { user_id, housing_id, rating, comment } = req.body;
+  const sql = `
+    INSERT INTO housing_reviews (user_id, housing_id, rating, comment, created_at)
+    VALUES (?, ?, ?, ?, NOW())
+  `;
+  db.query(sql, [user_id, housing_id, rating, comment], (err, result) => {
+    if (err) return res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, review_id: result.insertId });
+  });
+});
+
+// Get all reviews by a user
 app.get('/api/user/:id/reviews', (req, res) => {
   const { id } = req.params;
   const sql = `
@@ -1292,27 +1430,38 @@ app.get('/api/user/:id/reviews', (req, res) => {
   });
 });
 
-// Eatery reviews
-app.post('/api/eatery_reviews', (req, res) => {
-  const { user_id, eatery_id, rating, comment } = req.body;
-  const sql = `INSERT INTO eatery_reviews (user_id, eatery_id, rating, comment, created_at)
-               VALUES (?, ?, ?, ?, NOW())`;
-  db.query(sql, [user_id, eatery_id, rating, comment], (err, result) => {
+// Get all reviews for a specific eatery
+app.get('/api/eatery_reviews/:eateryId', (req, res) => {
+  const { eateryId } = req.params;
+  const sql = `
+    SELECT er.*, u.name
+    FROM eatery_reviews er
+    JOIN user u ON er.user_id = u.user_id
+    WHERE er.eatery_id = ?
+    ORDER BY er.created_at DESC
+  `;
+  db.query(sql, [eateryId], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, review_id: result.insertId });
+    res.json({ success: true, reviews: result });
   });
 });
 
-// Housing review
-app.post('/api/housing_reviews', (req, res) => {
-  const { user_id, housing_id, rating, comment } = req.body;
-  const sql = `INSERT INTO housing_reviews (user_id, housing_id, rating, comment, created_at)
-               VALUES (?, ?, ?, ?, NOW())`;
-  db.query(sql, [user_id, housing_id, rating, comment], (err, result) => {
+// Get all reviews for a specific housing
+app.get('/api/housing_reviews/:housingId', (req, res) => {
+  const { housingId } = req.params;
+  const sql = `
+    SELECT hr.*, u.name
+    FROM housing_reviews hr
+    JOIN user u ON hr.user_id = u.user_id
+    WHERE hr.housing_id = ?
+    ORDER BY hr.created_at DESC
+  `;
+  db.query(sql, [housingId], (err, result) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, review_id: result.insertId });
+    res.json({ success: true, reviews: result });
   });
 });
+
 
 // Edit an eatery review
 app.put('/api/eatery_reviews/:id', (req, res) => {
@@ -1382,38 +1531,6 @@ app.delete('/api/housing_reviews/:id', (req, res) => {
   });
 });
 
-// Get all reviews for an establishment
-app.get('/api/eatery_reviews/:eateryId', (req, res) => {
-  const { eateryId } = req.params;
-  const sql = `
-    SELECT er.*, u.username 
-    FROM eatery_reviews er 
-    JOIN users u ON er.user_id = u.user_id 
-    WHERE er.eatery_id = ? 
-    ORDER BY er.created_at DESC
-  `;
-  
-  db.query(sql, [eateryId], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, reviews: result });
-  });
-});
-
-app.get('/api/housing_reviews/:housingId', (req, res) => {
-  const { housingId } = req.params;
-  const sql = `
-    SELECT hr.*, u.username 
-    FROM housing_reviews hr 
-    JOIN users u ON hr.user_id = u.user_id 
-    WHERE hr.housing_id = ? 
-    ORDER BY hr.created_at DESC
-  `;
-  
-  db.query(sql, [housingId], (err, result) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    res.json({ success: true, reviews: result });
-  });
-});
 
 // ===== Test Email =====
 app.get('/api/test-email', async (req, res) => {
